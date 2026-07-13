@@ -25,6 +25,14 @@ const WIN_VALUE = 2048;
 /** En yüksek skorun localStorage anahtarı. */
 const BEST_SCORE_KEY = 'game2048.bestScore';
 
+/** Geri al için saklanan tek adımlık oyun durumu. */
+interface GameSnapshot {
+  tiles: Tile[];
+  score: number;
+  status: GameStatus;
+  keepPlayingAfterWin: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class GameService {
   /** Taşlara benzersiz id vermek için artan sayaç. */
@@ -46,6 +54,12 @@ export class GameService {
 
   /** Oyunun anlık durumu. */
   readonly status = signal<GameStatus>(GameStatus.Idle);
+
+  /** Son hamleden ÖNCEKİ durum (tek adımlık geçmiş). */
+  private readonly history = signal<GameSnapshot | null>(null);
+
+  /** Geri alınabilecek bir hamle var mı? */
+  readonly canUndo = computed<boolean>(() => this.history() !== null);
 
   // --- Türetilmiş sinyaller -----------------------------------
 
@@ -77,6 +91,7 @@ export class GameService {
     this.tiles.set([]);
     this.score.set(0);
     this.keepPlayingAfterWin = false;
+    this.history.set(null); // geçmişi de sıfırla
     this.status.set(GameStatus.Playing);
     this.spawnRandomTile();
     this.spawnRandomTile();
@@ -87,7 +102,36 @@ export class GameService {
     this.tiles.set([]);
     this.score.set(0);
     this.keepPlayingAfterWin = false;
+    this.history.set(null);
     this.status.set(GameStatus.Idle);
+  }
+
+  /**
+   * Son hamleyi geri alır (tek adım).
+   * Oyun bittiyse (Won/Lost) de çalışır — kaybettiren hamle geri alınabilir.
+   * En yüksek skor GERİ ALINMAZ (o bir rekor kaydı).
+   * @returns geri alma yapıldıysa true.
+   */
+  undo(): boolean {
+    const snapshot = this.history();
+    if (!snapshot) return false;
+
+    // Animasyon bayraklarını temizleyerek geri yükle (pop/bump tekrar oynamasın)
+    this.tiles.set(
+      snapshot.tiles.map((t) => ({
+        id: t.id,
+        value: t.value,
+        row: t.row,
+        col: t.col,
+      })),
+    );
+    this.score.set(snapshot.score);
+    this.keepPlayingAfterWin = snapshot.keepPlayingAfterWin;
+    this.status.set(snapshot.status);
+
+    // Tek adımlık geçmiş: geri aldıktan sonra tekrar geri alınamaz
+    this.history.set(null);
+    return true;
   }
 
   /** Kazandıktan sonra "Devam Et": oyuna geri dön, kazanmayı bir daha tetikleme. */
@@ -108,6 +152,15 @@ export class GameService {
 
     const result = applyMove(this.tiles(), direction);
     if (!result.moved) return false;
+
+    // Geçerli hamle → hamle ÖNCESİ durumu sakla (geri al için).
+    // applyMove saf olduğundan this.tiles() hâlâ hamle öncesi listedir.
+    this.history.set({
+      tiles: this.tiles(),
+      score: this.score(),
+      status: this.status(),
+      keepPlayingAfterWin: this.keepPlayingAfterWin,
+    });
 
     // Yeni durum (birleşenlerde `merged` işaretli; `isNew` temizlenmiş olur)
     this.tiles.set(result.tiles);

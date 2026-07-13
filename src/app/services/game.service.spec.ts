@@ -346,3 +346,136 @@ describe('GameService — kazanma / kaybetme', () => {
     expect(service.tiles().length).toBe(2);
   });
 });
+
+describe('GameService — geri al (undo) ve yeni oyun', () => {
+  let service: GameService;
+
+  beforeEach(() => {
+    // bestScore localStorage'dan yüklendiği için testler arası sızıntıyı önle
+    localStorage.clear();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(GameService);
+  });
+
+  /** Karşılaştırma için tahtayı "değer@satır,sütun" listesine çevirir. */
+  function snapshot(s: GameService): string {
+    return s
+      .tiles()
+      .map((t) => `${t.value}@${t.row},${t.col}`)
+      .sort()
+      .join(' | ');
+  }
+
+  it('başlangıçta geri alınacak hamle yok', () => {
+    expect(service.canUndo()).toBe(false);
+    expect(service.undo()).toBe(false);
+  });
+
+  it('geri al, son hamleyi tam olarak geri alır (tahta + skor)', () => {
+    service.status.set(GameStatus.Playing);
+    service.tiles.set([
+      { id: 1, value: 2, row: 0, col: 0 },
+      { id: 2, value: 2, row: 0, col: 1 },
+      { id: 3, value: 8, row: 3, col: 3 },
+    ]);
+    const before = snapshot(service);
+    const scoreBefore = service.score();
+
+    service.move(Direction.Left); // birleşir (+4) ve yeni kare gelir
+    expect(service.score()).toBe(4);
+    expect(snapshot(service)).not.toBe(before);
+    expect(service.canUndo()).toBe(true);
+
+    const undone = service.undo();
+
+    expect(undone).toBe(true);
+    expect(snapshot(service)).toBe(before); // tahta aynen geri geldi
+    expect(service.score()).toBe(scoreBefore); // skor da geri alındı
+  });
+
+  it('geri al yalnızca TEK adım (iki kez geri alınamaz)', () => {
+    service.status.set(GameStatus.Playing);
+    service.tiles.set([
+      { id: 1, value: 2, row: 0, col: 0 },
+      { id: 2, value: 2, row: 0, col: 1 },
+    ]);
+    service.move(Direction.Left);
+
+    expect(service.undo()).toBe(true);
+    expect(service.canUndo()).toBe(false);
+    expect(service.undo()).toBe(false); // ikinci geri alma yok
+  });
+
+  it('geçersiz hamle geçmişe yazılmaz', () => {
+    service.status.set(GameStatus.Playing);
+    service.tiles.set([{ id: 1, value: 2, row: 0, col: 0 }]);
+
+    service.move(Direction.Left); // geçersiz (zaten sola dayalı)
+
+    expect(service.canUndo()).toBe(false);
+  });
+
+  it('kaybettiren hamle geri alınabilir (oyun devam eder)', () => {
+    service.status.set(GameStatus.Playing);
+    service.tiles.set([
+      { id: 1, value: 2, row: 0, col: 0 },
+      { id: 2, value: 4, row: 0, col: 1 },
+      { id: 3, value: 16, row: 0, col: 2 },
+      { id: 4, value: 8, row: 0, col: 3 },
+      { id: 5, value: 4, row: 1, col: 0 },
+      { id: 6, value: 16, row: 1, col: 1 },
+      { id: 7, value: 8, row: 1, col: 2 },
+      { id: 8, value: 2, row: 1, col: 3 },
+      { id: 9, value: 16, row: 2, col: 0 },
+      { id: 10, value: 8, row: 2, col: 1 },
+      { id: 11, value: 2, row: 2, col: 2 },
+      { id: 12, value: 32, row: 2, col: 3 },
+      // (3,0) boş — sola hamle boşluğu (3,3)'e taşır, spawn kilitler
+      { id: 13, value: 4, row: 3, col: 1 },
+      { id: 14, value: 32, row: 3, col: 2 },
+      { id: 15, value: 16, row: 3, col: 3 },
+    ]);
+    const before = snapshot(service);
+
+    service.move(Direction.Left);
+    expect(service.status()).toBe(GameStatus.Lost);
+
+    service.undo();
+
+    expect(service.status()).toBe(GameStatus.Playing); // oyun geri döndü
+    expect(snapshot(service)).toBe(before);
+  });
+
+  it('en yüksek skor geri ALINMAZ (rekor kaydı)', () => {
+    service.status.set(GameStatus.Playing);
+    service.tiles.set([
+      { id: 1, value: 2, row: 0, col: 0 },
+      { id: 2, value: 2, row: 0, col: 1 },
+    ]);
+    service.move(Direction.Left); // best = 4
+    expect(service.bestScore()).toBe(4);
+
+    service.undo();
+
+    expect(service.score()).toBe(0); // anlık skor geri alındı
+    expect(service.bestScore()).toBe(4); // rekor korundu
+  });
+
+  it('yeni oyun geçmişi de sıfırlar', () => {
+    service.status.set(GameStatus.Playing);
+    service.tiles.set([
+      { id: 1, value: 2, row: 0, col: 0 },
+      { id: 2, value: 2, row: 0, col: 1 },
+    ]);
+    service.move(Direction.Left);
+    expect(service.canUndo()).toBe(true);
+
+    service.startGame();
+
+    expect(service.canUndo()).toBe(false); // geçmiş temizlendi
+    expect(service.score()).toBe(0);
+    expect(service.tiles().length).toBe(2);
+    expect(service.status()).toBe(GameStatus.Playing);
+  });
+});

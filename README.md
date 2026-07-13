@@ -75,3 +75,4 @@ ng test
 - [x] Skor + en yüksek skor kalıcılığı (localStorage)
 - [x] Kazandın / kaybettin ekranları (overlay + "Devam Et")
 - [x] Animasyonlar: kayma + pop-in + bump (`prefers-reduced-motion` destekli)
+- [x] Geri al (tek adım) + yeni oyun

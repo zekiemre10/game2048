@@ -27,6 +27,7 @@ export class App {
   protected readonly status = this.game.status;
   protected readonly score = this.game.score;
   protected readonly bestScore = this.game.bestScore;
+  protected readonly canUndo = this.game.canUndo;
   protected readonly GameStatus = GameStatus;
 
   /** Dokunmatik kaydırmanın başlangıç noktası. */
@@ -81,5 +82,10 @@ export class App {
   /** Kazandıktan sonra oyuna devam et. */
   onContinue(): void {
     this.game.continueAfterWin();
+  }
+
+  /** Son hamleyi geri al. */
+  onUndo(): void {
+    this.game.undo();
   }
 }

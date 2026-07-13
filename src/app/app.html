@@ -36,6 +36,11 @@
                 <button class="btn-primary" type="button" (click)="onContinue()">
                   Devam Et
                 </button>
+              } @else if (canUndo()) {
+                <!-- Kaybettiren hamleyi geri al -->
+                <button class="btn-primary" type="button" (click)="onUndo()">
+                  ↶ Geri Al
+                </button>
               }
               <button
                 class="btn-primary ghost"
@@ -50,8 +55,18 @@
       }
     </div>
 
-    <button class="btn-primary restart-btn" type="button" (click)="onRestart()">
-      Yeni Oyun
-    </button>
+    <div class="controls">
+      <button
+        class="btn-primary ghost"
+        type="button"
+        [disabled]="!canUndo()"
+        (click)="onUndo()"
+      >
+        ↶ Geri Al
+      </button>
+      <button class="btn-primary" type="button" (click)="onRestart()">
+        Yeni Oyun
+      </button>
+    </div>
   </main>
 }

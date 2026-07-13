@@ -41,3 +41,9 @@ $font-family: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif;
 // --- Gölge / geçiş ---
 $shadow-soft: 0 4px 14px rgba(119, 110, 101, 0.18);
 $transition-fast: 100ms ease-in-out;
+
+// --- Animasyon süreleri ---
+// Kısa tutuluyor: oyun akıcı kalsın, hızlı ard arda hamleler tıkanmasın.
+$slide-duration: 110ms; // karenin yeni konumuna kayması
+$pop-duration: 160ms; // yeni karenin belirmesi
+$bump-duration: 160ms; // birleşen karenin "zıplaması"

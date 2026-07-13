@@ -4,6 +4,10 @@
 // Host = tek bir kare. Izgara zemininin üstünde mutlak konumlanır ve
 // satır/sütuna göre transform: translate ile yerleşir.
 // --row / --col değerleri bileşen tarafından host'a yazılır.
+//
+// KAYMA ANİMASYONU: kare id'leri hamleler arasında korunduğu için
+// (@for track tile.id) DOM elemanı aynı kalır; --row/--col değişince
+// transform yeniden hesaplanır ve transition sayesinde kare KAYAR.
 :host {
   position: absolute;
   top: 0;
@@ -15,8 +19,8 @@
     calc(var(--col, 0) * (100% + #{v.$gap})),
     calc(var(--row, 0) * (100% + #{v.$gap}))
   );
-  // Hamle animasyonları için hazır (sonraki adımda kullanılacak)
-  transition: transform 120ms ease-in-out;
+  transition: transform v.$slide-duration ease-in-out;
+  // Yalnızca transform animasyonu → compositor'da çalışır, layout tetiklemez
   will-change: transform;
 }
 
@@ -33,23 +37,47 @@
   box-shadow: v.$shadow-soft;
 }
 
-// Yeni beliren kare için küçük "pop" animasyonu
+// --- Yeni kare: "pop-in" -------------------------------------
+// Kayma bitince belirsin diye kayma süresi kadar gecikmeli başlar.
 .is-new {
-  animation: tile-pop 140ms ease-in-out;
+  animation: tile-pop v.$pop-duration ease-in-out v.$slide-duration backwards;
 }
 
 @keyframes tile-pop {
   0% {
     transform: scale(0);
   }
+  70% {
+    transform: scale(1.12);
+  }
   100% {
     transform: scale(1);
   }
 }
 
-// Değere göre renk ve font boyutu — _variables.scss'teki paletten üretilir
+// --- Birleşen kare: "bump" -----------------------------------
+// Kayma bitince zıplasın diye kayma süresi kadar gecikmeli başlar.
+.is-merged {
+  animation: tile-bump v.$bump-duration ease-in-out v.$slide-duration;
+}
+
+@keyframes tile-bump {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+// Değere göre renk ve font boyutu — _variables.scss'teki paletten üretilir.
+// Sınıf yerine attribute selector: [class] bağlaması, bileşenin imperatif
+// eklediği .is-merged sınıfını ezmesin diye.
 @each $val, $color in v.$tile-colors {
-  .tile-#{$val} {
+  .tile[data-value='#{$val}'] {
     background: $color;
     @if $val >= 8 {
       color: v.$color-text-light;
@@ -60,5 +88,19 @@
     @if $val >= 1024 {
       font-size: 1.35rem; // 4 haneli
     }
+  }
+}
+
+// --- Erişilebilirlik: hareket azaltma ------------------------
+// Kullanıcı sistem ayarında "hareketi azalt" seçtiyse animasyonları kapat.
+// Oyun aynen oynanır, kareler anında yerine oturur.
+@media (prefers-reduced-motion: reduce) {
+  :host {
+    transition: none;
+  }
+
+  .is-new,
+  .is-merged {
+    animation: none;
   }
 }

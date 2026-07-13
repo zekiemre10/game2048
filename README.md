@@ -74,4 +74,4 @@ ng test
 - [x] Oyun sonu tespiti + giriş kilidi
 - [x] Skor + en yüksek skor kalıcılığı (localStorage)
 - [x] Kazandın / kaybettin ekranları (overlay + "Devam Et")
-- [ ] Kayma animasyonları
+- [x] Animasyonlar: kayma + pop-in + bump (`prefers-reduced-motion` destekli)

@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { GameService } from './game.service';
-import { BOARD_SIZE, GameStatus } from '../models/tile.model';
+import { BOARD_SIZE, Direction, GameStatus } from '../models/tile.model';
 
 describe('GameService', () => {
   let service: GameService;
@@ -55,5 +55,40 @@ describe('GameService', () => {
       }
     }
     expect(occupied).toBe(2);
+  });
+
+  it('geçerli hamle: skoru artırır ve yeni kare ekler', () => {
+    service.status.set(GameStatus.Playing);
+    service.tiles.set([
+      { id: 1, value: 2, row: 0, col: 0 },
+      { id: 2, value: 2, row: 0, col: 1 },
+    ]);
+
+    const moved = service.move(Direction.Left);
+
+    expect(moved).toBe(true);
+    expect(service.score()).toBe(4);
+    // birleşme sonrası 1 kare kalır + 1 yeni spawn = 2
+    expect(service.tiles().length).toBe(2);
+  });
+
+  it('geçersiz hamle: yeni kare üretmez, skor değişmez', () => {
+    service.status.set(GameStatus.Playing);
+    service.tiles.set([{ id: 1, value: 2, row: 0, col: 0 }]);
+
+    const moved = service.move(Direction.Left);
+
+    expect(moved).toBe(false);
+    expect(service.tiles().length).toBe(1);
+    expect(service.score()).toBe(0);
+  });
+
+  it('oyun oynanmıyorken hamle yok sayılır', () => {
+    service.reset(); // Idle
+    service.tiles.set([
+      { id: 1, value: 2, row: 0, col: 0 },
+      { id: 2, value: 2, row: 0, col: 1 },
+    ]);
+    expect(service.move(Direction.Left)).toBe(false);
   });
 });

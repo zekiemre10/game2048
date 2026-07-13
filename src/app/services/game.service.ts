@@ -1,5 +1,13 @@
 import { Injectable, computed, signal } from '@angular/core';
-import { BOARD_SIZE, Cell, Grid, GameStatus, Tile } from '../models/tile.model';
+import {
+  BOARD_SIZE,
+  Cell,
+  Direction,
+  Grid,
+  GameStatus,
+  Tile,
+} from '../models/tile.model';
+import { applyMove } from '../logic/board-logic';
 
 // ============================================================
 //  2048 — Oyun servisi
@@ -70,6 +78,31 @@ export class GameService {
     this.tiles.set([]);
     this.score.set(0);
     this.status.set(GameStatus.Idle);
+  }
+
+  /**
+   * Verilen yöne hamle yapar.
+   * - Izgara değişmediyse (geçersiz hamle) hiçbir şey yapmaz, yeni kare üretmez.
+   * - Değiştiyse: skoru günceller ve yeni bir rastgele kare ekler.
+   * @returns hamle geçerli olduysa true.
+   */
+  move(direction: Direction): boolean {
+    if (this.status() !== GameStatus.Playing) return false;
+
+    const result = applyMove(this.tiles(), direction);
+    if (!result.moved) return false;
+
+    // Yeni durum (birleşenlerde `merged` işaretli; `isNew` temizlenmiş olur)
+    this.tiles.set(result.tiles);
+
+    if (result.gained > 0) {
+      this.score.update((s) => s + result.gained);
+      this.bestScore.update((b) => Math.max(b, this.score()));
+    }
+
+    // Her geçerli hamleden sonra yeni bir kare
+    this.spawnRandomTile();
+    return true;
   }
 
   // --- Yardımcılar --------------------------------------------

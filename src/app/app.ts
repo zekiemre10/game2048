@@ -1,8 +1,16 @@
-import { Component, inject } from '@angular/core';
+import { Component, HostListener, inject } from '@angular/core';
 import { StartScreen } from './components/start-screen/start-screen';
 import { BoardComponent } from './components/board/board';
 import { GameService } from './services/game.service';
-import { GameStatus } from './models/tile.model';
+import { Direction, GameStatus } from './models/tile.model';
+
+/** Ok tuşu → yön eşlemesi. */
+const KEY_TO_DIRECTION: Record<string, Direction> = {
+  ArrowLeft: Direction.Left,
+  ArrowRight: Direction.Right,
+  ArrowUp: Direction.Up,
+  ArrowDown: Direction.Down,
+};
 
 @Component({
   selector: 'app-root',
@@ -18,6 +26,16 @@ export class App {
   protected readonly status = this.game.status;
   protected readonly score = this.game.score;
   protected readonly GameStatus = GameStatus;
+
+  /** Ok tuşlarıyla hamle (dokunmatik kontroller sonraki adımda). */
+  @HostListener('window:keydown', ['$event'])
+  onKeydown(event: KeyboardEvent): void {
+    if (this.status() !== GameStatus.Playing) return;
+    const direction = KEY_TO_DIRECTION[event.key];
+    if (!direction) return;
+    event.preventDefault();
+    this.game.move(direction);
+  }
 
   /** Yeni oyun / yeniden başlat. */
   onRestart(): void {

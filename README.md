@@ -64,7 +64,8 @@ ng test
 - [x] Başlık / açılış ekranı
 - [x] Izgara veri modeli + signal state (2 başlangıç karesi)
 - [x] 4×4 tahta görünümü
-- [ ] Hamle ve birleştirme mantığı
-- [ ] Skor + en yüksek skor (localStorage)
+- [x] Hamle ve birleştirme mantığı (saf, test edilebilir)
+- [x] Ok tuşu kontrolleri (temel)
+- [ ] En yüksek skor kalıcılığı (localStorage)
 - [ ] Kazandın / kaybettin ekranları
-- [ ] Klavye ve dokunmatik (swipe) kontrolleri
+- [ ] Dokunmatik (swipe) kontrolleri + kayma animasyonları

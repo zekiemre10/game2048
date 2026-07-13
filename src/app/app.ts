@@ -1,12 +1,13 @@
 import { Component, inject } from '@angular/core';
 import { StartScreen } from './components/start-screen/start-screen';
+import { BoardComponent } from './components/board/board';
 import { GameService } from './services/game.service';
 import { GameStatus } from './models/tile.model';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [StartScreen],
+  imports: [StartScreen, BoardComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
@@ -15,7 +16,6 @@ export class App {
 
   /** Şablonda kullanmak için durumları dışa aç. */
   protected readonly status = this.game.status;
-  protected readonly grid = this.game.grid;
   protected readonly score = this.game.score;
   protected readonly GameStatus = GameStatus;
 

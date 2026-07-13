@@ -1,4 +1,3 @@
-@use 'sass:map';
 @use '../styles/variables' as v;
 
 .game {
@@ -38,53 +37,6 @@
 
   strong {
     font-size: 1.5rem;
-  }
-}
-
-.board {
-  background: v.$color-board;
-  border-radius: v.$radius-lg;
-  padding: v.$gap;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: v.$gap;
-  aspect-ratio: 1 / 1;
-}
-
-.cell {
-  background: v.$color-cell-empty;
-  border-radius: v.$radius-md;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.tile {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: v.$radius-md;
-  font-weight: 800;
-  font-size: 2.2rem;
-  color: v.$color-text-dark;
-  box-shadow: v.$shadow-soft;
-}
-
-// Değere göre taş renkleri — _variables.scss'teki paletten üretilir
-@each $val, $color in v.$tile-colors {
-  .tile-#{$val} {
-    background: $color;
-    @if $val >= 8 {
-      color: v.$color-text-light;
-    }
-    @if $val >= 128 {
-      font-size: 1.8rem; // 3+ haneli sayılar için küçült
-    }
-    @if $val >= 1024 {
-      font-size: 1.4rem;
-    }
   }
 }
 

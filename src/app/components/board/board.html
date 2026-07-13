@@ -1,0 +1,15 @@
+<div class="board">
+  <!-- Izgara zemini: 4×4 boş hücreler -->
+  <div class="grid-bg">
+    @for (cell of backgroundCells; track $index) {
+      <div class="cell-bg"></div>
+    }
+  </div>
+
+  <!-- Kareler: signal'den okunur, kimliğe göre takip edilir -->
+  <div class="tiles-layer">
+    @for (tile of tiles(); track tile.id) {
+      <app-tile [tile]="tile" />
+    }
+  </div>
+</div>

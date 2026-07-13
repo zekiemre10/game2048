@@ -1,0 +1,33 @@
+@use '../../../styles/variables' as v;
+
+.board {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: v.$color-board;
+  border-radius: v.$radius-lg;
+  padding: v.$gap;
+  box-sizing: border-box;
+}
+
+// Zemin: 4×4 boş hücre ızgarası
+.grid-bg {
+  position: absolute;
+  inset: v.$gap;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: v.$gap;
+}
+
+.cell-bg {
+  background: v.$color-cell-empty;
+  border-radius: v.$radius-md;
+}
+
+// Karelerin konumlandığı katman (zeminle aynı alanı kaplar).
+// Kareler bu katmanın içinde mutlak konumlanır (bkz. tile.scss).
+.tiles-layer {
+  position: absolute;
+  inset: v.$gap;
+}

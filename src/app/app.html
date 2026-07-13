@@ -10,17 +10,7 @@
       </div>
     </header>
 
-    <div class="board">
-      @for (row of grid(); track $index) {
-        @for (cell of row; let ci = $index; track ci) {
-          <div class="cell">
-            @if (cell) {
-              <div class="tile tile-{{ cell.value }}">{{ cell.value }}</div>
-            }
-          </div>
-        }
-      }
-    </div>
+    <app-board />
 
     <button class="btn-primary restart-btn" type="button" (click)="onRestart()">
       Yeni Oyun

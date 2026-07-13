@@ -92,3 +92,70 @@ describe('GameService', () => {
     expect(service.move(Direction.Left)).toBe(false);
   });
 });
+
+describe('GameService — spawnRandomTile (rastgele yeni kare)', () => {
+  let service: GameService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(GameService);
+  });
+
+  /** Tahtayı tamamen dolduran 16 kare üretir. */
+  function fullBoard() {
+    const tiles = [];
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        tiles.push({ id: r * BOARD_SIZE + c + 1, value: 2, row: r, col: c });
+      }
+    }
+    return tiles;
+  }
+
+  it('boş hücreye yeni kare ekler (yeni, benzersiz id + isNew)', () => {
+    service.tiles.set([{ id: 100, value: 2, row: 0, col: 0 }]);
+    const tile = service.spawnRandomTile();
+
+    expect(tile).not.toBeNull();
+    expect(tile!.isNew).toBe(true);
+    expect(tile!.id).not.toBe(100);
+    expect(service.tiles().length).toBe(2);
+    // Yeni kare gerçekten boş bir hücreye kondu (0,0 dolu değil)
+    expect(tile!.row === 0 && tile!.col === 0).toBe(false);
+  });
+
+  it('dolu ızgaraya kare EKLEMEZ (null döner)', () => {
+    service.tiles.set(fullBoard());
+    const tile = service.spawnRandomTile();
+
+    expect(tile).toBeNull();
+    expect(service.tiles().length).toBe(BOARD_SIZE * BOARD_SIZE); // 16, artmadı
+  });
+
+  it('yeni kare değeri her zaman 2 veya 4 olmalı', () => {
+    for (let i = 0; i < 200; i++) {
+      service.tiles.set([]);
+      const tile = service.spawnRandomTile();
+      expect([2, 4]).toContain(tile!.value);
+    }
+  });
+
+  it('2/4 oranı yaklaşık %90/%10 olmalı', () => {
+    const N = 4000;
+    let fours = 0;
+    for (let i = 0; i < N; i++) {
+      service.tiles.set([]); // her seferinde boş tahta
+      const tile = service.spawnRandomTile();
+      if (tile!.value === 4) fours++;
+    }
+    const fourRatio = fours / N;
+    // Beklenen %10; istatistiksel sapma için geniş tolerans
+    expect(fourRatio).toBeGreaterThan(0.06);
+    expect(fourRatio).toBeLessThan(0.14);
+  });
+
+  it('emptyCells dolu tahtada boş liste döndürür', () => {
+    service.tiles.set(fullBoard());
+    expect(service.emptyCells().length).toBe(0);
+  });
+});

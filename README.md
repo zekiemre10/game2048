@@ -33,6 +33,11 @@ src/
   styles.scss          # Global stil giriş noktası
 ```
 
+## Hızlı başlat (Windows)
+
+En kolayı: **`oyna.bat`** dosyasına çift tıkla. Sunucuyu başlatır ve oyunu
+tarayıcıda otomatik açar (ilk çalıştırmada paketleri de kurar).
+
 ## Geliştirme
 
 Bağımlılıkları kur ve geliştirme sunucusunu başlat:
@@ -68,5 +73,5 @@ ng test
 - [x] Klavye (ok tuşu) + dokunmatik (swipe) kontrolleri
 - [x] Oyun sonu tespiti + giriş kilidi
 - [x] Skor + en yüksek skor kalıcılığı (localStorage)
-- [ ] Kazandın / kaybettin ekranları
+- [x] Kazandın / kaybettin ekranları (overlay + "Devam Et")
 - [ ] Kayma animasyonları

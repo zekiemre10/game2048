@@ -19,6 +19,9 @@ import { applyMove, hasAnyMove } from '../logic/board-logic';
 /** Yeni taşın 4 gelme olasılığı (kalan %90 → 2). */
 const CHANCE_OF_FOUR = 0.1;
 
+/** Kazanma değeri. */
+const WIN_VALUE = 2048;
+
 /** En yüksek skorun localStorage anahtarı. */
 const BEST_SCORE_KEY = 'game2048.bestScore';
 
@@ -26,6 +29,9 @@ const BEST_SCORE_KEY = 'game2048.bestScore';
 export class GameService {
   /** Taşlara benzersiz id vermek için artan sayaç. */
   private nextId = 1;
+
+  /** 2048'e ulaşıp "Devam Et" denildi mi? (kazanma tekrar tetiklenmesin) */
+  private keepPlayingAfterWin = false;
 
   // --- Durum sinyalleri ---------------------------------------
 
@@ -70,6 +76,7 @@ export class GameService {
   startGame(): void {
     this.tiles.set([]);
     this.score.set(0);
+    this.keepPlayingAfterWin = false;
     this.status.set(GameStatus.Playing);
     this.spawnRandomTile();
     this.spawnRandomTile();
@@ -79,7 +86,15 @@ export class GameService {
   reset(): void {
     this.tiles.set([]);
     this.score.set(0);
+    this.keepPlayingAfterWin = false;
     this.status.set(GameStatus.Idle);
+  }
+
+  /** Kazandıktan sonra "Devam Et": oyuna geri dön, kazanmayı bir daha tetikleme. */
+  continueAfterWin(): void {
+    if (this.status() !== GameStatus.Won) return;
+    this.keepPlayingAfterWin = true;
+    this.status.set(GameStatus.Playing);
   }
 
   /**
@@ -105,9 +120,16 @@ export class GameService {
     // Her geçerli hamleden sonra yeni bir kare
     this.spawnRandomTile();
 
-    // Oyun sonu: yeni kareden sonra hiç hamle kalmadıysa kaybedildi.
-    // (Kazandın/kaybettin EKRANLARI sonraki adımda; burada yalnızca
-    //  durumu güncelleyip girişlerin kilitlenmesini sağlıyoruz.)
+    // Kazanma: 2048'e ilk kez ulaşıldıysa (ve "devam et" seçilmediyse).
+    if (
+      !this.keepPlayingAfterWin &&
+      this.tiles().some((t) => t.value >= WIN_VALUE)
+    ) {
+      this.status.set(GameStatus.Won);
+      return true;
+    }
+
+    // Kaybetme: hiç hamle kalmadıysa (dolu + birleşme yok).
     if (!hasAnyMove(this.tiles())) {
       this.status.set(GameStatus.Lost);
     }

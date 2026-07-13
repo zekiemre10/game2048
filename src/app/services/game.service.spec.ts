@@ -280,3 +280,69 @@ describe('GameService — skor ve en yüksek skor (localStorage)', () => {
     expect(service.bestScore()).toBe(4); // korunur
   });
 });
+
+describe('GameService — kazanma / kaybetme', () => {
+  let service: GameService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(GameService);
+  });
+
+  it('2048 oluşunca kazanma tetiklenir (status Won)', () => {
+    service.status.set(GameStatus.Playing);
+    service.tiles.set([
+      { id: 1, value: 1024, row: 0, col: 0 },
+      { id: 2, value: 1024, row: 0, col: 1 },
+    ]);
+
+    const moved = service.move(Direction.Left);
+
+    expect(moved).toBe(true);
+    expect(service.score()).toBe(2048);
+    expect(service.status()).toBe(GameStatus.Won);
+    expect(service.tiles().some((t) => t.value === 2048)).toBe(true);
+  });
+
+  it('kazanmadan sonra girişler kilitli (Won iken hamle yok)', () => {
+    service.status.set(GameStatus.Won);
+    expect(service.move(Direction.Left)).toBe(false);
+  });
+
+  it('"Devam Et" oyuna döner ve kazanmayı tekrar tetiklemez', () => {
+    // Kazan
+    service.status.set(GameStatus.Playing);
+    service.tiles.set([
+      { id: 1, value: 1024, row: 0, col: 0 },
+      { id: 2, value: 1024, row: 0, col: 1 },
+    ]);
+    service.move(Direction.Left);
+    expect(service.status()).toBe(GameStatus.Won);
+
+    // Devam et
+    service.continueAfterWin();
+    expect(service.status()).toBe(GameStatus.Playing);
+
+    // 2048 tahtada dururken geçerli bir hamle daha → tekrar Won olmamalı
+    service.tiles.set([
+      { id: 1, value: 2048, row: 0, col: 0 },
+      { id: 2, value: 2, row: 0, col: 3 },
+    ]);
+    service.move(Direction.Left);
+    expect(service.status()).toBe(GameStatus.Playing);
+  });
+
+  it('continueAfterWin yalnızca Won durumunda çalışır', () => {
+    service.status.set(GameStatus.Playing);
+    service.continueAfterWin();
+    expect(service.status()).toBe(GameStatus.Playing);
+  });
+
+  it('yeni oyun temiz başlar (Playing, skor 0, 2 kare, kazanma sıfırlanır)', () => {
+    service.status.set(GameStatus.Won);
+    service.startGame();
+    expect(service.status()).toBe(GameStatus.Playing);
+    expect(service.score()).toBe(0);
+    expect(service.tiles().length).toBe(2);
+  });
+});

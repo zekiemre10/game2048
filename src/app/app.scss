@@ -52,3 +52,80 @@
 .restart-btn {
   margin-top: 1.25rem;
 }
+
+// --- Kazandın / Kaybettin overlay ---------------------------
+
+.board-wrap {
+  position: relative;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: v.$radius-lg;
+  background: v.$color-overlay; // açık, hafif saydam (kaybetme)
+  animation: overlay-fade 220ms ease-in-out;
+
+  // Kazanma: altın tonlu, daha canlı
+  &.win {
+    background: rgba(237, 194, 46, 0.5);
+  }
+}
+
+.overlay-card {
+  text-align: center;
+  padding: 1.5rem;
+}
+
+.overlay-title {
+  font-size: 2.4rem;
+  font-weight: 800;
+  margin: 0;
+  color: v.$color-text-dark;
+}
+
+.overlay-sub {
+  margin: 0.25rem 0 0.75rem;
+  color: v.$color-text-dark;
+  opacity: 0.85;
+}
+
+.overlay-score {
+  margin: 0 0 1.25rem;
+  font-size: 1.1rem;
+  color: v.$color-text-dark;
+
+  strong {
+    font-size: 1.4rem;
+  }
+}
+
+.overlay-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+// İkincil (çerçeveli) buton varyantı
+.btn-primary.ghost {
+  background: transparent;
+  color: v.$color-text-dark;
+  box-shadow: inset 0 0 0 2px v.$color-button;
+
+  &:hover {
+    background: rgba(v.$color-button, 0.12);
+  }
+}
+
+@keyframes overlay-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

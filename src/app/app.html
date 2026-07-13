@@ -16,7 +16,39 @@
       </div>
     </header>
 
-    <app-board />
+    <div class="board-wrap">
+      <app-board />
+
+      @if (status() === GameStatus.Won || status() === GameStatus.Lost) {
+        <div class="overlay" [class.win]="status() === GameStatus.Won">
+          <div class="overlay-card">
+            @if (status() === GameStatus.Won) {
+              <h2 class="overlay-title">Kazandın! 🎉</h2>
+              <p class="overlay-sub">2048'e ulaştın</p>
+            } @else {
+              <h2 class="overlay-title">Oyun Bitti</h2>
+              <p class="overlay-sub">Hamle kalmadı</p>
+            }
+            <p class="overlay-score">Skor: <strong>{{ score() }}</strong></p>
+
+            <div class="overlay-actions">
+              @if (status() === GameStatus.Won) {
+                <button class="btn-primary" type="button" (click)="onContinue()">
+                  Devam Et
+                </button>
+              }
+              <button
+                class="btn-primary ghost"
+                type="button"
+                (click)="onRestart()"
+              >
+                Yeni Oyun
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
 
     <button class="btn-primary restart-btn" type="button" (click)="onRestart()">
       Yeni Oyun

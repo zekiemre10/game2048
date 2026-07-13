@@ -77,4 +77,9 @@ export class App {
   onRestart(): void {
     this.game.startGame();
   }
+
+  /** Kazandıktan sonra oyuna devam et. */
+  onContinue(): void {
+    this.game.continueAfterWin();
+  }
 }

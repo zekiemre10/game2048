@@ -26,6 +26,7 @@ export class App {
   /** Şablonda kullanmak için durumları dışa aç. */
   protected readonly status = this.game.status;
   protected readonly score = this.game.score;
+  protected readonly bestScore = this.game.bestScore;
   protected readonly GameStatus = GameStatus;
 
   /** Dokunmatik kaydırmanın başlangıç noktası. */

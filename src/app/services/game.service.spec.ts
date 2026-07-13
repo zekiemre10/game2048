@@ -212,3 +212,71 @@ describe('GameService — oyun sonu / giriş kilidi', () => {
     expect(service.tiles()).toBe(before); // hiç değişmedi
   });
 });
+
+describe('GameService — skor ve en yüksek skor (localStorage)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  function freshService(): GameService {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    return TestBed.inject(GameService);
+  }
+
+  it('geçerli birleşme skoru artırır', () => {
+    const service = freshService();
+    service.status.set(GameStatus.Playing);
+    service.tiles.set([
+      { id: 1, value: 2, row: 0, col: 0 },
+      { id: 2, value: 2, row: 0, col: 1 },
+    ]);
+    service.move(Direction.Left);
+    expect(service.score()).toBe(4);
+  });
+
+  it('en yüksek skor, anlık skorla birlikte yükselir', () => {
+    const service = freshService();
+    service.status.set(GameStatus.Playing);
+    service.tiles.set([
+      { id: 1, value: 2, row: 0, col: 0 },
+      { id: 2, value: 2, row: 0, col: 1 },
+    ]);
+    service.move(Direction.Left);
+    expect(service.bestScore()).toBe(4);
+  });
+
+  it('en yüksek skor localStorage’a kaydedilir', () => {
+    const service = freshService();
+    service.status.set(GameStatus.Playing);
+    service.tiles.set([
+      { id: 1, value: 4, row: 0, col: 0 },
+      { id: 2, value: 4, row: 0, col: 1 },
+    ]);
+    service.move(Direction.Left); // +8
+
+    // effect senkron çalışır; depolamada değeri görmeliyiz
+    expect(localStorage.getItem('game2048.bestScore')).toBe('8');
+  });
+
+  it('yeni servis, en yüksek skoru localStorage’dan yükler', () => {
+    localStorage.setItem('game2048.bestScore', '512');
+    const service = freshService();
+    expect(service.bestScore()).toBe(512);
+  });
+
+  it('yeni oyun anlık skoru sıfırlar ama en yüksek skoru korur', () => {
+    const service = freshService();
+    service.status.set(GameStatus.Playing);
+    service.tiles.set([
+      { id: 1, value: 2, row: 0, col: 0 },
+      { id: 2, value: 2, row: 0, col: 1 },
+    ]);
+    service.move(Direction.Left); // best = 4
+    expect(service.bestScore()).toBe(4);
+
+    service.startGame();
+    expect(service.score()).toBe(0);
+    expect(service.bestScore()).toBe(4); // korunur
+  });
+});

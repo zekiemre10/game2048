@@ -67,6 +67,6 @@ ng test
 - [x] Hamle ve birleştirme mantığı (saf, test edilebilir)
 - [x] Klavye (ok tuşu) + dokunmatik (swipe) kontrolleri
 - [x] Oyun sonu tespiti + giriş kilidi
-- [ ] En yüksek skor kalıcılığı (localStorage)
+- [x] Skor + en yüksek skor kalıcılığı (localStorage)
 - [ ] Kazandın / kaybettin ekranları
 - [ ] Kayma animasyonları

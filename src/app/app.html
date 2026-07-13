@@ -4,9 +4,15 @@
   <main class="game">
     <header class="topbar">
       <h1 class="brand">2048</h1>
-      <div class="score-box">
-        <span>SKOR</span>
-        <strong>{{ score() }}</strong>
+      <div class="scores">
+        <div class="score-box">
+          <span>SKOR</span>
+          <strong>{{ score() }}</strong>
+        </div>
+        <div class="score-box best">
+          <span>EN İYİ</span>
+          <strong>{{ bestScore() }}</strong>
+        </div>
       </div>
     </header>
 

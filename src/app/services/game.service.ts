@@ -14,11 +14,13 @@ import { applyMove, hasAnyMove } from '../logic/board-logic';
 //  Oyunun tüm durumu Angular signal'ları ile tutulur.
 //  Kaynak gerçeği (source of truth): `tiles` — tahtadaki taşların
 //  listesi. `grid` bu listeden türetilen 2B görünümdür.
-//  Hamle/birleştirme mantığı sonraki adımda eklenecek.
 // ============================================================
 
 /** Yeni taşın 4 gelme olasılığı (kalan %90 → 2). */
 const CHANCE_OF_FOUR = 0.1;
+
+/** En yüksek skorun localStorage anahtarı. */
+const BEST_SCORE_KEY = 'game2048.bestScore';
 
 @Injectable({ providedIn: 'root' })
 export class GameService {
@@ -33,8 +35,8 @@ export class GameService {
   /** Anlık skor. */
   readonly score = signal<number>(0);
 
-  /** En yüksek skor (sonraki adımda localStorage'a bağlanacak). */
-  readonly bestScore = signal<number>(0);
+  /** En yüksek skor (localStorage'dan yüklenir, değişince kaydedilir). */
+  readonly bestScore = signal<number>(loadBestScore());
 
   /** Oyunun anlık durumu. */
   readonly status = signal<GameStatus>(GameStatus.Idle);
@@ -97,7 +99,7 @@ export class GameService {
 
     if (result.gained > 0) {
       this.score.update((s) => s + result.gained);
-      this.bestScore.update((b) => Math.max(b, this.score()));
+      this.updateBestScore();
     }
 
     // Her geçerli hamleden sonra yeni bir kare
@@ -145,5 +147,39 @@ export class GameService {
 
     this.tiles.update((list) => [...list, tile]);
     return tile;
+  }
+
+  /** Anlık skor en yüksek skoru geçtiyse güncelle ve kalıcı kaydet. */
+  private updateBestScore(): void {
+    if (this.score() > this.bestScore()) {
+      this.bestScore.set(this.score());
+      saveBestScore(this.bestScore());
+    }
+  }
+}
+
+// ============================================================
+//  En yüksek skor kalıcılığı (localStorage)
+// ============================================================
+
+/** localStorage'dan en yüksek skoru okur (yoksa/hatalıysa 0). */
+function loadBestScore(): number {
+  try {
+    if (typeof localStorage === 'undefined') return 0;
+    const raw = localStorage.getItem(BEST_SCORE_KEY);
+    const n = raw ? parseInt(raw, 10) : 0;
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** En yüksek skoru localStorage'a yazar (hata olursa sessizce geçer). */
+function saveBestScore(best: number): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(BEST_SCORE_KEY, String(best));
+  } catch {
+    // Depolama kullanılamıyorsa (gizli mod, kota vb.) oyunu bozma
   }
 }

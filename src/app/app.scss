@@ -20,13 +20,18 @@
   color: v.$color-text-dark;
 }
 
+.scores {
+  display: flex;
+  gap: 0.6rem;
+}
+
 .score-box {
   background: v.$color-board;
   color: v.$color-text-light;
-  padding: 0.4rem 1.25rem;
+  padding: 0.4rem 1.1rem;
   border-radius: v.$radius-md;
   text-align: center;
-  min-width: 90px;
+  min-width: 80px;
 
   span {
     display: block;
@@ -37,6 +42,10 @@
 
   strong {
     font-size: 1.5rem;
+  }
+
+  &.best {
+    background: v.$color-button;
   }
 }
 

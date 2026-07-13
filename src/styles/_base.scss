@@ -3,6 +3,13 @@
 // ============================================================
 @use 'variables' as v;
 
+// --- Responsive tasarım token'ları ---------------------------
+// Hücreler arası boşluk ekranla ölçeklenir. Tahta ve karelerin tüm
+// hesapları (genişlik, transform) bu değişkeni kullanır → tek yerden ölçek.
+:root {
+  --gap: clamp(6px, 2.4vw, #{v.$gap});
+}
+
 * {
   box-sizing: border-box;
 }
@@ -12,6 +19,8 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100%;
+  // Telefonda yatay kaydırma OLMASIN
+  overflow-x: hidden;
 }
 
 body {
@@ -20,6 +29,9 @@ body {
   color: v.$color-text-dark;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  // Mobilde çift dokunuşla zoom / metin seçimi oyunu bozmasın
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button {
@@ -33,10 +45,12 @@ button {
   background: v.$color-button;
   color: v.$color-text-light;
   font-weight: 700;
-  font-size: 1.1rem;
-  padding: 0.75rem 1.75rem;
+  font-size: clamp(0.95rem, 3.6vw, 1.1rem);
+  padding: 0.75rem clamp(1rem, 4.5vw, 1.75rem);
   border-radius: v.$radius-md;
   transition: background v.$transition-fast;
+  // Dokunmatik hedef en az 44px (rahat basılsın)
+  min-height: 44px;
 
   &:hover {
     background: v.$color-button-hover;

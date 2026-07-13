@@ -3,10 +3,12 @@
 
 .start-screen {
   min-height: 100vh;
+  // Mobil tarayıcı adres çubuğunu hesaba katan modern birim (destekleyende)
+  min-height: 100svh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem;
+  padding: clamp(1rem, 5vw, 1.5rem);
 }
 
 .hero {
@@ -16,22 +18,22 @@
 }
 
 .logo {
-  width: 90px;
-  height: 90px;
+  width: clamp(64px, 20vw, 90px);
+  aspect-ratio: 1 / 1;
   margin: 0 auto 1rem;
   display: flex;
   align-items: center;
   justify-content: center;
   background: map.get(v.$tile-colors, 2048);
   color: v.$color-text-light;
-  font-size: 1.6rem;
+  font-size: clamp(1.1rem, 4.5vw, 1.6rem);
   font-weight: 800;
   border-radius: v.$radius-lg;
   box-shadow: v.$shadow-soft;
 }
 
 .title {
-  font-size: 4rem;
+  font-size: clamp(2.5rem, 13vw, 4rem);
   font-weight: 800;
   margin: 0;
   color: v.$color-text-dark;
@@ -39,8 +41,8 @@
 }
 
 .subtitle {
-  font-size: 1.2rem;
-  margin: 0.5rem 0 1.75rem;
+  font-size: clamp(0.95rem, 4vw, 1.2rem);
+  margin: 0.5rem 0 clamp(1rem, 5vw, 1.75rem);
   color: v.$color-text-dark;
 
   strong {
@@ -50,35 +52,47 @@
 
 .preview {
   display: flex;
-  gap: 10px;
+  gap: clamp(6px, 2.5vw, 10px);
   justify-content: center;
-  margin-bottom: 2rem;
+  margin-bottom: clamp(1.25rem, 6vw, 2rem);
 }
 
 .mini-tile {
-  width: 56px;
-  height: 56px;
+  width: clamp(42px, 13vw, 56px);
+  aspect-ratio: 1 / 1;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: v.$radius-md;
   font-weight: 700;
-  font-size: 1.3rem;
+  font-size: clamp(1rem, 4vw, 1.3rem);
   box-shadow: v.$shadow-soft;
 
-  &.t2  { background: map.get(v.$tile-colors, 2);  color: v.$color-text-dark; }
-  &.t4  { background: map.get(v.$tile-colors, 4);  color: v.$color-text-dark; }
-  &.t8  { background: map.get(v.$tile-colors, 8);  color: v.$color-text-light; }
-  &.t16 { background: map.get(v.$tile-colors, 16); color: v.$color-text-light; }
+  &.t2 {
+    background: map.get(v.$tile-colors, 2);
+    color: v.$color-text-dark;
+  }
+  &.t4 {
+    background: map.get(v.$tile-colors, 4);
+    color: v.$color-text-dark;
+  }
+  &.t8 {
+    background: map.get(v.$tile-colors, 8);
+    color: v.$color-text-light;
+  }
+  &.t16 {
+    background: map.get(v.$tile-colors, 16);
+    color: v.$color-text-light;
+  }
 }
 
 .start-btn {
-  font-size: 1.3rem;
-  padding: 0.9rem 3rem;
+  font-size: clamp(1.05rem, 4.5vw, 1.3rem);
+  padding: 0.9rem clamp(2rem, 10vw, 3rem);
 }
 
 .hint {
-  margin-top: 1.5rem;
-  font-size: 0.9rem;
+  margin-top: clamp(1rem, 5vw, 1.5rem);
+  font-size: clamp(0.8rem, 3.2vw, 0.9rem);
   color: rgba(v.$color-text-dark, 0.7);
 }

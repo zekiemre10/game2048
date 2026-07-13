@@ -1,12 +1,14 @@
 @use '../../../styles/variables' as v;
 
+// Tahta her zaman kare (aspect-ratio) ve kapsayıcısının genişliğini alır.
+// Ölçek --gap değişkeniyle ekrana göre uyarlanır (bkz. _base.scss).
 .board {
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
   background: v.$color-board;
   border-radius: v.$radius-lg;
-  padding: v.$gap;
+  padding: var(--gap);
   box-sizing: border-box;
   // Mobilde tahta üzerinde kaydırınca sayfa scroll olmasın
   touch-action: none;
@@ -15,11 +17,11 @@
 // Zemin: 4×4 boş hücre ızgarası
 .grid-bg {
   position: absolute;
-  inset: v.$gap;
+  inset: var(--gap);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: repeat(4, 1fr);
-  gap: v.$gap;
+  gap: var(--gap);
 }
 
 .cell-bg {
@@ -31,5 +33,5 @@
 // Kareler bu katmanın içinde mutlak konumlanır (bkz. tile.scss).
 .tiles-layer {
   position: absolute;
-  inset: v.$gap;
+  inset: var(--gap);
 }

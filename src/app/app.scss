@@ -1,20 +1,23 @@
 @use '../styles/variables' as v;
 
+// Oyun alanı: dar ekranda tam genişlik, masaüstünde ortalı ve sınırlı.
 .game {
-  max-width: v.$board-size;
-  margin: 2rem auto;
-  padding: 1rem;
+  width: min(100%, #{v.$board-size});
+  margin: clamp(0.75rem, 3vw, 2rem) auto;
+  padding: clamp(0.6rem, 3vw, 1rem);
 }
 
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.25rem;
+  gap: 0.75rem;
+  margin-bottom: clamp(0.75rem, 3vw, 1.25rem);
+  flex-wrap: wrap;
 }
 
 .brand {
-  font-size: 3rem;
+  font-size: clamp(2rem, 9vw, 3rem);
   font-weight: 800;
   margin: 0;
   color: v.$color-text-dark;
@@ -22,26 +25,26 @@
 
 .scores {
   display: flex;
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
 
 .score-box {
   background: v.$color-board;
   color: v.$color-text-light;
-  padding: 0.4rem 1.1rem;
+  padding: 0.35rem clamp(0.6rem, 3vw, 1.1rem);
   border-radius: v.$radius-md;
   text-align: center;
-  min-width: 80px;
+  min-width: clamp(64px, 20vw, 80px);
 
   span {
     display: block;
-    font-size: 0.7rem;
+    font-size: clamp(0.6rem, 2.4vw, 0.7rem);
     letter-spacing: 1px;
     opacity: 0.85;
   }
 
   strong {
-    font-size: 1.5rem;
+    font-size: clamp(1.1rem, 4.5vw, 1.5rem);
   }
 
   &.best {
@@ -53,7 +56,8 @@
   display: flex;
   gap: 0.75rem;
   justify-content: center;
-  margin-top: 1.25rem;
+  margin-top: clamp(0.75rem, 3vw, 1.25rem);
+  flex-wrap: wrap;
 }
 
 // Devre dışı buton (geri alınacak hamle yokken)
@@ -86,11 +90,12 @@
 
 .overlay-card {
   text-align: center;
-  padding: 1.5rem;
+  padding: clamp(0.75rem, 4vw, 1.5rem);
+  width: 100%;
 }
 
 .overlay-title {
-  font-size: 2.4rem;
+  font-size: clamp(1.5rem, 7vw, 2.4rem);
   font-weight: 800;
   margin: 0;
   color: v.$color-text-dark;
@@ -98,23 +103,24 @@
 
 .overlay-sub {
   margin: 0.25rem 0 0.75rem;
+  font-size: clamp(0.85rem, 3.4vw, 1rem);
   color: v.$color-text-dark;
   opacity: 0.85;
 }
 
 .overlay-score {
-  margin: 0 0 1.25rem;
-  font-size: 1.1rem;
+  margin: 0 0 clamp(0.75rem, 4vw, 1.25rem);
+  font-size: clamp(0.95rem, 3.6vw, 1.1rem);
   color: v.$color-text-dark;
 
   strong {
-    font-size: 1.4rem;
+    font-size: clamp(1.15rem, 4.5vw, 1.4rem);
   }
 }
 
 .overlay-actions {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.6rem;
   justify-content: center;
   flex-wrap: wrap;
 }
@@ -136,5 +142,23 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+// --- Yatay (landscape) telefon ------------------------------
+// Ekran alçakken tahta dikeyde taşmasın: genişliği yüksekliğe göre sınırla.
+@media (orientation: landscape) and (max-height: 600px) {
+  .game {
+    max-width: min(#{v.$board-size}, 58vh);
+    margin: 0.5rem auto;
+  }
+
+  .brand {
+    font-size: 1.75rem;
+  }
+
+  .btn-primary {
+    padding: 0.5rem 1rem;
+    min-height: 40px;
   }
 }

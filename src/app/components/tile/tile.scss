@@ -4,6 +4,7 @@
 // Host = tek bir kare. Izgara zemininin üstünde mutlak konumlanır ve
 // satır/sütuna göre transform: translate ile yerleşir.
 // --row / --col değerleri bileşen tarafından host'a yazılır.
+// --gap ekranla ölçeklenir (bkz. _base.scss) → tahta responsive.
 //
 // KAYMA ANİMASYONU: kare id'leri hamleler arasında korunduğu için
 // (@for track tile.id) DOM elemanı aynı kalır; --row/--col değişince
@@ -12,12 +13,12 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: calc((100% - #{v.$gap} * 3) / 4);
+  width: calc((100% - var(--gap) * 3) / 4);
   aspect-ratio: 1 / 1;
   // Bir adım = bir hücre genişliği (100%) + hücreler arası boşluk
   transform: translate(
-    calc(var(--col, 0) * (100% + #{v.$gap})),
-    calc(var(--row, 0) * (100% + #{v.$gap}))
+    calc(var(--col, 0) * (100% + var(--gap))),
+    calc(var(--row, 0) * (100% + var(--gap)))
   );
   transition: transform v.$slide-duration ease-in-out;
   // Yalnızca transform animasyonu → compositor'da çalışır, layout tetiklemez
@@ -32,9 +33,12 @@
   justify-content: center;
   border-radius: v.$radius-md;
   font-weight: 800;
-  font-size: 2.2rem;
+  // Ekranla ölçeklenir: küçük telefonda taşmaz, masaüstünde büyür
+  font-size: clamp(1.3rem, 6.4vw, 2.2rem);
   color: v.$color-text-dark;
   box-shadow: v.$shadow-soft;
+  // Karedeki sayı seçilip sürüklenmesin (mobilde swipe'ı bozar)
+  user-select: none;
 }
 
 // --- Yeni kare: "pop-in" -------------------------------------
@@ -76,6 +80,7 @@
 // Değere göre renk ve font boyutu — _variables.scss'teki paletten üretilir.
 // Sınıf yerine attribute selector: [class] bağlaması, bileşenin imperatif
 // eklediği .is-merged sınıfını ezmesin diye.
+// Basamak sayısı arttıkça font küçülür (clamp ile responsive kalır).
 @each $val, $color in v.$tile-colors {
   .tile[data-value='#{$val}'] {
     background: $color;
@@ -83,10 +88,10 @@
       color: v.$color-text-light;
     }
     @if $val >= 128 {
-      font-size: 1.8rem; // 3 haneli
+      font-size: clamp(1rem, 5.2vw, 1.8rem); // 3 haneli
     }
     @if $val >= 1024 {
-      font-size: 1.35rem; // 4 haneli
+      font-size: clamp(0.8rem, 4vw, 1.35rem); // 4 haneli
     }
   }
 }

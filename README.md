@@ -1,0 +1,69 @@
+# 2048 — Angular
+
+Klasik **2048** oyununun Angular ile yeniden yazımı. Standalone bileşen mimarisi, SCSS teması ve signal tabanlı durum yönetimi kullanır.
+
+> Durum: 🚧 Geliştirme aşamasında — şu an başlık ekranı ve proje iskeleti hazır. Oyun tahtası ve hamle mantığı sonraki adımlarda eklenecek.
+
+## Nasıl oynanır
+
+- Ok tuşlarıyla (↑ ↓ ← →) taşları kaydır.
+- Aynı sayıya sahip iki taş çarpışınca birleşir ve değerleri toplanır.
+- Amaç **2048** taşına ulaşmak.
+- Hamle kalmayınca oyun biter.
+
+## Teknolojiler
+
+- [Angular 22](https://angular.dev/) — standalone bileşenler
+- TypeScript
+- SCSS (merkezi renk değişkenleri)
+- Angular Signals (durum yönetimi)
+
+## Proje yapısı
+
+```
+src/
+  app/
+    components/        # Arayüz bileşenleri (start-screen, ...)
+    services/          # Oyun mantığı ve durum (game.service)
+    models/            # Tip tanımları (Tile, Direction, GameStatus)
+    app.ts / .html     # Kök bileşen
+  styles/
+    _variables.scss    # Renk paleti ve tasarım token'ları
+    _base.scss         # Global temel stiller
+  styles.scss          # Global stil giriş noktası
+```
+
+## Geliştirme
+
+Bağımlılıkları kur ve geliştirme sunucusunu başlat:
+
+```bash
+npm install
+ng serve
+```
+
+Ardından tarayıcıdan `http://localhost:4200/` adresine git. Kaynak dosyaları değiştirdikçe uygulama otomatik yenilenir.
+
+## Derleme
+
+```bash
+ng build
+```
+
+Çıktı `dist/` klasörüne yazılır.
+
+## Testler
+
+```bash
+ng test
+```
+
+## Yol haritası
+
+- [x] Proje iskeleti (Angular + SCSS teması)
+- [x] Başlık / açılış ekranı
+- [ ] 4×4 oyun tahtası
+- [ ] Hamle ve birleştirme mantığı
+- [ ] Skor + en yüksek skor (localStorage)
+- [ ] Kazandın / kaybettin ekranları
+- [ ] Klavye ve dokunmatik (swipe) kontrolleri

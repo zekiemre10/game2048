@@ -1,0 +1,48 @@
+// ============================================================
+//  2048 — Global temel stiller
+// ============================================================
+@use 'variables' as v;
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: v.$font-family;
+  background: v.$color-bg;
+  color: v.$color-text-dark;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+}
+
+// Basit birincil buton yardımcı sınıfı — tüm oyunda kullanılır
+.btn-primary {
+  background: v.$color-button;
+  color: v.$color-text-light;
+  font-weight: 700;
+  font-size: 1.1rem;
+  padding: 0.75rem 1.75rem;
+  border-radius: v.$radius-md;
+  transition: background v.$transition-fast;
+
+  &:hover {
+    background: v.$color-button-hover;
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+}

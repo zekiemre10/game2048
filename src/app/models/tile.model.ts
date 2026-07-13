@@ -1,0 +1,42 @@
+// ============================================================
+//  2048 — Temel veri modelleri
+// ============================================================
+
+/** Tahtadaki tek bir taşı temsil eder. */
+export interface Tile {
+  /** Benzersiz kimlik (animasyonları takip etmek için). */
+  id: number;
+  /** Taşın değeri: 2, 4, 8, ... */
+  value: number;
+  /** Satır indeksi (0-3). */
+  row: number;
+  /** Sütun indeksi (0-3). */
+  col: number;
+  /** Bu hamlede yeni oluştu mu? */
+  isNew?: boolean;
+  /** Bu hamlede birleşti mi? */
+  merged?: boolean;
+}
+
+/** Oyuncunun yapabileceği hamle yönleri. */
+export enum Direction {
+  Up = 'up',
+  Down = 'down',
+  Left = 'left',
+  Right = 'right',
+}
+
+/** Oyunun genel durumu. */
+export enum GameStatus {
+  /** Henüz başlanmadı — başlık ekranı. */
+  Idle = 'idle',
+  /** Oynanıyor. */
+  Playing = 'playing',
+  /** 2048'e ulaşıldı. */
+  Won = 'won',
+  /** Hamle kalmadı. */
+  Lost = 'lost',
+}
+
+/** Tahta boyutu (4x4). */
+export const BOARD_SIZE = 4;

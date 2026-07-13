@@ -1,0 +1,9 @@
+@if (status() === GameStatus.Idle) {
+  <app-start-screen />
+} @else {
+  <!-- Oyun tahtası sonraki adımda buraya gelecek -->
+  <main class="game-placeholder">
+    <h2>Oyun başlıyor…</h2>
+    <p>Tahta bir sonraki adımda eklenecek.</p>
+  </main>
+}

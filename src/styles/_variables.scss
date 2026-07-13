@@ -1,0 +1,43 @@
+// ============================================================
+//  2048 — Renk değişkenleri ve tasarım token'ları
+// ============================================================
+
+// --- Genel arayüz renkleri ---
+$color-bg:            #faf8ef; // sayfa arka planı
+$color-board:         #bbada0; // oyun tahtası zemini
+$color-cell-empty:    #cdc1b4; // boş hücre
+$color-text-dark:     #776e65; // koyu metin (açık taşlar)
+$color-text-light:    #f9f6f2; // açık metin (koyu taşlar)
+$color-button:        #8f7a66; // birincil buton
+$color-button-hover:  #9f8b77;
+$color-overlay:       rgba(238, 228, 218, 0.73); // kazandın/kaybettin katmanı
+
+// --- Taş renkleri (değere göre) ---
+$tile-colors: (
+  2:    #eee4da,
+  4:    #ede0c8,
+  8:    #f2b179,
+  16:   #f59563,
+  32:   #f67c5f,
+  64:   #f65e3b,
+  128:  #edcf72,
+  256:  #edcc61,
+  512:  #edc850,
+  1024: #edc53f,
+  2048: #edc22e,
+);
+
+// --- Ölçüler ---
+$radius-sm: 3px;
+$radius-md: 6px;
+$radius-lg: 12px;
+
+$gap:        15px;
+$board-size: 500px;
+
+// --- Tipografi ---
+$font-family: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif;
+
+// --- Gölge / geçiş ---
+$shadow-soft: 0 4px 14px rgba(119, 110, 101, 0.18);
+$transition-fast: 100ms ease-in-out;

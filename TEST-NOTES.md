@@ -83,11 +83,27 @@ Tarayıcıda görünen `TS2339: Property 'updateBestScore' does not exist` overl
 
 ---
 
-## 3. Elle test edilecekler (kontrol listesi)
+## 3. Canlı site duman testi (otomatik) ✅
+
+Gerçek Chrome ile **canlı adres** sürüldü (Playwright):
+http://34.158.136.9/emre/2048/
+
+| Adım | Sonuç |
+|------|-------|
+| Sayfa yükleniyor (HTTP 200, varlıklar 200) | ✅ |
+| "Başla" tıklanıyor → tahta çiziliyor | ✅ |
+| 10 ok tuşu hamlesi → kareler kayıyor/birleşiyor | ✅ |
+| Skor işliyor (16 / 28 / 36 ölçüldü) | ✅ |
+| Açık tema, koyu tema, mobil (390px) görünümleri | ✅ (ekran görüntüleri `docs/`) |
+| **Hata #1 doğrulaması:** mobilde tema butonu skor kutusuna binmiyor | ✅ |
+| **Hata #2 doğrulaması:** koyu temada kare metinleri okunuyor | ✅ |
+| Airport Manager (`/emre/`) hâlâ çalışıyor — bozulmadı | ✅ |
+
+## 4. Elle test edilecekler (kontrol listesi)
 
 Otomatik testler mantığı kapsıyor; aşağıdakiler **gerçek cihazda/tarayıcıda** doğrulanmalı.
 
-**Bilgisayar:** http://localhost:4200/ &nbsp;•&nbsp; **Telefon (aynı Wi-Fi):** http://172.20.10.18:4200/
+**Canlı:** http://34.158.136.9/emre/2048/ &nbsp;•&nbsp; **Yerel:** http://localhost:4200/
 
 ### Ana senaryolar
 - [ ] Başla → tahtada 2 kare çıkıyor

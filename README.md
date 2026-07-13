@@ -1,83 +1,134 @@
-# 2048 — Angular
+# 2048 — Sayı Birleştirme Bulmacası
 
-Klasik **2048** oyununun Angular ile yeniden yazımı. Standalone bileşen mimarisi, SCSS teması ve signal tabanlı durum yönetimi kullanır.
+Klasik **2048** oyununun Angular ile sıfırdan yeniden yazımı. Standalone bileşen
+mimarisi, signal tabanlı durum yönetimi, saf ve test edilebilir oyun mantığı.
 
-> Durum: 🚧 Geliştirme aşamasında — şu an başlık ekranı ve proje iskeleti hazır. Oyun tahtası ve hamle mantığı sonraki adımlarda eklenecek.
+## 🎮 Canlı Oyna
+
+### **http://34.158.136.9/emre/2048/**
+
+Bilgisayarda **ok tuşlarıyla**, telefonda **parmakla kaydırarak** oynanır.
+
+## Ekran Görüntüleri
+
+| Açık tema | Koyu tema |
+|-----------|-----------|
+| ![Açık tema](docs/screenshot-light.png) | ![Koyu tema](docs/screenshot-dark.png) |
+
+| Başlık ekranı | Mobil |
+|---------------|-------|
+| ![Başlık ekranı](docs/screenshot-start.png) | <img src="docs/screenshot-mobile.png" width="260"> |
 
 ## Nasıl oynanır
 
-- Ok tuşlarıyla (↑ ↓ ← →) taşları kaydır.
-- Aynı sayıya sahip iki taş çarpışınca birleşir ve değerleri toplanır.
-- Amaç **2048** taşına ulaşmak.
-- Hamle kalmayınca oyun biter.
+- Ok tuşlarıyla (↑ ↓ ← →) veya parmakla kaydırarak kareleri it.
+- Aynı sayıya sahip iki kare çarpışınca **birleşir** ve değerleri toplanır (2+2=4).
+- Bir hamlede her kare **en fazla bir kez** birleşir (zincirleme yok: `2 2 4` → `4 4`).
+- Her geçerli hamleden sonra boş bir hücreye yeni kare gelir (%90 "2", %10 "4").
+- Amaç **2048** karesine ulaşmak. Ulaşınca "Devam Et" ile oynamaya devam edebilirsin.
+- Izgara dolup hiç birleşme kalmayınca oyun biter.
+
+## Özellikler
+
+- 🎯 **Doğru 2048 mantığı** — saf, framework'süz, tam test edilmiş
+- ⌨️ **Klavye + dokunmatik** — ok tuşları ve swipe
+- ↶ **Geri al** — son hamleyi geri al (kaybettiren hamle dahil)
+- 🏆 **Kalıcı rekor** — en yüksek skor `localStorage`'da saklanır
+- 🌙 **Açık/koyu tema** — tercih kalıcı, sistem tercihini varsayılan alır
+- ✨ **Akıcı animasyonlar** — kayma, pop-in, birleşme "bump"ı
+- 📱 **Responsive** — telefon, tablet, masaüstü
+- ♿ **Erişilebilirlik** — `prefers-reduced-motion`, odak halkaları, 44px dokunma hedefleri
 
 ## Teknolojiler
 
-- [Angular 22](https://angular.dev/) — standalone bileşenler
+- [Angular 22](https://angular.dev/) — standalone bileşenler, **signals**
 - TypeScript
-- SCSS (merkezi renk değişkenleri)
-- Angular Signals (durum yönetimi)
+- SCSS (CSS değişkenleriyle temalama)
+- Vitest (81 birim/bileşen testi)
+- Backend yok — tamamen istemci tarafı
 
 ## Proje yapısı
 
 ```
 src/
   app/
-    components/        # Arayüz bileşenleri (start-screen, ...)
-    services/          # Oyun mantığı ve durum (game.service)
-    models/            # Tip tanımları (Tile, Direction, GameStatus)
-    app.ts / .html     # Kök bileşen
+    components/
+      board/           # 4×4 ızgara zemini + kare katmanı
+      tile/            # Tek kare: renk, konum, animasyonlar
+      start-screen/    # Başlık ekranı
+    services/
+      game.service.ts  # Oyun durumu (signals) + skor + geri al
+      theme.service.ts # Açık/koyu tema (localStorage)
+    logic/
+      board-logic.ts   # SAF hamle mantığı (kaydırma + birleştirme)
+      swipe.ts         # SAF dokunmatik yön tespiti
+    models/
+      tile.model.ts    # Tile, Grid, Direction, GameStatus
   styles/
-    _variables.scss    # Renk paleti ve tasarım token'ları
-    _base.scss         # Global temel stiller
-  styles.scss          # Global stil giriş noktası
+    _variables.scss    # Kare paleti, ölçüler, animasyon süreleri
+    _base.scss         # Tema değişkenleri (:root + [data-theme=dark])
 ```
+
+**Mimari not:** Oyun mantığı (`logic/`) Angular'dan tamamen bağımsızdır —
+saf fonksiyonlar, girdiyi değiştirmez. Bu sayede hızlı ve güvenilir test edilir.
+Kare **id'leri** hamleler arasında korunur; kayma animasyonu bunun üzerine kurulur.
 
 ## Hızlı başlat (Windows)
 
-En kolayı: **`oyna.bat`** dosyasına çift tıkla. Sunucuyu başlatır ve oyunu
-tarayıcıda otomatik açar (ilk çalıştırmada paketleri de kurar).
+**`oyna.bat`** dosyasına çift tıkla — sunucuyu başlatır ve oyunu tarayıcıda açar
+(ilk çalıştırmada paketleri de kurar).
 
-## Geliştirme
+## Kurulum ve geliştirme
 
-Bağımlılıkları kur ve geliştirme sunucusunu başlat:
+Gereksinim: [Node.js](https://nodejs.org/) 20+
 
 ```bash
+# Bağımlılıkları kur
 npm install
-ng serve
+
+# Geliştirme sunucusu → http://localhost:4200/
+npm start
+
+# Telefondan test etmek için (aynı Wi-Fi, bilgisayarın IP'si ile)
+npx ng serve --host 0.0.0.0
 ```
-
-Ardından tarayıcıdan `http://localhost:4200/` adresine git. Kaynak dosyaları değiştirdikçe uygulama otomatik yenilenir.
-
-## Derleme
-
-```bash
-ng build
-```
-
-Çıktı `dist/` klasörüne yazılır.
 
 ## Testler
 
 ```bash
-ng test
+npm test
 ```
 
-**81 test**, hepsi geçiyor. Kapsam ve elle test kontrol listesi için:
-[TEST-NOTES.md](TEST-NOTES.md)
+**81 test**, hepsi geçiyor. Kapsam ve elle test kontrol listesi: [TEST-NOTES.md](TEST-NOTES.md)
+
+## Derleme ve deploy
+
+```bash
+# Üretim derlemesi (kök dizine kurulacaksa)
+npm run build
+
+# Alt dizine kurulacaksa base-href gerekir
+npx ng build --base-href /emre/2048/
+```
+
+Çıktı `dist/game2048/browser/` klasörüne yazılır — statik dosyalar, herhangi bir
+web sunucusuyla servis edilebilir. Canlı sürüm bu dosyaların
+`/var/www/emre/2048/` altına kopyalanmasıyla yayınlanmıştır.
 
 ## Yol haritası
 
 - [x] Proje iskeleti (Angular + SCSS teması)
 - [x] Başlık / açılış ekranı
-- [x] Izgara veri modeli + signal state (2 başlangıç karesi)
-- [x] 4×4 tahta görünümü
+- [x] Izgara veri modeli + signal state
+- [x] 4×4 tahta ve kare bileşenleri
 - [x] Hamle ve birleştirme mantığı (saf, test edilebilir)
+- [x] Rastgele yeni kare üretimi
 - [x] Klavye (ok tuşu) + dokunmatik (swipe) kontrolleri
-- [x] Oyun sonu tespiti + giriş kilidi
 - [x] Skor + en yüksek skor kalıcılığı (localStorage)
 - [x] Kazandın / kaybettin ekranları (overlay + "Devam Et")
 - [x] Animasyonlar: kayma + pop-in + bump (`prefers-reduced-motion` destekli)
 - [x] Geri al (tek adım) + yeni oyun
 - [x] Responsive tasarım (mobil / tablet / masaüstü)
 - [x] Açık/koyu tema (kalıcı), favicon, meta bilgileri
+- [x] Test ve hata ayıklama (81 test, 3 hata giderildi)
+- [x] **Deploy ve teslim** ✅

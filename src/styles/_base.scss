@@ -1,13 +1,39 @@
 // ============================================================
-//  2048 — Global temel stiller
+//  2048 — Global temel stiller + tema değişkenleri
 // ============================================================
 @use 'variables' as v;
 
-// --- Responsive tasarım token'ları ---------------------------
-// Hücreler arası boşluk ekranla ölçeklenir. Tahta ve karelerin tüm
-// hesapları (genişlik, transform) bu değişkeni kullanır → tek yerden ölçek.
+// --- Tema (CSS değişkenleri) ---------------------------------
+// Karelerin canlı paleti (2, 4, 8...) her iki temada AYNI kalır —
+// tanınırlığı korur ve kontrastı zaten yüksektir.
+// Değişen: arka plan, tahta zemini, metin, butonlar, overlay.
 :root {
+  // Açık tema (varsayılan)
+  --color-bg: #{v.$color-bg};
+  --color-board: #{v.$color-board};
+  --color-cell-empty: #{v.$color-cell-empty};
+  --color-text: #{v.$color-text-dark};
+  --color-text-light: #{v.$color-text-light};
+  --color-button: #{v.$color-button};
+  --color-button-hover: #{v.$color-button-hover};
+  --color-overlay: #{v.$color-overlay};
+  --color-overlay-win: rgba(237, 194, 46, 0.5);
+
+  // Responsive: hücreler arası boşluk ekranla ölçeklenir.
+  // Tahta ve karelerin tüm hesapları bunu kullanır → tek yerden ölçek.
   --gap: clamp(6px, 2.4vw, #{v.$gap});
+}
+
+[data-theme='dark'] {
+  --color-bg: #1a1917;
+  --color-board: #3b3733;
+  --color-cell-empty: #4c4741;
+  --color-text: #ece3d8;
+  --color-text-light: #f9f6f2;
+  --color-button: #a08d78;
+  --color-button-hover: #b09c86;
+  --color-overlay: rgba(26, 25, 23, 0.82);
+  --color-overlay-win: rgba(237, 194, 46, 0.45);
 }
 
 * {
@@ -25,13 +51,17 @@ body {
 
 body {
   font-family: v.$font-family;
-  background: v.$color-bg;
-  color: v.$color-text-dark;
+  background: var(--color-bg);
+  color: var(--color-text);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   // Mobilde çift dokunuşla zoom / metin seçimi oyunu bozmasın
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
+  // Tema geçişi yumuşak olsun
+  transition:
+    background-color 250ms ease,
+    color 250ms ease;
 }
 
 button {
@@ -42,21 +72,37 @@ button {
 
 // Basit birincil buton yardımcı sınıfı — tüm oyunda kullanılır
 .btn-primary {
-  background: v.$color-button;
-  color: v.$color-text-light;
+  background: var(--color-button);
+  color: var(--color-text-light);
   font-weight: 700;
   font-size: clamp(0.95rem, 3.6vw, 1.1rem);
   padding: 0.75rem clamp(1rem, 4.5vw, 1.75rem);
   border-radius: v.$radius-md;
-  transition: background v.$transition-fast;
+  transition:
+    background-color v.$transition-fast,
+    transform v.$transition-fast;
   // Dokunmatik hedef en az 44px (rahat basılsın)
   min-height: 44px;
 
   &:hover {
-    background: v.$color-button-hover;
+    background: var(--color-button-hover);
   }
 
   &:active {
     transform: translateY(1px);
+  }
+
+  // Klavye erişilebilirliği: görünür odak halkası
+  &:focus-visible {
+    outline: 3px solid var(--color-button);
+    outline-offset: 3px;
+  }
+}
+
+// Hareket azaltma tercihi: tema/buton geçişlerini de kapat
+@media (prefers-reduced-motion: reduce) {
+  body,
+  .btn-primary {
+    transition: none;
   }
 }

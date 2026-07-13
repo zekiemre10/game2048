@@ -20,7 +20,8 @@
   font-size: clamp(2rem, 9vw, 3rem);
   font-weight: 800;
   margin: 0;
-  color: v.$color-text-dark;
+  color: var(--color-text);
+  letter-spacing: -1px;
 }
 
 .scores {
@@ -29,12 +30,13 @@
 }
 
 .score-box {
-  background: v.$color-board;
-  color: v.$color-text-light;
+  background: var(--color-board);
+  color: var(--color-text-light);
   padding: 0.35rem clamp(0.6rem, 3vw, 1.1rem);
   border-radius: v.$radius-md;
   text-align: center;
   min-width: clamp(64px, 20vw, 80px);
+  transition: background-color 250ms ease;
 
   span {
     display: block;
@@ -48,7 +50,7 @@
   }
 
   &.best {
-    background: v.$color-button;
+    background: var(--color-button);
   }
 }
 
@@ -66,6 +68,46 @@
   cursor: not-allowed;
 }
 
+// --- Tema geçiş butonu (her ekranda sağ üstte) ---------------
+
+.theme-toggle {
+  position: fixed;
+  top: clamp(0.6rem, 2.5vw, 1rem);
+  right: clamp(0.6rem, 2.5vw, 1rem);
+  z-index: 10;
+
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 1.25rem;
+  line-height: 1;
+  border-radius: 50%;
+  background: var(--color-board);
+  color: var(--color-text-light);
+  box-shadow: v.$shadow-soft;
+  transition:
+    background-color 250ms ease,
+    transform v.$transition-fast;
+
+  &:hover {
+    background: var(--color-button);
+  }
+
+  &:active {
+    transform: scale(0.92);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--color-button);
+    outline-offset: 3px;
+  }
+}
+
 // --- Kazandın / Kaybettin overlay ---------------------------
 
 .board-wrap {
@@ -79,12 +121,12 @@
   align-items: center;
   justify-content: center;
   border-radius: v.$radius-lg;
-  background: v.$color-overlay; // açık, hafif saydam (kaybetme)
+  background: var(--color-overlay);
   animation: overlay-fade 220ms ease-in-out;
 
   // Kazanma: altın tonlu, daha canlı
   &.win {
-    background: rgba(237, 194, 46, 0.5);
+    background: var(--color-overlay-win);
   }
 }
 
@@ -98,20 +140,20 @@
   font-size: clamp(1.5rem, 7vw, 2.4rem);
   font-weight: 800;
   margin: 0;
-  color: v.$color-text-dark;
+  color: var(--color-text);
 }
 
 .overlay-sub {
   margin: 0.25rem 0 0.75rem;
   font-size: clamp(0.85rem, 3.4vw, 1rem);
-  color: v.$color-text-dark;
+  color: var(--color-text);
   opacity: 0.85;
 }
 
 .overlay-score {
   margin: 0 0 clamp(0.75rem, 4vw, 1.25rem);
   font-size: clamp(0.95rem, 3.6vw, 1.1rem);
-  color: v.$color-text-dark;
+  color: var(--color-text);
 
   strong {
     font-size: clamp(1.15rem, 4.5vw, 1.4rem);
@@ -128,11 +170,11 @@
 // İkincil (çerçeveli) buton varyantı
 .btn-primary.ghost {
   background: transparent;
-  color: v.$color-text-dark;
-  box-shadow: inset 0 0 0 2px v.$color-button;
+  color: var(--color-text);
+  box-shadow: inset 0 0 0 2px var(--color-button);
 
   &:hover {
-    background: rgba(v.$color-button, 0.12);
+    background: color-mix(in srgb, var(--color-button) 15%, transparent);
   }
 }
 
@@ -160,5 +202,11 @@
   .btn-primary {
     padding: 0.5rem 1rem;
     min-height: 40px;
+  }
+
+  .theme-toggle {
+    width: 38px;
+    height: 38px;
+    min-height: 38px;
   }
 }

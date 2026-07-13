@@ -2,6 +2,7 @@ import { Component, HostListener, inject } from '@angular/core';
 import { StartScreen } from './components/start-screen/start-screen';
 import { BoardComponent } from './components/board/board';
 import { GameService } from './services/game.service';
+import { ThemeService } from './services/theme.service';
 import { Direction, GameStatus } from './models/tile.model';
 import { swipeDirection } from './logic/swipe';
 
@@ -22,12 +23,14 @@ const KEY_TO_DIRECTION: Record<string, Direction> = {
 })
 export class App {
   private readonly game = inject(GameService);
+  private readonly themeService = inject(ThemeService);
 
   /** Şablonda kullanmak için durumları dışa aç. */
   protected readonly status = this.game.status;
   protected readonly score = this.game.score;
   protected readonly bestScore = this.game.bestScore;
   protected readonly canUndo = this.game.canUndo;
+  protected readonly theme = this.themeService.theme;
   protected readonly GameStatus = GameStatus;
 
   /** Dokunmatik kaydırmanın başlangıç noktası. */
@@ -87,5 +90,10 @@ export class App {
   /** Son hamleyi geri al. */
   onUndo(): void {
     this.game.undo();
+  }
+
+  /** Açık ↔ koyu tema geçişi (tercih kalıcı kaydedilir). */
+  onToggleTheme(): void {
+    this.themeService.toggle();
   }
 }

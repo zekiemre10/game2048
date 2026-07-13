@@ -76,3 +76,5 @@ ng test
 - [x] Kazandın / kaybettin ekranları (overlay + "Devam Et")
 - [x] Animasyonlar: kayma + pop-in + bump (`prefers-reduced-motion` destekli)
 - [x] Geri al (tek adım) + yeni oyun
+- [x] Responsive tasarım (mobil / tablet / masaüstü)
+- [x] Açık/koyu tema (kalıcı), favicon, meta bilgileri

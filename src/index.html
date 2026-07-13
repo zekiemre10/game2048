@@ -1,11 +1,46 @@
 <!doctype html>
-<html lang="en">
+<html lang="tr">
 <head>
   <meta charset="utf-8">
-  <title>2048</title>
+  <title>2048 — Sayı Birleştirme Bulmacası</title>
   <base href="/">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <!-- Açıklama / SEO -->
+  <meta name="description"
+        content="Klasik 2048 bulmacası. Kareleri kaydır, aynı sayıları birleştir ve 2048'e ulaş. Angular ile geliştirildi.">
+  <meta name="author" content="emre">
+
+  <!-- Tarayıcı arayüz rengi (açık/koyu temaya göre) -->
+  <meta name="theme-color" content="#faf8ef" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1a1917" media="(prefers-color-scheme: dark)">
+
+  <!-- Paylaşım önizlemesi -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="2048 — Sayı Birleştirme Bulmacası">
+  <meta property="og:description" content="Kareleri kaydır, aynı sayıları birleştir, 2048'e ulaş!">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <!--
+    Tema erken uygulanır (FOUC önleme): Angular yüklenmeden önce
+    <html data-theme> ayarlanır, böylece koyu temada beyaz ekran parlamaz.
+    ThemeService aynı anahtarı/kuralı kullanır.
+  -->
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('game2048.theme');
+        var dark = saved
+          ? saved === 'dark'
+          : window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
 </head>
 <body>
   <app-root></app-root>

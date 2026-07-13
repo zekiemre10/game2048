@@ -6,12 +6,13 @@
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
-  background: v.$color-board;
+  background: var(--color-board);
   border-radius: v.$radius-lg;
   padding: var(--gap);
   box-sizing: border-box;
   // Mobilde tahta üzerinde kaydırınca sayfa scroll olmasın
   touch-action: none;
+  transition: background-color 250ms ease;
 }
 
 // Zemin: 4×4 boş hücre ızgarası
@@ -25,8 +26,9 @@
 }
 
 .cell-bg {
-  background: v.$color-cell-empty;
+  background: var(--color-cell-empty);
   border-radius: v.$radius-md;
+  transition: background-color 250ms ease;
 }
 
 // Karelerin konumlandığı katman (zeminle aynı alanı kaplar).

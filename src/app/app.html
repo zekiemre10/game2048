@@ -1,3 +1,16 @@
+<!-- Tema geçişi: her ekranda sağ üstte -->
+<button
+  class="theme-toggle"
+  type="button"
+  [attr.aria-label]="
+    theme() === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'
+  "
+  [attr.title]="theme() === 'dark' ? 'Açık tema' : 'Koyu tema'"
+  (click)="onToggleTheme()"
+>
+  {{ theme() === 'dark' ? '☀️' : '🌙' }}
+</button>
+
 @if (status() === GameStatus.Idle) {
   <app-start-screen />
 } @else {

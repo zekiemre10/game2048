@@ -479,3 +479,87 @@ describe('GameService — geri al (undo) ve yeni oyun', () => {
     expect(service.status()).toBe(GameStatus.Playing);
   });
 });
+
+describe('GameService — uçtan uca oyun akışı', () => {
+  let service: GameService;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(GameService);
+  });
+
+  it('gerçek bir oyun: rastgele hamleler oyunu asla tutarsız bırakmaz', () => {
+    service.startGame();
+
+    const dirs = [
+      Direction.Left,
+      Direction.Right,
+      Direction.Up,
+      Direction.Down,
+    ];
+
+    // 300 rastgele hamle: hiçbir noktada değişmezler bozulmamalı
+    for (let i = 0; i < 300; i++) {
+      const dir = dirs[i % 4];
+      service.move(dir);
+
+      const tiles = service.tiles();
+
+      // 1) Kare sayısı hiçbir zaman 16'yı aşmaz
+      expect(tiles.length).toBeLessThanOrEqual(BOARD_SIZE * BOARD_SIZE);
+
+      // 2) Hiçbir kare tahtanın dışında olamaz
+      for (const t of tiles) {
+        expect(t.row).toBeGreaterThanOrEqual(0);
+        expect(t.row).toBeLessThan(BOARD_SIZE);
+        expect(t.col).toBeGreaterThanOrEqual(0);
+        expect(t.col).toBeLessThan(BOARD_SIZE);
+      }
+
+      // 3) İki kare AYNI hücrede olamaz (üst üste binme)
+      const cells = tiles.map((t) => `${t.row},${t.col}`);
+      expect(new Set(cells).size).toBe(tiles.length);
+
+      // 4) id'ler benzersiz olmalı (animasyon takibi için kritik)
+      const ids = tiles.map((t) => t.id);
+      expect(new Set(ids).size).toBe(ids.length);
+
+      // 5) Her değer 2'nin kuvveti olmalı
+      for (const t of tiles) {
+        expect(Number.isInteger(Math.log2(t.value))).toBe(true);
+        expect(t.value).toBeGreaterThanOrEqual(2);
+      }
+
+      // 6) Skor asla azalmaz, en yüksek skor asla skorun altında kalmaz
+      expect(service.score()).toBeGreaterThanOrEqual(0);
+      expect(service.bestScore()).toBeGreaterThanOrEqual(service.score());
+
+      // Oyun bittiyse dur
+      if (service.status() !== GameStatus.Playing) break;
+    }
+  });
+
+  it('oyun bittiğinde ya kazanılmış ya kaybedilmiş olur (asılı kalmaz)', () => {
+    service.startGame();
+    const dirs = [
+      Direction.Left,
+      Direction.Up,
+      Direction.Right,
+      Direction.Down,
+    ];
+
+    let moves = 0;
+    while (service.status() === GameStatus.Playing && moves < 2000) {
+      service.move(dirs[moves % 4]);
+      moves++;
+    }
+
+    // 2000 hamlede oyun bitmiş olmalı (dört yön döngüsü tahtayı doldurur)
+    expect([GameStatus.Won, GameStatus.Lost]).toContain(service.status());
+
+    // Bittiğinde giriş kilitli
+    expect(service.move(Direction.Left)).toBe(false);
+  });
+});

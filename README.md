@@ -63,6 +63,9 @@ ng build
 ng test
 ```
 
+**81 test**, hepsi geçiyor. Kapsam ve elle test kontrol listesi için:
+[TEST-NOTES.md](TEST-NOTES.md)
+
 ## Yol haritası
 
 - [x] Proje iskeleti (Angular + SCSS teması)

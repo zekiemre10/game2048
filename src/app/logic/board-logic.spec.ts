@@ -122,6 +122,110 @@ describe('applyMove — skor ve geçerlilik', () => {
   });
 });
 
+describe('applyMove — birleşme kenar durumları', () => {
+  it('4 4 4 4 → 8 8 (iki ayrı birleşme, zincirleme değil)', () => {
+    const res = applyMove(
+      [t(4, 0, 0), t(4, 0, 1), t(4, 0, 2), t(4, 0, 3)],
+      Direction.Left,
+    );
+    expect(toValueGrid(res.tiles)[0]).toEqual([8, 8, 0, 0]);
+    expect(res.gained).toBe(16); // 8 + 8
+  });
+
+  // Üç eşit karede HANGİ çiftin birleştiği yöne bağlıdır —
+  // itilen kenara EN YAKIN çift birleşir.
+  it('SOL: 2 2 2 → 4 2 (soldaki çift birleşir)', () => {
+    const res = applyMove(
+      [t(2, 0, 0), t(2, 0, 1), t(2, 0, 2)],
+      Direction.Left,
+    );
+    expect(toValueGrid(res.tiles)[0]).toEqual([4, 2, 0, 0]);
+  });
+
+  it('SAĞ: 2 2 2 → 2 4 (sağdaki çift birleşir)', () => {
+    const res = applyMove(
+      [t(2, 0, 1), t(2, 0, 2), t(2, 0, 3)],
+      Direction.Right,
+    );
+    expect(toValueGrid(res.tiles)[0]).toEqual([0, 0, 2, 4]);
+  });
+
+  it('YUKARI: 2 2 2 → 4 2 (üstteki çift birleşir)', () => {
+    const res = applyMove(
+      [t(2, 0, 0), t(2, 1, 0), t(2, 2, 0)],
+      Direction.Up,
+    );
+    const g = toValueGrid(res.tiles);
+    expect([g[0][0], g[1][0], g[2][0], g[3][0]]).toEqual([4, 2, 0, 0]);
+  });
+
+  it('AŞAĞI: 2 2 2 → 2 4 (alttaki çift birleşir)', () => {
+    const res = applyMove(
+      [t(2, 1, 0), t(2, 2, 0), t(2, 3, 0)],
+      Direction.Down,
+    );
+    const g = toValueGrid(res.tiles);
+    expect([g[0][0], g[1][0], g[2][0], g[3][0]]).toEqual([0, 0, 2, 4]);
+  });
+
+  it('birleşme olmayan dolu satır sola hamlede değişmez', () => {
+    const res = applyMove(
+      [t(2, 0, 0), t(4, 0, 1), t(8, 0, 2), t(16, 0, 3)],
+      Direction.Left,
+    );
+    expect(res.moved).toBe(false);
+    expect(res.gained).toBe(0);
+  });
+
+  it('boş tahtada hamle geçersizdir', () => {
+    const res = applyMove([], Direction.Left);
+    expect(res.moved).toBe(false);
+    expect(res.tiles.length).toBe(0);
+  });
+
+  it('tüm satırlar aynı anda birleşir ve skor toplanır', () => {
+    // 4 satırın hepsinde 2 2 _ _ → hepsi 4 olur; kazanç 4×4 = 16
+    const tiles = [];
+    for (let r = 0; r < 4; r++) {
+      tiles.push(t(2, r, 0), t(2, r, 1));
+    }
+    const res = applyMove(tiles, Direction.Left);
+    const g = toValueGrid(res.tiles);
+
+    expect(res.gained).toBe(16);
+    for (let r = 0; r < 4; r++) {
+      expect(g[r]).toEqual([4, 0, 0, 0]);
+    }
+    expect(res.tiles.length).toBe(4); // 8 kare → 4 kare
+  });
+
+  it('birleşen kareler `merged`, diğerleri işaretsiz olmalı', () => {
+    // satır: 2 2 8 → 4(merged) 8(merged değil)
+    const res = applyMove(
+      [t(2, 0, 0), t(2, 0, 1), t(8, 0, 2)],
+      Direction.Left,
+    );
+    const four = res.tiles.find((x) => x.value === 4);
+    const eight = res.tiles.find((x) => x.value === 8);
+
+    expect(four?.merged).toBe(true);
+    expect(eight?.merged).toBe(false);
+  });
+
+  it('kaymayan kareler id’lerini korur (animasyon sürekliliği)', () => {
+    const a = t(2, 0, 0); // zaten solda, kaymaz
+    const b = t(4, 0, 2); // sola kayar
+    const res = applyMove([a, b], Direction.Left);
+
+    const movedTile = res.tiles.find((x) => x.value === 4);
+    const stayed = res.tiles.find((x) => x.value === 2);
+
+    expect(stayed?.id).toBe(a.id);
+    expect(movedTile?.id).toBe(b.id); // id korundu → DOM aynı → kayar
+    expect(movedTile?.col).toBe(1);
+  });
+});
+
 describe('hasAnyMove (oyun sonu tespiti)', () => {
   it('boş hücre varsa hamle vardır', () => {
     expect(hasAnyMove([t(2, 0, 0)])).toBe(true);

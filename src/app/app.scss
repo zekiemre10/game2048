@@ -16,6 +16,15 @@
   flex-wrap: wrap;
 }
 
+// Dar ekranda oyun alanı sağ kenara dayanır ve skor kutuları,
+// sabit konumlu tema butonunun ALTINA girer. Butona yer ayır.
+// (Geniş ekranda oyun ortalı/sınırlı olduğu için çakışma olmaz.)
+@media (max-width: 640px) {
+  .topbar {
+    padding-right: 52px;
+  }
+}
+
 .brand {
   font-size: clamp(2rem, 9vw, 3rem);
   font-weight: 800;

@@ -159,3 +159,56 @@ describe('GameService — spawnRandomTile (rastgele yeni kare)', () => {
     expect(service.emptyCells().length).toBe(0);
   });
 });
+
+describe('GameService — oyun sonu / giriş kilidi', () => {
+  let service: GameService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(GameService);
+  });
+
+  /** 2B değer ızgarasından (0 = boş) kare listesi üretir. */
+  function tilesFromGrid(grid: number[][]) {
+    const tiles = [];
+    let id = 1;
+    for (let r = 0; r < grid.length; r++) {
+      for (let c = 0; c < grid[r].length; c++) {
+        if (grid[r][c] !== 0) {
+          tiles.push({ id: id++, value: grid[r][c], row: r, col: c });
+        }
+      }
+    }
+    return tiles;
+  }
+
+  it('hamle sonrası hamle kalmazsa durum Lost olur', () => {
+    // Tek boş hücre (3,0). SOLA hamle son satırı kaydırır, boşluk (3,3)'e
+    // gider; spawn oraya düşer. (3,3) komşuları 16 ve 32 olduğundan yeni
+    // kare 2 de gelse 4 de gelse birleşemez → tahta kilitlenir.
+    service.status.set(GameStatus.Playing);
+    service.tiles.set(
+      tilesFromGrid([
+        [2, 4, 16, 8],
+        [4, 16, 8, 2],
+        [16, 8, 2, 32],
+        [0, 4, 32, 16],
+      ]),
+    );
+
+    const moved = service.move(Direction.Left);
+
+    expect(moved).toBe(true);
+    expect(service.tiles().length).toBe(BOARD_SIZE * BOARD_SIZE); // tahta doldu
+    expect(service.status()).toBe(GameStatus.Lost);
+  });
+
+  it('oyun bittikten sonra hamle alınmıyor', () => {
+    service.status.set(GameStatus.Lost);
+    const before = service.tiles();
+    const moved = service.move(Direction.Left);
+
+    expect(moved).toBe(false);
+    expect(service.tiles()).toBe(before); // hiç değişmedi
+  });
+});

@@ -8,6 +8,8 @@
   border-radius: v.$radius-lg;
   padding: v.$gap;
   box-sizing: border-box;
+  // Mobilde tahta üzerinde kaydırınca sayfa scroll olmasın
+  touch-action: none;
 }
 
 // Zemin: 4×4 boş hücre ızgarası

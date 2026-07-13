@@ -7,7 +7,7 @@ import {
   GameStatus,
   Tile,
 } from '../models/tile.model';
-import { applyMove } from '../logic/board-logic';
+import { applyMove, hasAnyMove } from '../logic/board-logic';
 
 // ============================================================
 //  2048 — Oyun servisi
@@ -102,6 +102,14 @@ export class GameService {
 
     // Her geçerli hamleden sonra yeni bir kare
     this.spawnRandomTile();
+
+    // Oyun sonu: yeni kareden sonra hiç hamle kalmadıysa kaybedildi.
+    // (Kazandın/kaybettin EKRANLARI sonraki adımda; burada yalnızca
+    //  durumu güncelleyip girişlerin kilitlenmesini sağlıyoruz.)
+    if (!hasAnyMove(this.tiles())) {
+      this.status.set(GameStatus.Lost);
+    }
+
     return true;
   }
 

@@ -40,3 +40,12 @@ export enum GameStatus {
 
 /** Tahta boyutu (4x4). */
 export const BOARD_SIZE = 4;
+
+/** 4×4 ızgaranın 2B görünümü: her hücre ya bir Tile ya da boş (null). */
+export type Grid = (Tile | null)[][];
+
+/** Boş bir hücrenin konumu. */
+export interface Cell {
+  row: number;
+  col: number;
+}

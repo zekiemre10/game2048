@@ -62,7 +62,8 @@ ng test
 
 - [x] Proje iskeleti (Angular + SCSS teması)
 - [x] Başlık / açılış ekranı
-- [ ] 4×4 oyun tahtası
+- [x] Izgara veri modeli + signal state (2 başlangıç karesi)
+- [x] 4×4 tahta görünümü
 - [ ] Hamle ve birleştirme mantığı
 - [ ] Skor + en yüksek skor (localStorage)
 - [ ] Kazandın / kaybettin ekranları

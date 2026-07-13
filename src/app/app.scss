@@ -1,8 +1,93 @@
-.game-placeholder {
-  min-height: 100vh;
+@use 'sass:map';
+@use '../styles/variables' as v;
+
+.game {
+  max-width: v.$board-size;
+  margin: 2rem auto;
+  padding: 1rem;
+}
+
+.topbar {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.brand {
+  font-size: 3rem;
+  font-weight: 800;
+  margin: 0;
+  color: v.$color-text-dark;
+}
+
+.score-box {
+  background: v.$color-board;
+  color: v.$color-text-light;
+  padding: 0.4rem 1.25rem;
+  border-radius: v.$radius-md;
+  text-align: center;
+  min-width: 90px;
+
+  span {
+    display: block;
+    font-size: 0.7rem;
+    letter-spacing: 1px;
+    opacity: 0.85;
+  }
+
+  strong {
+    font-size: 1.5rem;
+  }
+}
+
+.board {
+  background: v.$color-board;
+  border-radius: v.$radius-lg;
+  padding: v.$gap;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: v.$gap;
+  aspect-ratio: 1 / 1;
+}
+
+.cell {
+  background: v.$color-cell-empty;
+  border-radius: v.$radius-md;
+  display: flex;
   align-items: center;
   justify-content: center;
-  text-align: center;
+}
+
+.tile {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: v.$radius-md;
+  font-weight: 800;
+  font-size: 2.2rem;
+  color: v.$color-text-dark;
+  box-shadow: v.$shadow-soft;
+}
+
+// Değere göre taş renkleri — _variables.scss'teki paletten üretilir
+@each $val, $color in v.$tile-colors {
+  .tile-#{$val} {
+    background: $color;
+    @if $val >= 8 {
+      color: v.$color-text-light;
+    }
+    @if $val >= 128 {
+      font-size: 1.8rem; // 3+ haneli sayılar için küçült
+    }
+    @if $val >= 1024 {
+      font-size: 1.4rem;
+    }
+  }
+}
+
+.restart-btn {
+  margin-top: 1.25rem;
 }

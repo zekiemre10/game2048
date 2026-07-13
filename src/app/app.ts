@@ -15,5 +15,12 @@ export class App {
 
   /** Şablonda kullanmak için durumları dışa aç. */
   protected readonly status = this.game.status;
+  protected readonly grid = this.game.grid;
+  protected readonly score = this.game.score;
   protected readonly GameStatus = GameStatus;
+
+  /** Yeni oyun / yeniden başlat. */
+  onRestart(): void {
+    this.game.startGame();
+  }
 }

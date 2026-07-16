@@ -1,8 +1,9 @@
-import { Component, HostListener, computed, inject } from '@angular/core';
+import { Component, HostListener, computed, inject, signal } from '@angular/core';
 import { StartScreen } from './components/start-screen/start-screen';
 import { BoardComponent } from './components/board/board';
 import { GameService } from './services/game.service';
-import { ThemeService } from './services/theme.service';
+import { ThemeService, Theme } from './services/theme.service';
+import { AudioService } from './services/audio.service';
 import { Direction, GameStatus } from './models/tile.model';
 import { swipeDirection } from './logic/swipe';
 import { formatTime } from './logic/format-time';
@@ -25,6 +26,7 @@ const KEY_TO_DIRECTION: Record<string, Direction> = {
 export class App {
   private readonly game = inject(GameService);
   private readonly themeService = inject(ThemeService);
+  private readonly audio = inject(AudioService);
 
   /** Şablonda kullanmak için durumları dışa aç. */
   protected readonly status = this.game.status;
@@ -34,10 +36,18 @@ export class App {
   protected readonly moves = this.game.moves;
   protected readonly elapsedSeconds = this.game.elapsedSeconds;
   protected readonly theme = this.themeService.theme;
+  protected readonly musicOn = this.audio.musicOn;
+  protected readonly volume = this.audio.volume;
   protected readonly GameStatus = GameStatus;
+
+  /** Ayarlar paneli açık mı? */
+  protected readonly settingsOpen = signal(false);
 
   /** Geçen süreyi mm:ss biçiminde döndürür (şablonda gösterim için). */
   protected readonly elapsedLabel = computed(() => formatTime(this.elapsedSeconds()));
+
+  /** Ses seviyesini yüzde (0-100) olarak gösterir. */
+  protected readonly volumePercent = computed(() => Math.round(this.volume() * 100));
 
   /** Dokunmatik kaydırmanın başlangıç noktası. */
   private touchStartX = 0;
@@ -101,5 +111,33 @@ export class App {
   /** Açık ↔ koyu tema geçişi (tercih kalıcı kaydedilir). */
   onToggleTheme(): void {
     this.themeService.toggle();
+  }
+
+  // --- Ayarlar paneli -----------------------------------------
+
+  /** Ayarlar panelini aç. */
+  onOpenSettings(): void {
+    this.settingsOpen.set(true);
+  }
+
+  /** Ayarlar panelini kapat. */
+  onCloseSettings(): void {
+    this.settingsOpen.set(false);
+  }
+
+  /** Temayı doğrudan ayarla (Ayarlar panelindeki düğmeler). */
+  onSetTheme(theme: Theme): void {
+    this.themeService.set(theme);
+  }
+
+  /** Müziği aç/kapat. */
+  onToggleMusic(): void {
+    this.audio.toggleMusic();
+  }
+
+  /** Ses seviyesi kaydırıcısı değişti (0-100 → 0..1). */
+  onVolumeInput(event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value);
+    this.audio.setVolume(value / 100);
   }
 }

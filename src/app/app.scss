@@ -114,14 +114,18 @@
   cursor: not-allowed;
 }
 
-// --- Tema geçiş butonu (her ekranda sağ üstte) ---------------
+// --- Sağ üst aksiyon butonları (tema + ayarlar) --------------
 
-.theme-toggle {
+.top-actions {
   position: fixed;
   top: clamp(0.6rem, 2.5vw, 1rem);
   right: clamp(0.6rem, 2.5vw, 1rem);
   z-index: 10;
+  display: flex;
+  gap: 0.5rem;
+}
 
+.round-btn {
   width: 44px;
   height: 44px;
   min-height: 44px;
@@ -152,6 +156,163 @@
     outline: 3px solid var(--color-button);
     outline-offset: 3px;
   }
+}
+
+// --- Ayarlar paneli -----------------------------------------
+
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.45);
+  animation: overlay-fade 180ms ease-in-out;
+}
+
+.settings-panel {
+  width: min(100%, 380px);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--color-bg);
+  color: var(--color-text);
+  border-radius: v.$radius-lg;
+  padding: clamp(1.2rem, 5vw, 1.75rem);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.settings-title {
+  margin: 0 0 0.25rem;
+  font-size: clamp(1.4rem, 5vw, 1.8rem);
+  font-weight: 800;
+}
+
+.settings-note {
+  margin: 0 0 1.25rem;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.settings-section {
+  margin-bottom: 1.25rem;
+}
+
+.settings-heading {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  letter-spacing: 1.5px;
+  opacity: 0.75;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.4rem 0;
+  font-size: 1rem;
+}
+
+// Aç/kapa anahtarı
+.switch {
+  position: relative;
+  width: 52px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--color-cell-empty);
+  transition: background-color v.$transition-fast;
+
+  &.on {
+    background: var(--color-button);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--color-button);
+    outline-offset: 3px;
+  }
+}
+
+.switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform v.$transition-fast;
+
+  .switch.on & {
+    transform: translateX(22px);
+  }
+}
+
+// Ses kaydırıcısı
+.volume {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1;
+  max-width: 200px;
+}
+
+.volume input[type='range'] {
+  flex: 1;
+  accent-color: var(--color-button);
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.volume-val {
+  min-width: 2.2ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+// Tema seçimi
+.theme-choice {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.theme-choice button {
+  flex: 1;
+  padding: 0.6rem;
+  border-radius: v.$radius-md;
+  font-weight: 700;
+  background: var(--color-cell-empty);
+  color: var(--color-text);
+  transition:
+    background-color v.$transition-fast,
+    box-shadow v.$transition-fast;
+
+  &.active {
+    box-shadow: inset 0 0 0 2px var(--color-button);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--color-button);
+    outline-offset: 2px;
+  }
+}
+
+.settings-credit {
+  margin: 0 0 1.25rem;
+  font-size: 0.78rem;
+  opacity: 0.65;
+  text-align: center;
+}
+
+.settings-close {
+  width: 100%;
 }
 
 // --- Kazandın / Kaybettin overlay ---------------------------

@@ -1,15 +1,107 @@
-<!-- Tema geçişi: her ekranda sağ üstte -->
-<button
-  class="theme-toggle"
-  type="button"
-  [attr.aria-label]="
-    theme() === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'
-  "
-  [attr.title]="theme() === 'dark' ? 'Açık tema' : 'Koyu tema'"
-  (click)="onToggleTheme()"
->
-  {{ theme() === 'dark' ? '☀️' : '🌙' }}
-</button>
+<!-- Sağ üst: hızlı tema + ayarlar -->
+<div class="top-actions">
+  <button
+    class="round-btn"
+    type="button"
+    [attr.aria-label]="
+      theme() === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'
+    "
+    [attr.title]="theme() === 'dark' ? 'Açık tema' : 'Koyu tema'"
+    (click)="onToggleTheme()"
+  >
+    {{ theme() === 'dark' ? '☀️' : '🌙' }}
+  </button>
+  <button
+    class="round-btn"
+    type="button"
+    aria-label="Ayarlar"
+    title="Ayarlar"
+    (click)="onOpenSettings()"
+  >
+    ⚙️
+  </button>
+</div>
+
+<!-- Ayarlar paneli -->
+@if (settingsOpen()) {
+  <div class="settings-backdrop" (click)="onCloseSettings()">
+    <div
+      class="settings-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Ayarlar"
+      (click)="$event.stopPropagation()"
+    >
+      <h2 class="settings-title">⚙️ Ayarlar</h2>
+      <p class="settings-note">
+        Ayarların otomatik kaydedilir ve oyunu tekrar açtığında korunur.
+      </p>
+
+      <!-- SES -->
+      <section class="settings-section">
+        <h3 class="settings-heading">🔊 SES</h3>
+        <div class="settings-row">
+          <span>Müzik</span>
+          <button
+            class="switch"
+            type="button"
+            role="switch"
+            [attr.aria-checked]="musicOn()"
+            [class.on]="musicOn()"
+            (click)="onToggleMusic()"
+          >
+            <span class="switch-knob"></span>
+          </button>
+        </div>
+        <div class="settings-row">
+          <span>Ses seviyesi</span>
+          <div class="volume">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              [value]="volumePercent()"
+              [disabled]="!musicOn()"
+              (input)="onVolumeInput($event)"
+              aria-label="Ses seviyesi"
+            />
+            <span class="volume-val">{{ volumePercent() }}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- TEMA -->
+      <section class="settings-section">
+        <h3 class="settings-heading">🎨 TEMA</h3>
+        <div class="theme-choice">
+          <button
+            type="button"
+            [class.active]="theme() === 'light'"
+            (click)="onSetTheme('light')"
+          >
+            ☀️ Açık
+          </button>
+          <button
+            type="button"
+            [class.active]="theme() === 'dark'"
+            (click)="onSetTheme('dark')"
+          >
+            🌙 Koyu
+          </button>
+        </div>
+      </section>
+
+      <p class="settings-credit">
+        🎵 “Calm Mind – Chill Lofi Beat” — FASSounds · Pixabay · Ücretsiz lisans
+      </p>
+
+      <button class="btn-primary settings-close" type="button" (click)="onCloseSettings()">
+        Kapat
+      </button>
+    </div>
+  </div>
+}
 
 @if (status() === GameStatus.Idle) {
   <app-start-screen />

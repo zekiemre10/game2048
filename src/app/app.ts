@@ -108,11 +108,6 @@ export class App {
     this.game.undo();
   }
 
-  /** Açık ↔ koyu tema geçişi (tercih kalıcı kaydedilir). */
-  onToggleTheme(): void {
-    this.themeService.toggle();
-  }
-
   // --- Ayarlar paneli -----------------------------------------
 
   /** Ayarlar panelini aç. */

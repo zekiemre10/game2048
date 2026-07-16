@@ -16,6 +16,13 @@ import {
   emptyInventory,
   powerDef,
 } from '../models/power.model';
+import { ACHIEVEMENTS } from '../models/achievement.model';
+import {
+  dailyRewardAmount,
+  dayKey,
+  streakAfterActivity,
+  yesterdayKey,
+} from '../logic/daily';
 
 // ============================================================
 //  2048 — Oyun servisi
@@ -39,6 +46,9 @@ const BEST_LEVEL_KEY = 'game2048.bestLevel';
 /** Toplam altının localStorage anahtarı. */
 const GOLD_KEY = 'game2048.gold';
 
+/** Bugüne kadar kazanılan toplam altının anahtarı. */
+const TOTAL_EARNED_KEY = 'game2048.totalGoldEarned';
+
 /** Ödülü alınmış seviyelerin localStorage anahtarı. */
 const REWARDED_LEVELS_KEY = 'game2048.rewardedLevels';
 
@@ -47,6 +57,13 @@ const POWERS_KEY = 'game2048.powers';
 
 /** +30 saniye gücünün eklediği süre. */
 const TIME_POWER_SECONDS = 30;
+
+/** Profil/meta localStorage anahtarları. */
+const NAME_KEY = 'game2048.name';
+const STATS_KEY = 'game2048.stats';
+const STREAK_KEY = 'game2048.streak';
+const DAILY_KEY = 'game2048.dailyDay';
+const ACHIEVEMENTS_KEY = 'game2048.achievements';
 
 /** Geri al için saklanan tek adımlık oyun durumu. */
 interface GameSnapshot {
@@ -105,6 +122,9 @@ export class GameService {
   /** Toplam altın (hesapta kalıcı). */
   readonly gold = signal<number>(loadGold());
 
+  /** Bugüne kadar kazanılan toplam altın (başarım için). */
+  readonly totalGoldEarned = signal<number>(loadTotalEarned());
+
   /** Ödülü zaten alınmış seviyeler (tekrar tamamlamada altın verilmez). */
   private readonly rewardedLevels = new Set<number>(loadRewardedLevels());
 
@@ -125,6 +145,47 @@ export class GameService {
 
   /** İpucu temizleme zamanlayıcısı. */
   private hintTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // --- Profil / istatistik / seri / başarım -------------------
+
+  /** Oyuncu adı. */
+  readonly playerName = signal<string>(loadName());
+
+  /** Oynanan toplam oyun. */
+  readonly gamesPlayed = signal<number>(loadStat('gamesPlayed'));
+  /** Kazanılan oyun (2048'e ulaşma / tüm seviyeler). */
+  readonly gamesWon = signal<number>(loadStat('gamesWon'));
+  /** Ulaşılan en yüksek kare değeri. */
+  readonly bestTile = signal<number>(loadStat('bestTile'));
+  /** Toplam yapılan hamle. */
+  readonly totalMoves = signal<number>(loadStat('totalMoves'));
+  /** En az bir bomba kullanıldı mı? */
+  private bombUsed = signal<boolean>(loadStat('bombUsed') === 1);
+
+  /** Anlık gün serisi. */
+  readonly currentStreak = signal<number>(loadStreak('current'));
+  /** En yüksek seri. */
+  readonly bestStreak = signal<number>(loadStreak('best'));
+  private lastActiveDay = signal<string | null>(loadStreakDay());
+
+  /** Günlük ödülün son alındığı gün. */
+  private lastRewardDay = signal<string | null>(loadDailyDay());
+  /** Son günlük ödül miktarı (UI gösterimi için). */
+  readonly lastDailyReward = signal<number>(0);
+
+  /** Açılmış başarım id'leri. */
+  readonly unlockedAchievements = signal<Set<string>>(loadAchievements());
+
+  /** Kazanma yüzdesi (0-100). */
+  readonly winRate = computed<number>(() => {
+    const played = this.gamesPlayed();
+    return played === 0 ? 0 : Math.round((this.gamesWon() / played) * 100);
+  });
+
+  /** Bugün günlük ödül alınabilir mi? */
+  readonly canClaimDaily = computed<boolean>(
+    () => this.lastRewardDay() !== dayKey(new Date()),
+  );
 
   /** (Seviye modu) anlık seviyenin hedef karesi. */
   readonly levelTarget = computed<number>(() => levelConfig(this.level()).target);
@@ -173,6 +234,7 @@ export class GameService {
     this.spawnRandomTile();
     this.spawnRandomTile();
     this.startTimer(0); // süre sıfırdan başlar
+    this.registerActivity(); // gün serisi
   }
 
   // --- Seviye modu --------------------------------------------
@@ -182,6 +244,7 @@ export class GameService {
     this.mode.set(GameMode.Level);
     this.level.set(1);
     this.startLevel();
+    this.registerActivity(); // gün serisi
   }
 
   /** Anlık seviyeyi (yeniden) başlatır: boş tahta + geri sayım. */
@@ -273,6 +336,25 @@ export class GameService {
     this.startTimer(this.elapsedSeconds());
   }
 
+  // --- Altın ekonomisi ----------------------------------------
+
+  /** Altın ekler (kazanç sayılır → toplam kazanç + başarım kontrolü). */
+  addGold(amount: number): void {
+    if (amount <= 0) return;
+    this.gold.update((g) => g + amount);
+    this.totalGoldEarned.update((t) => t + amount);
+    saveGold(this.gold());
+    saveTotalEarned(this.totalGoldEarned());
+  }
+
+  /** Altın harcar. Yeterli değilse harcamaz. @returns başarılıysa true. */
+  spendGold(amount: number): boolean {
+    if (this.gold() < amount) return false;
+    this.gold.update((g) => g - amount);
+    saveGold(this.gold());
+    return true;
+  }
+
   // --- Güçler (mağaza + kullanım) -----------------------------
 
   /**
@@ -280,12 +362,8 @@ export class GameService {
    * @returns satın alma başarılıysa true (yeterli altın vs.).
    */
   buyPower(id: PowerId): boolean {
-    const price = powerDef(id).price;
-    if (this.gold() < price) return false;
-
-    this.gold.update((g) => g - price);
+    if (!this.spendGold(powerDef(id).price)) return false;
     this.powers.update((inv) => ({ ...inv, [id]: inv[id] + 1 }));
-    saveGold(this.gold());
     savePowers(this.powers());
     return true;
   }
@@ -333,6 +411,12 @@ export class GameService {
     );
     this.consumePower('bomb');
     this.bombMode.set(false);
+
+    if (!this.bombUsed()) {
+      this.bombUsed.set(true);
+      this.saveStats();
+      this.checkAchievements(); // "Bombacı" başarımı
+    }
     return true;
   }
 
@@ -426,6 +510,119 @@ export class GameService {
     }
   }
 
+  // --- Profil / istatistik / seri / günlük / başarım ----------
+
+  /** Oyuncu adını ayarlar (kalıcı). */
+  setName(name: string): void {
+    const clean = name.trim().slice(0, 16) || 'Oyuncu';
+    this.playerName.set(clean);
+    saveName(clean);
+  }
+
+  /** Oyun başlangıcında günün aktivitesini kaydeder (seri). */
+  private registerActivity(): void {
+    const now = new Date();
+    const today = dayKey(now);
+    const yesterday = yesterdayKey(now);
+    const next = streakAfterActivity(
+      this.currentStreak(),
+      this.lastActiveDay(),
+      today,
+      yesterday,
+    );
+    this.currentStreak.set(next);
+    if (next > this.bestStreak()) this.bestStreak.set(next);
+    this.lastActiveDay.set(today);
+    saveStreak(this.currentStreak(), this.bestStreak(), today);
+    this.checkAchievements();
+  }
+
+  /**
+   * Günlük ödülü alır (günde bir kez). Seriye göre altın verir.
+   * @returns ödül alındıysa true.
+   */
+  claimDailyReward(): boolean {
+    const today = dayKey(new Date());
+    if (this.lastRewardDay() === today) return false; // bugün alınmış
+
+    this.registerActivity(); // seriyi güncelle
+    const reward = dailyRewardAmount(this.currentStreak());
+    this.addGold(reward);
+    this.lastRewardDay.set(today);
+    this.lastDailyReward.set(reward);
+    saveDailyDay(today);
+    return true;
+  }
+
+  /** Oyun sonunda istatistikleri günceller. */
+  private recordGameEnd(won: boolean): void {
+    this.gamesPlayed.update((n) => n + 1);
+    if (won) this.gamesWon.update((n) => n + 1);
+    this.totalMoves.update((n) => n + this.moves());
+    this.saveStats();
+    this.checkAchievements();
+  }
+
+  /** Tahtadaki en yüksek kareyi izler (başarım için). */
+  private updateBestTile(): void {
+    let max = this.bestTile();
+    for (const t of this.tiles()) if (t.value > max) max = t.value;
+    if (max !== this.bestTile()) {
+      this.bestTile.set(max);
+      this.saveStats();
+      this.checkAchievements();
+    }
+  }
+
+  /** Koşulu sağlanan yeni başarımları açar ve altın verir. */
+  private checkAchievements(): void {
+    let changed = false;
+    for (const a of ACHIEVEMENTS) {
+      if (this.unlockedAchievements().has(a.id)) continue;
+      if (this.achievementMet(a.id)) {
+        this.unlockedAchievements.update((s) => new Set(s).add(a.id));
+        this.addGold(a.gold); // ödül (tekrar checkAchievements tetikler ama yakınsar)
+        changed = true;
+      }
+    }
+    if (changed) saveAchievements(this.unlockedAchievements());
+  }
+
+  private achievementMet(id: string): boolean {
+    switch (id) {
+      case 'tile-512':
+        return this.bestTile() >= 512;
+      case 'tile-1024':
+        return this.bestTile() >= 1024;
+      case 'first-win':
+        return this.bestTile() >= WIN_VALUE;
+      case 'level-3':
+        return this.bestLevel() >= 3;
+      case 'games-10':
+        return this.gamesPlayed() >= 10;
+      case 'streak-3':
+        return this.bestStreak() >= 3;
+      case 'streak-7':
+        return this.bestStreak() >= 7;
+      case 'bomb-use':
+        return this.bombUsed();
+      case 'rich':
+        return this.totalGoldEarned() >= 1000;
+      default:
+        return false;
+    }
+  }
+
+  private saveStats(): void {
+    saveStats({
+      gamesPlayed: this.gamesPlayed(),
+      gamesWon: this.gamesWon(),
+      bestTile: this.bestTile(),
+      totalMoves: this.totalMoves(),
+      bombUsed: this.bombUsed() ? 1 : 0,
+    });
+  }
+
   /**
    * Verilen yöne hamle yapar.
    * - Izgara değişmediyse (geçersiz hamle) hiçbir şey yapmaz, yeni kare üretmez.
@@ -460,6 +657,7 @@ export class GameService {
 
     // Her geçerli hamleden sonra yeni bir kare
     this.spawnRandomTile();
+    this.updateBestTile(); // en yüksek kare istatistiği
 
     if (this.mode() === GameMode.Level) {
       this.checkLevelEnd();
@@ -478,11 +676,13 @@ export class GameService {
     ) {
       this.stopTimer(); // süre "tamamlama" anında donar
       this.status.set(GameStatus.Won);
+      this.recordGameEnd(true);
       return;
     }
     if (!hasAnyMove(this.tiles())) {
       this.stopTimer();
       this.status.set(GameStatus.Lost);
+      this.recordGameEnd(false);
     }
   }
 
@@ -495,15 +695,18 @@ export class GameService {
     if (this.tiles().some((t) => t.value >= this.levelTarget())) {
       this.stopTimer();
       this.awardGold(this.level()); // seviye tamamlandı → altın ver
-      this.status.set(
-        this.level() >= MAX_LEVEL ? GameStatus.Won : GameStatus.LevelComplete,
-      );
+      if (this.level() >= MAX_LEVEL) {
+        this.status.set(GameStatus.Won);
+        this.recordGameEnd(true); // tüm seviyeler bitti = kazanılmış oyun
+      } else {
+        this.status.set(GameStatus.LevelComplete);
+      }
       return;
     }
     if (!hasAnyMove(this.tiles())) {
       this.stopTimer();
-      // Başarısız → altın YOK
-      this.status.set(GameStatus.Failed);
+      this.status.set(GameStatus.Failed); // Başarısız → altın YOK
+      this.recordGameEnd(false);
     }
   }
 
@@ -520,9 +723,8 @@ export class GameService {
       return;
     }
     this.rewardedLevels.add(level);
-    this.gold.update((g) => g + reward);
+    this.addGold(reward);
     this.lastReward.set(reward);
-    saveGold(this.gold());
     saveRewardedLevels(this.rewardedLevels);
   }
 
@@ -691,6 +893,28 @@ function saveGold(gold: number): void {
   }
 }
 
+/** Bugüne kadar kazanılan toplam altını okur. */
+function loadTotalEarned(): number {
+  try {
+    if (typeof localStorage === 'undefined') return 0;
+    const raw = localStorage.getItem(TOTAL_EARNED_KEY);
+    const n = raw ? parseInt(raw, 10) : 0;
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Toplam kazanılan altını yazar. */
+function saveTotalEarned(total: number): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(TOTAL_EARNED_KEY, String(total));
+  } catch {
+    /* yoksay */
+  }
+}
+
 /** Ödülü alınmış seviyelerin listesini localStorage'dan okur. */
 function loadRewardedLevels(): number[] {
   try {
@@ -737,6 +961,122 @@ function savePowers(inv: PowerInventory): void {
   try {
     if (typeof localStorage === 'undefined') return;
     localStorage.setItem(POWERS_KEY, JSON.stringify(inv));
+  } catch {
+    /* yoksay */
+  }
+}
+
+// --- Profil / istatistik / seri / günlük / başarım kalıcılık ---
+
+function loadName(): string {
+  try {
+    return localStorage?.getItem(NAME_KEY) || 'Oyuncu';
+  } catch {
+    return 'Oyuncu';
+  }
+}
+
+function saveName(name: string): void {
+  try {
+    localStorage?.setItem(NAME_KEY, name);
+  } catch {
+    /* yoksay */
+  }
+}
+
+interface StatsBlob {
+  gamesPlayed: number;
+  gamesWon: number;
+  bestTile: number;
+  totalMoves: number;
+  bombUsed: number;
+}
+
+function readStats(): Partial<StatsBlob> {
+  try {
+    if (typeof localStorage === 'undefined') return {};
+    const raw = localStorage.getItem(STATS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function loadStat(key: keyof StatsBlob): number {
+  const v = readStats()[key];
+  return typeof v === 'number' && v >= 0 ? v : 0;
+}
+
+function saveStats(blob: StatsBlob): void {
+  try {
+    localStorage?.setItem(STATS_KEY, JSON.stringify(blob));
+  } catch {
+    /* yoksay */
+  }
+}
+
+function readStreak(): { current?: number; best?: number; day?: string } {
+  try {
+    if (typeof localStorage === 'undefined') return {};
+    const raw = localStorage.getItem(STREAK_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function loadStreak(key: 'current' | 'best'): number {
+  const v = readStreak()[key];
+  return typeof v === 'number' && v >= 0 ? v : 0;
+}
+
+function loadStreakDay(): string | null {
+  return readStreak().day ?? null;
+}
+
+function saveStreak(current: number, best: number, day: string): void {
+  try {
+    localStorage?.setItem(STREAK_KEY, JSON.stringify({ current, best, day }));
+  } catch {
+    /* yoksay */
+  }
+}
+
+function loadDailyDay(): string | null {
+  try {
+    return localStorage?.getItem(DAILY_KEY) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function saveDailyDay(day: string): void {
+  try {
+    localStorage?.setItem(DAILY_KEY, day);
+  } catch {
+    /* yoksay */
+  }
+}
+
+function loadAchievements(): Set<string> {
+  const set = new Set<string>();
+  try {
+    if (typeof localStorage === 'undefined') return set;
+    const raw = localStorage.getItem(ACHIEVEMENTS_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr))
+        for (const id of arr) if (typeof id === 'string') set.add(id);
+    }
+  } catch {
+    /* yoksay */
+  }
+  return set;
+}
+
+function saveAchievements(set: Set<string>): void {
+  try {
+    localStorage?.setItem(ACHIEVEMENTS_KEY, JSON.stringify([...set]));
   } catch {
     /* yoksay */
   }

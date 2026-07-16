@@ -1,3 +1,20 @@
+<!-- Sol üst: profil -->
+<button
+  class="profile-btn"
+  type="button"
+  aria-label="Profil"
+  (click)="onOpenProfile()"
+>
+  <span class="profile-avatar">👤</span>
+  <span class="profile-meta">
+    <span class="profile-name">{{ playerName() }}</span>
+    <span class="profile-streak">🔥 {{ currentStreak() }} · 💰 {{ gold() }}</span>
+  </span>
+  @if (canClaimDaily()) {
+    <span class="profile-badge" title="Günlük ödül hazır">🎁</span>
+  }
+</button>
+
 <!-- Sağ üst: mağaza + ayarlar -->
 <div class="top-actions">
   <button
@@ -87,22 +104,27 @@
       <!-- TEMA -->
       <section class="settings-section">
         <h3 class="settings-heading">🎨 TEMA</h3>
-        <div class="theme-choice">
-          <button
-            type="button"
-            [class.active]="theme() === 'light'"
-            (click)="onSetTheme('light')"
-          >
-            ☀️ Açık
-          </button>
-          <button
-            type="button"
-            [class.active]="theme() === 'dark'"
-            (click)="onSetTheme('dark')"
-          >
-            🌙 Koyu
-          </button>
+        <div class="theme-swatches">
+          @for (t of THEMES; track t.id) {
+            @if (isThemeOwned(t.id)) {
+              <button
+                type="button"
+                class="theme-swatch"
+                [class.active]="theme() === t.id"
+                [title]="t.name"
+                (click)="onSelectTheme(t.id)"
+              >
+                <span class="swatch-colors">
+                  <span [style.background]="t.swatch[0]"></span>
+                  <span [style.background]="t.swatch[1]"></span>
+                  <span [style.background]="t.swatch[2]"></span>
+                </span>
+                <span class="swatch-name">{{ t.name }}</span>
+              </button>
+            }
+          }
         </div>
+        <p class="theme-hint">Daha fazla tema 🛒 Mağaza'da</p>
       </section>
 
       <p class="settings-credit">
@@ -133,6 +155,7 @@
 
       <div class="store-gold">💰 Altının: <strong>{{ gold() }}</strong></div>
 
+      <h3 class="store-heading">⚡ Güçler</h3>
       <div class="store-list">
         @for (p of POWERS; track p.id) {
           <div class="store-item">
@@ -158,7 +181,112 @@
         }
       </div>
 
+      <h3 class="store-heading">🎨 Temalar</h3>
+      <div class="store-list">
+        @for (t of THEMES; track t.id) {
+          @if (t.price > 0) {
+            <div class="store-item">
+              <span class="swatch-colors store-icon">
+                <span [style.background]="t.swatch[0]"></span>
+                <span [style.background]="t.swatch[1]"></span>
+                <span [style.background]="t.swatch[2]"></span>
+              </span>
+              <div class="store-info">
+                <div class="store-name">{{ t.name }}</div>
+                <div class="store-desc">Renk teması</div>
+              </div>
+              @if (isThemeOwned(t.id)) {
+                <button
+                  class="btn-primary store-buy ghost"
+                  type="button"
+                  (click)="onSelectTheme(t.id)"
+                >
+                  {{ theme() === t.id ? '✓ Seçili' : 'Seç' }}
+                </button>
+              } @else {
+                <button
+                  class="btn-primary store-buy"
+                  type="button"
+                  [disabled]="gold() < t.price"
+                  (click)="onBuyTheme(t.id)"
+                >
+                  💰 {{ t.price }}
+                </button>
+              }
+            </div>
+          }
+        }
+      </div>
+
       <button class="btn-primary settings-close" type="button" (click)="onCloseStore()">
+        Kapat
+      </button>
+    </div>
+  </div>
+}
+
+<!-- Profil paneli -->
+@if (profileOpen()) {
+  <div class="settings-backdrop" (click)="onCloseProfile()">
+    <div
+      class="settings-panel profile-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Profil"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="profile-head">
+        <span class="profile-head-avatar">👤</span>
+        <input
+          class="profile-name-input"
+          type="text"
+          maxlength="16"
+          [value]="playerName()"
+          (input)="onNameInput($event)"
+          aria-label="Oyuncu adı"
+        />
+      </div>
+
+      <!-- Günlük ödül -->
+      @if (canClaimDaily()) {
+        <button class="btn-primary daily-btn" type="button" (click)="onClaimDaily()">
+          🎁 Günlük Ödülü Al
+        </button>
+      } @else {
+        <div class="daily-done">✓ Günlük ödül alındı — yarın tekrar gel!</div>
+      }
+
+      <!-- İstatistikler -->
+      <div class="profile-stats">
+        <div class="pstat"><strong>{{ gamesPlayed() }}</strong><span>OYUN</span></div>
+        <div class="pstat"><strong>%{{ winRate() }}</strong><span>KAZANMA</span></div>
+        <div class="pstat"><strong>{{ bestTile() }}</strong><span>EN İYİ KARE</span></div>
+        <div class="pstat"><strong>🔥 {{ currentStreak() }}</strong><span>SERİ</span></div>
+        <div class="pstat"><strong>{{ bestStreak() }}</strong><span>EN İYİ SERİ</span></div>
+        <div class="pstat"><strong>{{ totalMoves() }}</strong><span>TOPLAM HAMLE</span></div>
+      </div>
+
+      <!-- Başarımlar -->
+      <h3 class="settings-heading">🏅 Başarımlar</h3>
+      <div class="ach-list">
+        @for (a of ACHIEVEMENTS; track a.id) {
+          <div class="ach-item" [class.locked]="!isAchievementUnlocked(a.id)">
+            <span class="ach-icon">{{ a.icon }}</span>
+            <div class="ach-info">
+              <div class="ach-name">
+                {{ a.name }}
+                @if (isAchievementUnlocked(a.id)) {
+                  <span class="ach-check">✓</span>
+                }
+              </div>
+              <div class="ach-desc">{{ a.desc }}</div>
+            </div>
+            <span class="ach-gold">💰 {{ a.gold }}</span>
+          </div>
+        }
+      </div>
+
+      <button class="btn-primary settings-close" type="button" (click)="onCloseProfile()">
         Kapat
       </button>
     </div>

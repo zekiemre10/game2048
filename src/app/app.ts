@@ -2,13 +2,15 @@ import { Component, HostListener, computed, inject, signal } from '@angular/core
 import { StartScreen } from './components/start-screen/start-screen';
 import { BoardComponent } from './components/board/board';
 import { GameService } from './services/game.service';
-import { ThemeService, Theme } from './services/theme.service';
+import { ThemeService } from './services/theme.service';
+import { THEMES, themeDef } from './models/theme.model';
 import { AudioService } from './services/audio.service';
 import { SfxService } from './services/sfx.service';
 import { Direction, GameMode, GameStatus } from './models/tile.model';
 import { swipeDirection } from './logic/swipe';
 import { formatTime } from './logic/format-time';
 import { POWERS, PowerId } from './models/power.model';
+import { ACHIEVEMENTS } from './models/achievement.model';
 
 /** Ok tuşu → yön eşlemesi. */
 const KEY_TO_DIRECTION: Record<string, Direction> = {
@@ -55,12 +57,29 @@ export class App {
   protected readonly GameMode = GameMode;
   protected readonly Direction = Direction;
   protected readonly POWERS = POWERS;
+  protected readonly THEMES = THEMES;
+  protected readonly ACHIEVEMENTS = ACHIEVEMENTS;
+
+  // Profil / meta
+  protected readonly playerName = this.game.playerName;
+  protected readonly gamesPlayed = this.game.gamesPlayed;
+  protected readonly gamesWon = this.game.gamesWon;
+  protected readonly winRate = this.game.winRate;
+  protected readonly bestTile = this.game.bestTile;
+  protected readonly totalMoves = this.game.totalMoves;
+  protected readonly currentStreak = this.game.currentStreak;
+  protected readonly bestStreak = this.game.bestStreak;
+  protected readonly canClaimDaily = this.game.canClaimDaily;
+  protected readonly unlockedAchievements = this.game.unlockedAchievements;
 
   /** Ayarlar paneli açık mı? */
   protected readonly settingsOpen = signal(false);
 
   /** Mağaza paneli açık mı? */
   protected readonly storeOpen = signal(false);
+
+  /** Profil paneli açık mı? */
+  protected readonly profileOpen = signal(false);
 
   /** Envanterde en az 1 tane olan güçler (oyun içi güç çubuğu için). */
   protected readonly ownedPowers = computed(() =>
@@ -204,6 +223,33 @@ export class App {
     return this.gold() >= price;
   }
 
+  // --- Profil + günlük ödül ----------------------------------
+
+  onOpenProfile(): void {
+    this.settingsOpen.set(false);
+    this.storeOpen.set(false);
+    this.profileOpen.set(true);
+  }
+
+  onCloseProfile(): void {
+    this.profileOpen.set(false);
+  }
+
+  /** Günlük ödülü al. */
+  onClaimDaily(): void {
+    this.game.claimDailyReward();
+  }
+
+  /** Oyuncu adını güncelle (input değişince). */
+  onNameInput(event: Event): void {
+    this.game.setName((event.target as HTMLInputElement).value);
+  }
+
+  /** Başarım açık mı? */
+  protected isAchievementUnlocked(id: string): boolean {
+    return this.unlockedAchievements().has(id);
+  }
+
   // --- Ayarlar paneli -----------------------------------------
 
   /** Ayarlar panelini aç. */
@@ -216,9 +262,19 @@ export class App {
     this.settingsOpen.set(false);
   }
 
-  /** Temayı doğrudan ayarla (Ayarlar panelindeki düğmeler). */
-  onSetTheme(theme: Theme): void {
-    this.themeService.set(theme);
+  /** Temayı seç (sahip olunanlar arasından). */
+  onSelectTheme(id: string): void {
+    this.themeService.select(id);
+  }
+
+  /** Temayı mağazadan satın al. */
+  onBuyTheme(id: string): void {
+    this.themeService.buyTheme(id);
+  }
+
+  /** Bir tema sahip olunuyor mu? */
+  protected isThemeOwned(id: string): boolean {
+    return this.themeService.isOwned(id);
   }
 
   /** Müziği aç/kapat. */

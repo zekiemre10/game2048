@@ -36,6 +36,57 @@
   --color-overlay-win: rgba(237, 194, 46, 0.45);
 }
 
+// --- Satın alınabilir temalar -------------------------------
+// Kare paleti (2,4,8...) her temada aynı kalır; yalnızca "çerçeve" değişir.
+
+[data-theme='neon'] {
+  --color-bg: #0d0221;
+  --color-board: #241b4a;
+  --color-cell-empty: #2f2560;
+  --color-text: #e6e1ff;
+  --color-text-light: #ffffff;
+  --color-button: #7b2ff7;
+  --color-button-hover: #9d4edd;
+  --color-overlay: rgba(13, 2, 33, 0.82);
+  --color-overlay-win: rgba(157, 78, 221, 0.5);
+}
+
+[data-theme='ocean'] {
+  --color-bg: #0a2540;
+  --color-board: #14507a;
+  --color-cell-empty: #1d6ca3;
+  --color-text: #e0f2ff;
+  --color-text-light: #ffffff;
+  --color-button: #1e88c7;
+  --color-button-hover: #34a0d8;
+  --color-overlay: rgba(10, 37, 64, 0.82);
+  --color-overlay-win: rgba(72, 202, 228, 0.5);
+}
+
+[data-theme='forest'] {
+  --color-bg: #e9f5e1;
+  --color-board: #6a8f5f;
+  --color-cell-empty: #86a878;
+  --color-text: #2f4a2a;
+  --color-text-light: #f5faf2;
+  --color-button: #4e8a45;
+  --color-button-hover: #5fa055;
+  --color-overlay: rgba(233, 245, 225, 0.82);
+  --color-overlay-win: rgba(78, 138, 69, 0.5);
+}
+
+[data-theme='sunset'] {
+  --color-bg: #2a1a2e;
+  --color-board: #7a3b5a;
+  --color-cell-empty: #9a4f6e;
+  --color-text: #ffe8d6;
+  --color-text-light: #ffffff;
+  --color-button: #e8623a;
+  --color-button-hover: #f47a52;
+  --color-overlay: rgba(42, 26, 46, 0.82);
+  --color-overlay-win: rgba(232, 98, 58, 0.5);
+}
+
 * {
   box-sizing: border-box;
 }

@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { ThemeService } from './theme.service';
+import { GameService } from './game.service';
 
 describe('ThemeService', () => {
   beforeEach(() => {
@@ -9,52 +10,57 @@ describe('ThemeService', () => {
     TestBed.configureTestingModule({});
   });
 
-  function freshService(): ThemeService {
+  function fresh(): ThemeService {
     return TestBed.inject(ThemeService);
   }
 
-  it('kayıt yoksa varsayılan tema belirlenir ve DOM’a uygulanır', () => {
-    const service = freshService();
-    expect(['light', 'dark']).toContain(service.theme());
-    expect(document.documentElement.getAttribute('data-theme')).toBe(
-      service.theme(),
-    );
+  it('varsayılan olarak açık/koyu sahip olunur', () => {
+    const s = fresh();
+    expect(s.isOwned('light')).toBe(true);
+    expect(s.isOwned('dark')).toBe(true);
+    expect(s.isOwned('neon')).toBe(false);
   });
 
-  it('toggle açık ↔ koyu arasında geçiş yapar', () => {
-    const service = freshService();
-    service.set('light');
-    expect(service.theme()).toBe('light');
-
-    service.toggle();
-    expect(service.theme()).toBe('dark');
-
-    service.toggle();
-    expect(service.theme()).toBe('light');
-  });
-
-  it('tema <html data-theme> attribute’una yazılır', () => {
-    const service = freshService();
-
-    service.set('dark');
+  it('sahip olunan tema seçilebilir ve DOM’a uygulanır', () => {
+    const s = fresh();
+    s.select('dark');
+    expect(s.theme()).toBe('dark');
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
-
-    service.set('light');
-    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
   });
 
-  it('tema tercihi localStorage’a kaydedilir', () => {
-    const service = freshService();
-    service.set('dark');
-    expect(localStorage.getItem('game2048.theme')).toBe('dark');
+  it('sahip olunmayan tema seçilemez', () => {
+    const s = fresh();
+    s.select('neon'); // sahip değil
+    expect(s.theme()).not.toBe('neon');
   });
 
-  it('kayıtlı tercih yeni serviste geri yüklenir (kalıcılık)', () => {
-    localStorage.setItem('game2048.theme', 'dark');
+  it('yetersiz altınla tema satın alınamaz', () => {
+    const game = TestBed.inject(GameService);
+    game.gold.set(50);
+    const s = fresh();
+    expect(s.buyTheme('neon')).toBe(false); // neon 200
+    expect(s.isOwned('neon')).toBe(false);
+  });
 
-    const service = freshService();
+  it('yeterli altınla tema satın alınır, altın düşer, otomatik seçilir', () => {
+    const game = TestBed.inject(GameService);
+    game.gold.set(500);
+    const s = fresh();
+    expect(s.buyTheme('neon')).toBe(true);
+    expect(game.gold()).toBe(300); // 500 - 200
+    expect(s.isOwned('neon')).toBe(true);
+    expect(s.theme()).toBe('neon');
+  });
 
-    expect(service.theme()).toBe('dark');
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+  it('satın alınan tema ve seçim kalıcı', () => {
+    const game = TestBed.inject(GameService);
+    game.gold.set(500);
+    fresh().buyTheme('ocean');
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    const s2 = TestBed.inject(ThemeService);
+    expect(s2.isOwned('ocean')).toBe(true);
+    expect(s2.theme()).toBe('ocean');
   });
 });

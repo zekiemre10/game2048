@@ -245,6 +245,203 @@
   font-size: 0.9rem;
 }
 
+// --- Profil butonu (sol üst) --------------------------------
+
+.profile-btn {
+  position: fixed;
+  top: clamp(0.6rem, 2.5vw, 1rem);
+  left: clamp(0.6rem, 2.5vw, 1rem);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem 0.35rem 0.4rem;
+  border-radius: 999px;
+  background: var(--color-board);
+  color: var(--color-text-light);
+  box-shadow: v.$shadow-soft;
+  transition: transform v.$transition-fast;
+
+  &:active {
+    transform: scale(0.96);
+  }
+}
+
+.profile-avatar {
+  font-size: 1.3rem;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-cell-empty);
+  border-radius: 50%;
+}
+
+.profile-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.profile-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.profile-streak {
+  font-size: 0.72rem;
+  opacity: 0.85;
+}
+
+.profile-badge {
+  margin-left: 0.15rem;
+  animation: pulse-low 1.2s ease-in-out infinite;
+}
+
+// Dar ekranda ismi gizle, sadece avatar
+@media (max-width: 520px) {
+  .profile-meta {
+    display: none;
+  }
+}
+
+// --- Profil paneli ------------------------------------------
+
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.profile-head-avatar {
+  font-size: 1.8rem;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-cell-empty);
+  border-radius: 50%;
+}
+
+.profile-name-input {
+  flex: 1;
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--color-text);
+  background: var(--color-cell-empty);
+  border: 2px solid transparent;
+  border-radius: v.$radius-md;
+  padding: 0.4rem 0.6rem;
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-button);
+  }
+}
+
+.daily-btn {
+  width: 100%;
+  margin-bottom: 0.75rem;
+  background: #f6c945;
+  color: #6b4e00;
+}
+
+.daily-done {
+  text-align: center;
+  padding: 0.5rem;
+  margin-bottom: 0.75rem;
+  color: var(--color-text);
+  opacity: 0.75;
+  font-size: 0.9rem;
+}
+
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.pstat {
+  background: var(--color-cell-empty);
+  border-radius: v.$radius-md;
+  padding: 0.5rem 0.25rem;
+  text-align: center;
+
+  strong {
+    display: block;
+    font-size: 1.2rem;
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  span {
+    font-size: 0.62rem;
+    letter-spacing: 0.5px;
+    opacity: 0.7;
+    color: var(--color-text);
+  }
+}
+
+.ach-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.ach-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  background: var(--color-cell-empty);
+  border-radius: v.$radius-md;
+
+  &.locked {
+    opacity: 0.5;
+    filter: grayscale(0.7);
+  }
+}
+
+.ach-icon {
+  font-size: 1.5rem;
+}
+
+.ach-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ach-name {
+  font-weight: 700;
+  color: var(--color-text);
+  font-size: 0.92rem;
+}
+
+.ach-check {
+  color: #3a9d4a;
+  margin-left: 0.2rem;
+}
+
+.ach-desc {
+  font-size: 0.78rem;
+  color: var(--color-text);
+  opacity: 0.75;
+}
+
+.ach-gold {
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  color: #b8860b;
+  font-weight: 700;
+}
+
 // --- Mağaza paneli ------------------------------------------
 
 .store-gold {
@@ -259,11 +456,73 @@
   }
 }
 
+.store-heading {
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--color-text);
+  opacity: 0.7;
+  margin: 0.5rem 0 0.5rem;
+}
+
 .store-list {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   margin-bottom: 1rem;
+}
+
+// Tema renk önizleme (3 renk şeridi)
+.swatch-colors {
+  display: inline-flex;
+  border-radius: v.$radius-sm;
+  overflow: hidden;
+  box-shadow: v.$shadow-soft;
+
+  span {
+    width: 14px;
+    height: 28px;
+  }
+}
+
+// --- Ayarlar: tema swatch seçici ----------------------------
+
+.theme-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.theme-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.4rem;
+  border-radius: v.$radius-md;
+  background: var(--color-cell-empty);
+  border: 2px solid transparent;
+
+  &.active {
+    border-color: var(--color-button);
+  }
+
+  .swatch-colors span {
+    width: 12px;
+    height: 22px;
+  }
+}
+
+.swatch-name {
+  font-size: 0.72rem;
+  color: var(--color-text);
+}
+
+.theme-hint {
+  margin: 0.6rem 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text);
+  opacity: 0.7;
 }
 
 .store-item {

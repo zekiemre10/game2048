@@ -1,53 +1,75 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { FREE_THEMES, themeDef } from '../models/theme.model';
+import { GameService } from './game.service';
 
 // ============================================================
-//  2048 — Tema servisi (açık / koyu)
-//  Tercih localStorage'da saklanır. Kayıt yoksa işletim sisteminin
-//  tercihi (prefers-color-scheme) kullanılır.
+//  2048 — Tema servisi
+//  Açık/Koyu ücretsiz; diğer temalar mağazadan altınla açılır.
+//  Seçili tema + sahip olunan temalar localStorage'da saklanır.
 // ============================================================
 
-export type Theme = 'light' | 'dark';
-
-/** Tema tercihinin localStorage anahtarı. */
+/** Seçili temanın localStorage anahtarı. */
 const THEME_KEY = 'game2048.theme';
+
+/** Sahip olunan temaların localStorage anahtarı. */
+const OWNED_THEMES_KEY = 'game2048.ownedThemes';
 
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
-  /** Aktif tema. */
-  readonly theme = signal<Theme>(loadTheme());
+  private readonly game = inject(GameService);
+
+  /** Aktif tema id'si. */
+  readonly theme = signal<string>(loadTheme());
+
+  /** Sahip olunan tema id'leri (açık/koyu her zaman dahil). */
+  readonly ownedThemes = signal<Set<string>>(loadOwnedThemes());
+
+  /** Bir tema sahip olunuyor mu? */
+  isOwned(id: string): boolean {
+    return this.ownedThemes().has(id);
+  }
 
   constructor() {
     this.applyToDocument(this.theme());
   }
 
-  /** Açık ↔ koyu arasında geçiş yapar ve tercihi kalıcı kaydeder. */
-  toggle(): void {
-    const next: Theme = this.theme() === 'dark' ? 'light' : 'dark';
-    this.set(next);
+  /** Temayı seçer (yalnızca sahip olunanlar). */
+  select(id: string): void {
+    if (!this.isOwned(id)) return;
+    this.theme.set(id);
+    saveTheme(id);
+    this.applyToDocument(id);
   }
 
-  /** Temayı doğrudan ayarlar. */
-  set(theme: Theme): void {
-    this.theme.set(theme);
-    saveTheme(theme);
-    this.applyToDocument(theme);
+  /**
+   * Temayı altınla satın alır.
+   * @returns satın alma başarılıysa true.
+   */
+  buyTheme(id: string): boolean {
+    if (this.isOwned(id)) return false;
+    const price = themeDef(id).price;
+    if (!this.game.spendGold(price)) return false;
+
+    this.ownedThemes.update((s) => new Set(s).add(id));
+    saveOwnedThemes(this.ownedThemes());
+    this.select(id); // satın alınca otomatik uygula
+    return true;
   }
 
   /** <html data-theme="..."> — CSS değişkenleri bu attribute'a bağlı. */
-  private applyToDocument(theme: Theme): void {
+  private applyToDocument(id: string): void {
     if (typeof document === 'undefined') return;
-    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-theme', id);
   }
 }
 
-/** Kayıtlı tercihi okur; yoksa sistem tercihine düşer. */
-function loadTheme(): Theme {
+/** Seçili temayı okur; yoksa sistem tercihine düşer. */
+function loadTheme(): string {
   try {
     if (typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem(THEME_KEY);
-      if (saved === 'light' || saved === 'dark') return saved;
+      if (saved) return saved;
     }
-    // Kayıt yok → işletim sistemi tercihi
     if (
       typeof matchMedia !== 'undefined' &&
       matchMedia('(prefers-color-scheme: dark)').matches
@@ -55,17 +77,41 @@ function loadTheme(): Theme {
       return 'dark';
     }
   } catch {
-    // Depolama/matchMedia kullanılamıyorsa varsayılana düş
+    /* varsayılana düş */
   }
   return 'light';
 }
 
-/** Tercihi kalıcı kaydeder (hata olursa sessizce geçer). */
-function saveTheme(theme: Theme): void {
+function saveTheme(id: string): void {
   try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(THEME_KEY, theme);
+    localStorage?.setItem(THEME_KEY, id);
   } catch {
-    // Gizli mod / kota → oyunu bozma
+    /* yoksay */
+  }
+}
+
+/** Sahip olunan temaları okur (açık/koyu her zaman dahil). */
+function loadOwnedThemes(): Set<string> {
+  const owned = new Set<string>(FREE_THEMES);
+  try {
+    if (typeof localStorage === 'undefined') return owned;
+    const raw = localStorage.getItem(OWNED_THEMES_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        for (const id of arr) if (typeof id === 'string') owned.add(id);
+      }
+    }
+  } catch {
+    /* yoksay */
+  }
+  return owned;
+}
+
+function saveOwnedThemes(owned: Set<string>): void {
+  try {
+    localStorage?.setItem(OWNED_THEMES_KEY, JSON.stringify([...owned]));
+  } catch {
+    /* yoksay */
   }
 }

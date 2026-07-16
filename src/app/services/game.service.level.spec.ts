@@ -205,8 +205,9 @@ describe('GameService — altın ödül sistemi', () => {
     completeCurrentLevel(); // L2: +75
     service.nextLevel();
     completeCurrentLevel(); // L3: +100
-    expect(service.gold()).toBe(50 + 75 + 100); // 225
-    expect(service.lastReward()).toBe(100);
+    // Not: seviye tamamlama başarımları da altın verebilir → en az seviye ödülleri
+    expect(service.lastReward()).toBe(100); // L3 seviye ödülü artmış
+    expect(service.gold()).toBeGreaterThanOrEqual(50 + 75 + 100);
   });
 
   it('başarısız seviyede altın verilmez', () => {
@@ -248,7 +249,9 @@ describe('GameService — altın ödül sistemi', () => {
     service.status.set(GameStatus.Playing);
     completeCurrentLevel(); // son seviye hedefi
     expect(service.status()).toBe(GameStatus.Won);
-    expect(service.gold()).toBe(levelConfig(MAX_LEVEL).gold); // 150
+    // Seviye ödülü verilmiş (başarımlar da ekleyebilir → en az bu kadar)
+    expect(service.lastReward()).toBe(levelConfig(MAX_LEVEL).gold); // 150
+    expect(service.gold()).toBeGreaterThanOrEqual(levelConfig(MAX_LEVEL).gold);
   });
 
   it('ödül geçmişi kalıcı: yeniden yüklenince tekrar ödül vermez', () => {

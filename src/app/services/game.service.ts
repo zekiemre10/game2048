@@ -41,6 +41,12 @@ export class GameService {
   /** 2048'e ulaşıp "Devam Et" denildi mi? (kazanma tekrar tetiklenmesin) */
   private keepPlayingAfterWin = false;
 
+  /** Süre sayacının setInterval kimliği (çalışmıyorsa null). */
+  private timerId: ReturnType<typeof setInterval> | null = null;
+
+  /** Süre sayacının başladığı an (epoch ms). */
+  private startTimestamp = 0;
+
   // --- Durum sinyalleri ---------------------------------------
 
   /** Tahtadaki taşların listesi (kaynak gerçeği). */
@@ -48,6 +54,12 @@ export class GameService {
 
   /** Anlık skor. */
   readonly score = signal<number>(0);
+
+  /** Bu oyunda yapılan geçerli hamle sayısı. */
+  readonly moves = signal<number>(0);
+
+  /** Bu oyunda geçen süre (saniye). */
+  readonly elapsedSeconds = signal<number>(0);
 
   /** En yüksek skor (localStorage'dan yüklenir, değişince kaydedilir). */
   readonly bestScore = signal<number>(loadBestScore());
@@ -90,20 +102,25 @@ export class GameService {
   startGame(): void {
     this.tiles.set([]);
     this.score.set(0);
+    this.moves.set(0); // hamle sayacı sıfırlanır
     this.keepPlayingAfterWin = false;
     this.history.set(null); // geçmişi de sıfırla
     this.status.set(GameStatus.Playing);
     this.spawnRandomTile();
     this.spawnRandomTile();
+    this.startTimer(0); // süre sıfırdan başlar
   }
 
   /** Oyunu başlık ekranına döndürür. */
   reset(): void {
     this.tiles.set([]);
     this.score.set(0);
+    this.moves.set(0);
     this.keepPlayingAfterWin = false;
     this.history.set(null);
     this.status.set(GameStatus.Idle);
+    this.stopTimer();
+    this.elapsedSeconds.set(0);
   }
 
   /**
@@ -139,6 +156,8 @@ export class GameService {
     if (this.status() !== GameStatus.Won) return;
     this.keepPlayingAfterWin = true;
     this.status.set(GameStatus.Playing);
+    // Süre kaldığı yerden devam etsin (donmuş değerden ileri)
+    this.startTimer(this.elapsedSeconds());
   }
 
   /**
@@ -151,7 +170,10 @@ export class GameService {
     if (this.status() !== GameStatus.Playing) return false;
 
     const result = applyMove(this.tiles(), direction);
-    if (!result.moved) return false;
+    if (!result.moved) return false; // geçersiz hamle → sayaç ARTMAZ
+
+    // Geçerli hamle → hamle sayısını artır.
+    this.moves.update((m) => m + 1);
 
     // Geçerli hamle → hamle ÖNCESİ durumu sakla (geri al için).
     // applyMove saf olduğundan this.tiles() hâlâ hamle öncesi listedir.
@@ -178,16 +200,43 @@ export class GameService {
       !this.keepPlayingAfterWin &&
       this.tiles().some((t) => t.value >= WIN_VALUE)
     ) {
+      this.stopTimer(); // süre "tamamlama" anında donar
       this.status.set(GameStatus.Won);
       return true;
     }
 
     // Kaybetme: hiç hamle kalmadıysa (dolu + birleşme yok).
     if (!hasAnyMove(this.tiles())) {
+      this.stopTimer();
       this.status.set(GameStatus.Lost);
     }
 
     return true;
+  }
+
+  // --- Süre sayacı --------------------------------------------
+
+  /** Süre sayacını başlatır (belirtilen saniyeden ileri sayar). */
+  private startTimer(fromSeconds: number): void {
+    this.stopTimer();
+    this.elapsedSeconds.set(fromSeconds);
+    this.startTimestamp = Date.now() - fromSeconds * 1000;
+
+    // Tarayıcı dışı ortamda (SSR/test) setInterval yoksa sessizce geç.
+    if (typeof setInterval === 'undefined') return;
+    this.timerId = setInterval(() => {
+      this.elapsedSeconds.set(
+        Math.floor((Date.now() - this.startTimestamp) / 1000),
+      );
+    }, 250);
+  }
+
+  /** Süre sayacını durdurur. */
+  private stopTimer(): void {
+    if (this.timerId !== null) {
+      clearInterval(this.timerId);
+      this.timerId = null;
+    }
   }
 
   // --- Yardımcılar --------------------------------------------

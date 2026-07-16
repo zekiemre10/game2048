@@ -29,6 +29,20 @@
       </div>
     </header>
 
+    <!-- Süre ve hamle sayacı (oyun alanının üstünde) -->
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-icon" aria-hidden="true">⏱️</span>
+        <span class="stat-label">SÜRE</span>
+        <strong class="stat-value">{{ elapsedLabel() }}</strong>
+      </div>
+      <div class="stat">
+        <span class="stat-icon" aria-hidden="true">🔀</span>
+        <span class="stat-label">HAMLE</span>
+        <strong class="stat-value">{{ moves() }}</strong>
+      </div>
+    </div>
+
     <div class="board-wrap">
       <app-board />
 
@@ -43,6 +57,9 @@
               <p class="overlay-sub">Hamle kalmadı</p>
             }
             <p class="overlay-score">Skor: <strong>{{ score() }}</strong></p>
+            <p class="overlay-stats">
+              ⏱️ {{ elapsedLabel() }} &nbsp;·&nbsp; 🔀 {{ moves() }} hamle
+            </p>
 
             <div class="overlay-actions">
               @if (status() === GameStatus.Won) {

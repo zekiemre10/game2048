@@ -63,6 +63,43 @@
   }
 }
 
+// Süre + hamle sayacı satırı (tahtanın hemen üstünde)
+.stats {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: clamp(0.6rem, 2.5vw, 1rem);
+}
+
+.stat {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background: var(--color-cell-empty);
+  color: var(--color-text);
+  padding: 0.4rem 0.75rem;
+  border-radius: v.$radius-md;
+  transition: background-color 250ms ease;
+}
+
+.stat-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: clamp(0.6rem, 2.4vw, 0.72rem);
+  letter-spacing: 1px;
+  opacity: 0.75;
+}
+
+.stat-value {
+  font-size: clamp(1rem, 4vw, 1.2rem);
+  font-variant-numeric: tabular-nums; // rakamlar zıplamasın
+  margin-left: 0.15rem;
+}
+
 .controls {
   display: flex;
   gap: 0.75rem;
@@ -160,13 +197,21 @@
 }
 
 .overlay-score {
-  margin: 0 0 clamp(0.75rem, 4vw, 1.25rem);
+  margin: 0 0 0.25rem;
   font-size: clamp(0.95rem, 3.6vw, 1.1rem);
   color: var(--color-text);
 
   strong {
     font-size: clamp(1.15rem, 4.5vw, 1.4rem);
   }
+}
+
+.overlay-stats {
+  margin: 0 0 clamp(0.75rem, 4vw, 1.25rem);
+  font-size: clamp(0.85rem, 3.4vw, 1rem);
+  color: var(--color-text);
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
 }
 
 .overlay-actions {

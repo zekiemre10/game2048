@@ -1,10 +1,11 @@
-import { Component, HostListener, inject } from '@angular/core';
+import { Component, HostListener, computed, inject } from '@angular/core';
 import { StartScreen } from './components/start-screen/start-screen';
 import { BoardComponent } from './components/board/board';
 import { GameService } from './services/game.service';
 import { ThemeService } from './services/theme.service';
 import { Direction, GameStatus } from './models/tile.model';
 import { swipeDirection } from './logic/swipe';
+import { formatTime } from './logic/format-time';
 
 /** Ok tuşu → yön eşlemesi. */
 const KEY_TO_DIRECTION: Record<string, Direction> = {
@@ -30,8 +31,13 @@ export class App {
   protected readonly score = this.game.score;
   protected readonly bestScore = this.game.bestScore;
   protected readonly canUndo = this.game.canUndo;
+  protected readonly moves = this.game.moves;
+  protected readonly elapsedSeconds = this.game.elapsedSeconds;
   protected readonly theme = this.themeService.theme;
   protected readonly GameStatus = GameStatus;
+
+  /** Geçen süreyi mm:ss biçiminde döndürür (şablonda gösterim için). */
+  protected readonly elapsedLabel = computed(() => formatTime(this.elapsedSeconds()));
 
   /** Dokunmatik kaydırmanın başlangıç noktası. */
   private touchStartX = 0;

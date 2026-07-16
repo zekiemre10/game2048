@@ -93,6 +93,82 @@ describe('GameService', () => {
   });
 });
 
+describe('GameService — süre ve hamle sayacı', () => {
+  let service: GameService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(GameService);
+  });
+
+  afterEach(() => {
+    service.reset(); // arkada kalan zamanlayıcıyı durdur
+  });
+
+  it('yeni oyun hamle ve süreyi sıfırlar', () => {
+    service.startGame();
+    expect(service.moves()).toBe(0);
+    expect(service.elapsedSeconds()).toBe(0);
+  });
+
+  it('geçerli hamle, hamle sayısını artırır', () => {
+    service.status.set(GameStatus.Playing);
+    service.moves.set(0);
+    service.tiles.set([
+      { id: 1, value: 2, row: 0, col: 0 },
+      { id: 2, value: 2, row: 0, col: 1 },
+    ]);
+
+    service.move(Direction.Left);
+    expect(service.moves()).toBe(1);
+
+    // İkinci geçerli hamle
+    service.tiles.set([
+      { id: 3, value: 2, row: 0, col: 0 },
+      { id: 4, value: 2, row: 0, col: 3 },
+    ]);
+    service.move(Direction.Right);
+    expect(service.moves()).toBe(2);
+  });
+
+  it('geçersiz hamle, hamle sayısını ARTIRMAZ', () => {
+    service.status.set(GameStatus.Playing);
+    service.moves.set(0);
+    // Tek kare zaten solda → sola hamle geçersiz
+    service.tiles.set([{ id: 1, value: 2, row: 0, col: 0 }]);
+
+    const moved = service.move(Direction.Left);
+
+    expect(moved).toBe(false);
+    expect(service.moves()).toBe(0);
+  });
+
+  it('yeni oyundan önceki hamleler sıfırlanır', () => {
+    service.status.set(GameStatus.Playing);
+    service.moves.set(0);
+    service.tiles.set([
+      { id: 1, value: 2, row: 0, col: 0 },
+      { id: 2, value: 2, row: 0, col: 1 },
+    ]);
+    service.move(Direction.Left);
+    expect(service.moves()).toBe(1);
+
+    service.startGame(); // yeni oyun
+    expect(service.moves()).toBe(0);
+    expect(service.elapsedSeconds()).toBe(0);
+  });
+
+  it('reset süreyi ve hamleyi sıfırlar', () => {
+    service.startGame();
+    service.moves.set(5);
+    service.elapsedSeconds.set(42);
+
+    service.reset();
+    expect(service.moves()).toBe(0);
+    expect(service.elapsedSeconds()).toBe(0);
+  });
+});
+
 describe('GameService — spawnRandomTile (rastgele yeni kare)', () => {
   let service: GameService;
 

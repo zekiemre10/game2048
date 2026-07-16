@@ -125,13 +125,31 @@
       </div>
     </header>
 
+    <!-- Seviye modu: seviye + hedef bilgisi -->
+    @if (mode() === GameMode.Level) {
+      <div class="level-bar">
+        <span class="level-badge">Seviye {{ level() }}</span>
+        <span class="level-target">
+          Hedef: <strong>{{ levelTarget() }}</strong>
+        </span>
+      </div>
+    }
+
     <!-- Süre ve hamle sayacı (oyun alanının üstünde) -->
     <div class="stats">
-      <div class="stat">
-        <span class="stat-icon" aria-hidden="true">⏱️</span>
-        <span class="stat-label">SÜRE</span>
-        <strong class="stat-value">{{ elapsedLabel() }}</strong>
-      </div>
+      @if (mode() === GameMode.Level) {
+        <div class="stat" [class.low]="lowTime()">
+          <span class="stat-icon" aria-hidden="true">⏳</span>
+          <span class="stat-label">KALAN</span>
+          <strong class="stat-value">{{ remainingLabel() }}</strong>
+        </div>
+      } @else {
+        <div class="stat">
+          <span class="stat-icon" aria-hidden="true">⏱️</span>
+          <span class="stat-label">SÜRE</span>
+          <strong class="stat-value">{{ elapsedLabel() }}</strong>
+        </div>
+      }
       <div class="stat">
         <span class="stat-icon" aria-hidden="true">🔀</span>
         <span class="stat-label">HAMLE</span>
@@ -142,39 +160,99 @@
     <div class="board-wrap">
       <app-board />
 
-      @if (status() === GameStatus.Won || status() === GameStatus.Lost) {
-        <div class="overlay" [class.win]="status() === GameStatus.Won">
+      @if (
+        status() === GameStatus.Won ||
+        status() === GameStatus.Lost ||
+        status() === GameStatus.LevelComplete ||
+        status() === GameStatus.Failed
+      ) {
+        <div
+          class="overlay"
+          [class.win]="
+            status() === GameStatus.Won || status() === GameStatus.LevelComplete
+          "
+        >
           <div class="overlay-card">
-            @if (status() === GameStatus.Won) {
-              <h2 class="overlay-title">Kazandın! 🎉</h2>
-              <p class="overlay-sub">2048'e ulaştın</p>
-            } @else {
-              <h2 class="overlay-title">Oyun Bitti</h2>
-              <p class="overlay-sub">Hamle kalmadı</p>
+            <!-- Başlık + alt metin (duruma göre) -->
+            @switch (status()) {
+              @case (GameStatus.Won) {
+                @if (mode() === GameMode.Level) {
+                  <h2 class="overlay-title">Tebrikler! 🏆</h2>
+                  <p class="overlay-sub">Tüm seviyeleri bitirdin</p>
+                } @else {
+                  <h2 class="overlay-title">Kazandın! 🎉</h2>
+                  <p class="overlay-sub">2048'e ulaştın</p>
+                }
+              }
+              @case (GameStatus.LevelComplete) {
+                <h2 class="overlay-title">Seviye {{ level() }} Tamam! 🎉</h2>
+                <p class="overlay-sub">Hedefe ulaştın ({{ levelTarget() }})</p>
+              }
+              @case (GameStatus.Failed) {
+                <h2 class="overlay-title">Başarısız</h2>
+                <p class="overlay-sub">
+                  {{ remainingSeconds() <= 0 ? 'Süre doldu!' : 'Hamle kalmadı' }}
+                </p>
+              }
+              @default {
+                <h2 class="overlay-title">Oyun Bitti</h2>
+                <p class="overlay-sub">Hamle kalmadı</p>
+              }
             }
+
             <p class="overlay-score">Skor: <strong>{{ score() }}</strong></p>
             <p class="overlay-stats">
-              ⏱️ {{ elapsedLabel() }} &nbsp;·&nbsp; 🔀 {{ moves() }} hamle
+              @if (mode() === GameMode.Level) {
+                ⏳ {{ remainingLabel() }} kaldı
+              } @else {
+                ⏱️ {{ elapsedLabel() }}
+              }
+              &nbsp;·&nbsp; 🔀 {{ moves() }} hamle
             </p>
 
             <div class="overlay-actions">
-              @if (status() === GameStatus.Won) {
+              <!-- Seviye tamam → sonraki seviye -->
+              @if (status() === GameStatus.LevelComplete) {
+                <button class="btn-primary" type="button" (click)="onNextLevel()">
+                  Sonraki Seviye →
+                </button>
+              }
+              <!-- Seviye başarısız → tekrar dene -->
+              @if (status() === GameStatus.Failed) {
+                <button class="btn-primary" type="button" (click)="onRetryLevel()">
+                  ↻ Tekrar Dene
+                </button>
+              }
+              <!-- Klasik kazanma → devam et -->
+              @if (status() === GameStatus.Won && mode() === GameMode.Classic) {
                 <button class="btn-primary" type="button" (click)="onContinue()">
                   Devam Et
                 </button>
-              } @else if (canUndo()) {
-                <!-- Kaybettiren hamleyi geri al -->
+              }
+              <!-- Klasik kaybetme → geri al -->
+              @if (status() === GameStatus.Lost && canUndo()) {
                 <button class="btn-primary" type="button" (click)="onUndo()">
                   ↶ Geri Al
                 </button>
               }
-              <button
-                class="btn-primary ghost"
-                type="button"
-                (click)="onRestart()"
-              >
-                Yeni Oyun
-              </button>
+              <!-- Her durumda: yeniden başla (moda uygun) -->
+              @if (mode() === GameMode.Level) {
+                <button
+                  class="btn-primary ghost"
+                  type="button"
+                  (click)="onStartLevelMode()"
+                >
+                  Baştan
+                </button>
+              } @else {
+                <button
+                  class="btn-primary ghost"
+                  type="button"
+                  (click)="onRestart()"
+                >
+                  Yeni Oyun
+                </button>
+              }
             </div>
           </div>
         </div>
@@ -190,9 +268,15 @@
       >
         ↶ Geri Al
       </button>
-      <button class="btn-primary" type="button" (click)="onRestart()">
-        Yeni Oyun
-      </button>
+      @if (mode() === GameMode.Level) {
+        <button class="btn-primary" type="button" (click)="onStartLevelMode()">
+          Baştan
+        </button>
+      } @else {
+        <button class="btn-primary" type="button" (click)="onRestart()">
+          Yeni Oyun
+        </button>
+      }
     </div>
   </main>
 }

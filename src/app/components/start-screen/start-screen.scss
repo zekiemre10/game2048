@@ -88,9 +88,25 @@
   }
 }
 
+.start-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  align-items: center;
+}
+
 .start-btn {
   font-size: clamp(1.05rem, 4.5vw, 1.3rem);
   padding: 0.9rem clamp(2rem, 10vw, 3rem);
+  min-width: min(260px, 80%);
+}
+
+.best-level {
+  margin: 0.9rem 0 0;
+  font-size: clamp(0.85rem, 3.4vw, 0.95rem);
+  color: var(--color-text);
+  opacity: 0.85;
+  font-weight: 600;
 }
 
 .hint {

@@ -4,10 +4,12 @@ import {
   Cell,
   Direction,
   Grid,
+  GameMode,
   GameStatus,
   Tile,
 } from '../models/tile.model';
 import { applyMove, hasAnyMove } from '../logic/board-logic';
+import { MAX_LEVEL, levelConfig } from '../models/level.model';
 
 // ============================================================
 //  2048 — Oyun servisi
@@ -24,6 +26,9 @@ const WIN_VALUE = 2048;
 
 /** En yüksek skorun localStorage anahtarı. */
 const BEST_SCORE_KEY = 'game2048.bestScore';
+
+/** Ulaşılan en yüksek seviyenin localStorage anahtarı. */
+const BEST_LEVEL_KEY = 'game2048.bestLevel';
 
 /** Geri al için saklanan tek adımlık oyun durumu. */
 interface GameSnapshot {
@@ -61,11 +66,26 @@ export class GameService {
   /** Bu oyunda geçen süre (saniye). */
   readonly elapsedSeconds = signal<number>(0);
 
+  /** (Seviye modu) kalan süre (saniye). */
+  readonly remainingSeconds = signal<number>(0);
+
   /** En yüksek skor (localStorage'dan yüklenir, değişince kaydedilir). */
   readonly bestScore = signal<number>(loadBestScore());
 
   /** Oyunun anlık durumu. */
   readonly status = signal<GameStatus>(GameStatus.Idle);
+
+  /** Oyun modu (klasik / seviye). */
+  readonly mode = signal<GameMode>(GameMode.Classic);
+
+  /** (Seviye modu) anlık seviye. */
+  readonly level = signal<number>(1);
+
+  /** Ulaşılan en yüksek seviye (localStorage'da kalıcı). */
+  readonly bestLevel = signal<number>(loadBestLevel());
+
+  /** (Seviye modu) anlık seviyenin hedef karesi. */
+  readonly levelTarget = computed<number>(() => levelConfig(this.level()).target);
 
   /** Son hamleden ÖNCEKİ durum (tek adımlık geçmiş). */
   private readonly history = signal<GameSnapshot | null>(null);
@@ -98,8 +118,9 @@ export class GameService {
     );
   }
 
-  /** Yeni oyunun başlangıç durumunu üretir: boş tahta + 2 rastgele taş. */
+  /** Klasik (sonsuz) oyunu başlatır: boş tahta + 2 rastgele taş, süre yukarı sayar. */
   startGame(): void {
+    this.mode.set(GameMode.Classic);
     this.tiles.set([]);
     this.score.set(0);
     this.moves.set(0); // hamle sayacı sıfırlanır
@@ -111,6 +132,49 @@ export class GameService {
     this.startTimer(0); // süre sıfırdan başlar
   }
 
+  // --- Seviye modu --------------------------------------------
+
+  /** Seviye modunu 1. seviyeden başlatır. */
+  startLevelMode(): void {
+    this.mode.set(GameMode.Level);
+    this.level.set(1);
+    this.startLevel();
+  }
+
+  /** Anlık seviyeyi (yeniden) başlatır: boş tahta + geri sayım. */
+  private startLevel(): void {
+    const cfg = levelConfig(this.level());
+    this.tiles.set([]);
+    this.score.set(0);
+    this.moves.set(0);
+    this.keepPlayingAfterWin = false;
+    this.history.set(null);
+    this.status.set(GameStatus.Playing);
+    this.spawnRandomTile();
+    this.spawnRandomTile();
+    this.startCountdown(cfg.seconds);
+
+    // Bu seviyeye ulaşıldı → en yüksek seviyeyi güncelle
+    if (this.level() > this.bestLevel()) {
+      this.bestLevel.set(this.level());
+      saveBestLevel(this.level());
+    }
+  }
+
+  /** Seviye başarısız olunca aynı seviyeyi tekrar dener. */
+  retryLevel(): void {
+    if (this.mode() !== GameMode.Level) return;
+    this.startLevel();
+  }
+
+  /** Seviye tamamlanınca bir sonraki seviyeye geçer. */
+  nextLevel(): void {
+    if (this.status() !== GameStatus.LevelComplete) return;
+    if (this.level() >= MAX_LEVEL) return; // zaten son seviye
+    this.level.update((l) => l + 1);
+    this.startLevel();
+  }
+
   /** Oyunu başlık ekranına döndürür. */
   reset(): void {
     this.tiles.set([]);
@@ -119,8 +183,11 @@ export class GameService {
     this.keepPlayingAfterWin = false;
     this.history.set(null);
     this.status.set(GameStatus.Idle);
+    this.mode.set(GameMode.Classic);
+    this.level.set(1);
     this.stopTimer();
     this.elapsedSeconds.set(0);
+    this.remainingSeconds.set(0);
   }
 
   /**
@@ -195,23 +262,48 @@ export class GameService {
     // Her geçerli hamleden sonra yeni bir kare
     this.spawnRandomTile();
 
-    // Kazanma: 2048'e ilk kez ulaşıldıysa (ve "devam et" seçilmediyse).
+    if (this.mode() === GameMode.Level) {
+      this.checkLevelEnd();
+    } else {
+      this.checkClassicEnd();
+    }
+
+    return true;
+  }
+
+  /** Klasik mod: 2048'e ulaşınca kazanma, hamle kalmayınca kaybetme. */
+  private checkClassicEnd(): void {
     if (
       !this.keepPlayingAfterWin &&
       this.tiles().some((t) => t.value >= WIN_VALUE)
     ) {
       this.stopTimer(); // süre "tamamlama" anında donar
       this.status.set(GameStatus.Won);
-      return true;
+      return;
     }
-
-    // Kaybetme: hiç hamle kalmadıysa (dolu + birleşme yok).
     if (!hasAnyMove(this.tiles())) {
       this.stopTimer();
       this.status.set(GameStatus.Lost);
     }
+  }
 
-    return true;
+  /**
+   * Seviye modu:
+   * - Hedefe ulaşıldıysa → seviye tamamlandı (son seviyeyse tüm oyun kazanıldı).
+   * - Hamle kalmadıysa → başarısız (süre dolması sayaç içinde yönetilir).
+   */
+  private checkLevelEnd(): void {
+    if (this.tiles().some((t) => t.value >= this.levelTarget())) {
+      this.stopTimer();
+      this.status.set(
+        this.level() >= MAX_LEVEL ? GameStatus.Won : GameStatus.LevelComplete,
+      );
+      return;
+    }
+    if (!hasAnyMove(this.tiles())) {
+      this.stopTimer();
+      this.status.set(GameStatus.Failed);
+    }
   }
 
   // --- Süre sayacı --------------------------------------------
@@ -228,6 +320,32 @@ export class GameService {
       this.elapsedSeconds.set(
         Math.floor((Date.now() - this.startTimestamp) / 1000),
       );
+    }, 250);
+  }
+
+  /**
+   * (Seviye modu) geri sayım: belirtilen saniyeden 0'a sayar.
+   * 0'a ulaşınca — hâlâ oynanıyorsa — seviye başarısız olur.
+   */
+  private startCountdown(seconds: number): void {
+    this.stopTimer();
+    this.startTimestamp = Date.now();
+    this.elapsedSeconds.set(0);
+    this.remainingSeconds.set(seconds);
+
+    if (typeof setInterval === 'undefined') return;
+    this.timerId = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - this.startTimestamp) / 1000);
+      this.elapsedSeconds.set(elapsed);
+      const remaining = Math.max(0, seconds - elapsed);
+      this.remainingSeconds.set(remaining);
+
+      if (remaining <= 0) {
+        this.stopTimer();
+        if (this.status() === GameStatus.Playing) {
+          this.status.set(GameStatus.Failed); // süre doldu
+        }
+      }
     }, 250);
   }
 
@@ -305,5 +423,27 @@ function saveBestScore(best: number): void {
     localStorage.setItem(BEST_SCORE_KEY, String(best));
   } catch {
     // Depolama kullanılamıyorsa (gizli mod, kota vb.) oyunu bozma
+  }
+}
+
+/** localStorage'dan ulaşılan en yüksek seviyeyi okur (yoksa 0). */
+function loadBestLevel(): number {
+  try {
+    if (typeof localStorage === 'undefined') return 0;
+    const raw = localStorage.getItem(BEST_LEVEL_KEY);
+    const n = raw ? parseInt(raw, 10) : 0;
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Ulaşılan en yüksek seviyeyi localStorage'a yazar. */
+function saveBestLevel(level: number): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(BEST_LEVEL_KEY, String(level));
+  } catch {
+    /* yoksay */
   }
 }

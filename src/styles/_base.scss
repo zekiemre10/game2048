@@ -99,6 +99,17 @@ button {
   }
 }
 
+// İkincil (çerçeveli) buton varyantı — global (tüm bileşenlerde kullanılır)
+.btn-primary.ghost {
+  background: transparent;
+  color: var(--color-text);
+  box-shadow: inset 0 0 0 2px var(--color-button);
+
+  &:hover {
+    background: color-mix(in srgb, var(--color-button) 15%, transparent);
+  }
+}
+
 // Hareket azaltma tercihi: tema/buton geçişlerini de kapat
 @media (prefers-reduced-motion: reduce) {
   body,

@@ -32,10 +32,22 @@ export enum GameStatus {
   Idle = 'idle',
   /** Oynanıyor. */
   Playing = 'playing',
-  /** 2048'e ulaşıldı. */
+  /** (Klasik) 2048'e ulaşıldı / (Seviye) tüm seviyeler bitti. */
   Won = 'won',
-  /** Hamle kalmadı. */
+  /** (Klasik) Hamle kalmadı. */
   Lost = 'lost',
+  /** (Seviye) Seviye hedefine ulaşıldı — sonraki seviye bekleniyor. */
+  LevelComplete = 'levelComplete',
+  /** (Seviye) Süre doldu veya hamle kalmadı — seviye başarısız. */
+  Failed = 'failed',
+}
+
+/** Oyun modu. */
+export enum GameMode {
+  /** Klasik sonsuz 2048 (süre yukarı sayar). */
+  Classic = 'classic',
+  /** Seviye modu (hedef + geri sayım). */
+  Level = 'level',
 }
 
 /** Tahta boyutu (4x4). */

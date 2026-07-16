@@ -5,7 +5,7 @@ import { GameService } from './services/game.service';
 import { ThemeService, Theme } from './services/theme.service';
 import { AudioService } from './services/audio.service';
 import { SfxService } from './services/sfx.service';
-import { Direction, GameStatus } from './models/tile.model';
+import { Direction, GameMode, GameStatus } from './models/tile.model';
 import { swipeDirection } from './logic/swipe';
 import { formatTime } from './logic/format-time';
 
@@ -41,13 +41,28 @@ export class App {
   protected readonly musicOn = this.audio.musicOn;
   protected readonly volume = this.audio.volume;
   protected readonly sfxVolume = this.sfx.sfxVolume;
+  protected readonly mode = this.game.mode;
+  protected readonly level = this.game.level;
+  protected readonly levelTarget = this.game.levelTarget;
+  protected readonly remainingSeconds = this.game.remainingSeconds;
   protected readonly GameStatus = GameStatus;
+  protected readonly GameMode = GameMode;
 
   /** Ayarlar paneli açık mı? */
   protected readonly settingsOpen = signal(false);
 
   /** Geçen süreyi mm:ss biçiminde döndürür (şablonda gösterim için). */
   protected readonly elapsedLabel = computed(() => formatTime(this.elapsedSeconds()));
+
+  /** Kalan süreyi mm:ss biçiminde döndürür (seviye modu). */
+  protected readonly remainingLabel = computed(() =>
+    formatTime(this.remainingSeconds()),
+  );
+
+  /** Kalan süre azaldı mı? (görsel uyarı için). */
+  protected readonly lowTime = computed(
+    () => this.mode() === GameMode.Level && this.remainingSeconds() <= 10,
+  );
 
   /** Ses seviyesini yüzde (0-100) olarak gösterir. */
   protected readonly volumePercent = computed(() => Math.round(this.volume() * 100));
@@ -122,6 +137,23 @@ export class App {
   /** Son hamleyi geri al. */
   onUndo(): void {
     this.game.undo();
+  }
+
+  // --- Seviye modu -------------------------------------------
+
+  /** Seviye modunu başlat (başlık ekranından değil, overlay'den "Baştan"). */
+  onStartLevelMode(): void {
+    this.game.startLevelMode();
+  }
+
+  /** Sonraki seviyeye geç. */
+  onNextLevel(): void {
+    this.game.nextLevel();
+  }
+
+  /** Başarısız seviyeyi tekrar dene. */
+  onRetryLevel(): void {
+    this.game.retryLevel();
   }
 
   // --- Ayarlar paneli -----------------------------------------

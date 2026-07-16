@@ -63,11 +63,60 @@
   }
 }
 
+// Seviye modu: seviye + hedef çubuğu
+.level-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: clamp(0.5rem, 2vw, 0.75rem);
+}
+
+.level-badge {
+  background: var(--color-button);
+  color: var(--color-text-light);
+  font-weight: 800;
+  font-size: clamp(0.85rem, 3.4vw, 1rem);
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+}
+
+.level-target {
+  font-size: clamp(0.85rem, 3.4vw, 1rem);
+  color: var(--color-text);
+  opacity: 0.9;
+
+  strong {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
 // Süre + hamle sayacı satırı (tahtanın hemen üstünde)
 .stats {
   display: flex;
   gap: 0.6rem;
   margin-bottom: clamp(0.6rem, 2.5vw, 1rem);
+}
+
+// Kalan süre azalınca kırmızı uyarı + nabız
+.stat.low {
+  background: #e8503a;
+  color: #fff;
+  animation: pulse-low 1s ease-in-out infinite;
+
+  .stat-label {
+    opacity: 0.9;
+  }
+}
+
+@keyframes pulse-low {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 .stat {
@@ -380,17 +429,6 @@
   gap: 0.6rem;
   justify-content: center;
   flex-wrap: wrap;
-}
-
-// İkincil (çerçeveli) buton varyantı
-.btn-primary.ghost {
-  background: transparent;
-  color: var(--color-text);
-  box-shadow: inset 0 0 0 2px var(--color-button);
-
-  &:hover {
-    background: color-mix(in srgb, var(--color-button) 15%, transparent);
-  }
 }
 
 @keyframes overlay-fade {

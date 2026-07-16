@@ -28,11 +28,17 @@ Bilgisayarda **ok tuşlarıyla**, telefonda **parmakla kaydırarak** oynanır.
 - Amaç **2048** karesine ulaşmak. Ulaşınca "Devam Et" ile oynamaya devam edebilirsin.
 - Izgara dolup hiç birleşme kalmayınca oyun biter.
 
+**Seviye Modu:** Her seviyede belirli bir hedef kareye (128 → 256 → 512 → 1024 → 2048)
+verilen süre içinde ulaşman gerekir. İlerledikçe süre kısalır (3:00 → 1:30), oyun
+zorlaşır. Süre dolar veya hamle biterse seviye başarısız olur ("Tekrar Dene").
+Hedefe ulaşınca sonraki seviyeye geçersin. Ulaştığın en yüksek seviye kaydedilir.
+
 ## Özellikler
 
 - 🎯 **Doğru 2048 mantığı** — saf, framework'süz, tam test edilmiş
 - ⌨️ **Klavye + dokunmatik** — ok tuşları ve swipe
 - ⏱️ **Süre ve hamle sayacı** — üstte gösterim, sonuç ekranında toplam
+- 🎯 **Seviye modu** — her seviyede hedef kare + geri sayım; ilerledikçe süre kısalır, hedef büyür; ulaşılan seviye kaydedilir
 - ↶ **Geri al** — son hamleyi geri al (kaybettiren hamle dahil)
 - 🏆 **Kalıcı rekor** — en yüksek skor `localStorage`'da saklanır
 - ⚙️ **Ayarlar paneli** — müzik, ses seviyeleri, tema (tercihler kalıcı)
@@ -49,7 +55,7 @@ Bilgisayarda **ok tuşlarıyla**, telefonda **parmakla kaydırarak** oynanır.
 - TypeScript
 - SCSS (CSS değişkenleriyle temalama)
 - Web Audio API (prosedürel ses efektleri)
-- Vitest (100 birim/bileşen testi)
+- Vitest (111 birim/bileşen testi)
 - Backend yok — tamamen istemci tarafı
 
 ## Proje yapısı
@@ -147,3 +153,4 @@ web sunucusuyla servis edilebilir. Canlı sürüm bu dosyaların
 - [x] Ayarlar paneli (⚙️ sağ üstte): müzik, ses seviyeleri, tema
 - [x] Arka plan müziği (Pixabay, kalıcı, aç/kapa + ses)
 - [x] Ses efektleri (Web Audio ile prosedürel: hamle / birleşme)
+- [x] Seviye modu (hedef + geri sayım, ilerledikçe zorlaşır, kayıtlı ilerleme)

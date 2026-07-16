@@ -8,6 +8,7 @@ import { SfxService } from './services/sfx.service';
 import { Direction, GameMode, GameStatus } from './models/tile.model';
 import { swipeDirection } from './logic/swipe';
 import { formatTime } from './logic/format-time';
+import { POWERS, PowerId } from './models/power.model';
 
 /** Ok tuşu → yön eşlemesi. */
 const KEY_TO_DIRECTION: Record<string, Direction> = {
@@ -47,11 +48,24 @@ export class App {
   protected readonly remainingSeconds = this.game.remainingSeconds;
   protected readonly gold = this.game.gold;
   protected readonly lastReward = this.game.lastReward;
+  protected readonly powers = this.game.powers;
+  protected readonly bombMode = this.game.bombMode;
+  protected readonly hintDirection = this.game.hintDirection;
   protected readonly GameStatus = GameStatus;
   protected readonly GameMode = GameMode;
+  protected readonly Direction = Direction;
+  protected readonly POWERS = POWERS;
 
   /** Ayarlar paneli açık mı? */
   protected readonly settingsOpen = signal(false);
+
+  /** Mağaza paneli açık mı? */
+  protected readonly storeOpen = signal(false);
+
+  /** Envanterde en az 1 tane olan güçler (oyun içi güç çubuğu için). */
+  protected readonly ownedPowers = computed(() =>
+    POWERS.filter((p) => this.powers()[p.id] > 0),
+  );
 
   /** Geçen süreyi mm:ss biçiminde döndürür (şablonda gösterim için). */
   protected readonly elapsedLabel = computed(() => formatTime(this.elapsedSeconds()));
@@ -156,6 +170,38 @@ export class App {
   /** Başarısız seviyeyi tekrar dene. */
   onRetryLevel(): void {
     this.game.retryLevel();
+  }
+
+  // --- Mağaza + güçler ---------------------------------------
+
+  onOpenStore(): void {
+    this.settingsOpen.set(false);
+    this.storeOpen.set(true);
+  }
+
+  onCloseStore(): void {
+    this.storeOpen.set(false);
+  }
+
+  /** Bir gücü satın al (yeterli altın varsa). */
+  onBuyPower(id: PowerId): void {
+    this.game.buyPower(id);
+  }
+
+  /** Sahip olunan gücü kullan. */
+  onUsePower(id: PowerId): void {
+    this.game.usePower(id);
+  }
+
+  /** Bomba hedeflemeyi iptal et. */
+  onCancelBomb(): void {
+    this.game.cancelBomb();
+  }
+
+  /** Bir güce yetecek altın var mı? */
+  protected canAfford(id: PowerId): boolean {
+    const price = POWERS.find((p) => p.id === id)!.price;
+    return this.gold() >= price;
   }
 
   // --- Ayarlar paneli -----------------------------------------

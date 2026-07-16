@@ -1,5 +1,14 @@
-<!-- Sağ üst: ayarlar (tema ayarların içinde) -->
+<!-- Sağ üst: mağaza + ayarlar -->
 <div class="top-actions">
+  <button
+    class="round-btn store-btn"
+    type="button"
+    aria-label="Mağaza"
+    title="Mağaza"
+    (click)="onOpenStore()"
+  >
+    🛒 <span class="store-btn-label">Mağaza</span>
+  </button>
   <button
     class="round-btn"
     type="button"
@@ -107,6 +116,55 @@
   </div>
 }
 
+<!-- Mağaza paneli -->
+@if (storeOpen()) {
+  <div class="settings-backdrop" (click)="onCloseStore()">
+    <div
+      class="settings-panel store-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Mağaza"
+      (click)="$event.stopPropagation()"
+    >
+      <h2 class="settings-title">🛒 Mağaza</h2>
+      <p class="settings-note">
+        Altınlarını güçlere harca. Güçler oyun sırasında kullanılır.
+      </p>
+
+      <div class="store-gold">💰 Altının: <strong>{{ gold() }}</strong></div>
+
+      <div class="store-list">
+        @for (p of POWERS; track p.id) {
+          <div class="store-item">
+            <div class="store-icon">{{ p.icon }}</div>
+            <div class="store-info">
+              <div class="store-name">
+                {{ p.name }}
+                @if (powers()[p.id] > 0) {
+                  <span class="store-owned">×{{ powers()[p.id] }}</span>
+                }
+              </div>
+              <div class="store-desc">{{ p.desc }}</div>
+            </div>
+            <button
+              class="btn-primary store-buy"
+              type="button"
+              [disabled]="!canAfford(p.id)"
+              (click)="onBuyPower(p.id)"
+            >
+              💰 {{ p.price }}
+            </button>
+          </div>
+        }
+      </div>
+
+      <button class="btn-primary settings-close" type="button" (click)="onCloseStore()">
+        Kapat
+      </button>
+    </div>
+  </div>
+}
+
 @if (status() === GameStatus.Idle) {
   <app-start-screen />
 } @else {
@@ -162,8 +220,47 @@
       </div>
     </div>
 
-    <div class="board-wrap">
+    <!-- Bomba hedefleme bandı -->
+    @if (bombMode()) {
+      <div class="bomb-banner">
+        💣 Silmek için bir kareye dokun
+        <button type="button" class="bomb-cancel" (click)="onCancelBomb()">
+          İptal
+        </button>
+      </div>
+    }
+
+    <!-- Sahip olunan güçler (kullanım çubuğu) -->
+    @if (ownedPowers().length > 0) {
+      <div class="power-bar">
+        @for (p of ownedPowers(); track p.id) {
+          <button
+            class="power-btn"
+            type="button"
+            [title]="p.name + ' — ' + p.desc"
+            (click)="onUsePower(p.id)"
+          >
+            <span class="power-icon">{{ p.icon }}</span>
+            <span class="power-count">{{ powers()[p.id] }}</span>
+          </button>
+        }
+      </div>
+    }
+
+    <div class="board-wrap" [class.bomb-active]="bombMode()">
       <app-board />
+
+      <!-- İpucu oku -->
+      @if (hintDirection()) {
+        <div class="hint-arrow" [attr.data-dir]="hintDirection()">
+          @switch (hintDirection()) {
+            @case (Direction.Left) { ← }
+            @case (Direction.Right) { → }
+            @case (Direction.Up) { ↑ }
+            @case (Direction.Down) { ↓ }
+          }
+        </div>
+      }
 
       @if (
         status() === GameStatus.Won ||

@@ -7,9 +7,9 @@
   </div>
 
   <!-- Kareler: signal'den okunur, kimliğe göre takip edilir -->
-  <div class="tiles-layer">
+  <div class="tiles-layer" [class.bomb-targeting]="bombMode()">
     @for (tile of tiles(); track tile.id) {
-      <app-tile [tile]="tile" />
+      <app-tile [tile]="tile" (click)="onTileClick(tile)" />
     }
   </div>
 </div>

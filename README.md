@@ -39,6 +39,8 @@ Hedefe ulaşınca sonraki seviyeye geçersin. Ulaştığın en yüksek seviye ka
 - ⌨️ **Klavye + dokunmatik** — ok tuşları ve swipe
 - ⏱️ **Süre ve hamle sayacı** — üstte gösterim, sonuç ekranında toplam
 - 🎯 **Seviye modu** — her seviyede hedef kare + geri sayım; ilerledikçe süre kısalır, hedef büyür; ulaşılan seviye kaydedilir
+- 💰 **Altın + Mağaza** — seviye tamamlayınca altın kazan; mağazadan güç satın al
+- ⚡ **Güçler** — ⏰ +30sn · 💣 bomba (kare sil) · 🔀 karıştır · ↩️ geri al · 💡 ipucu
 - ↶ **Geri al** — son hamleyi geri al (kaybettiren hamle dahil)
 - 🏆 **Kalıcı rekor** — en yüksek skor `localStorage`'da saklanır
 - ⚙️ **Ayarlar paneli** — müzik, ses seviyeleri, tema (tercihler kalıcı)
@@ -154,3 +156,5 @@ web sunucusuyla servis edilebilir. Canlı sürüm bu dosyaların
 - [x] Arka plan müziği (Pixabay, kalıcı, aç/kapa + ses)
 - [x] Ses efektleri (Web Audio ile prosedürel: hamle / birleşme)
 - [x] Seviye modu (hedef + geri sayım, ilerledikçe zorlaşır, kayıtlı ilerleme)
+- [x] Altın ödül sistemi (seviye tamamlama, kalıcı, ilk tamamlamada ödül)
+- [x] Mağaza + güçler (⏰+30sn, 💣bomba, 🔀karıştır, ↩️geri al, 💡ipucu)

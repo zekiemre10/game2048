@@ -231,6 +231,191 @@
   }
 }
 
+// Mağaza butonu: ikon + yazı (yuvarlak değil, hap şekli)
+.store-btn {
+  width: auto;
+  border-radius: 999px;
+  padding: 0 0.9rem;
+  gap: 0.35rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.store-btn-label {
+  font-size: 0.9rem;
+}
+
+// --- Mağaza paneli ------------------------------------------
+
+.store-gold {
+  text-align: center;
+  font-size: 1.05rem;
+  color: #b8860b;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+
+  strong {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.store-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.store-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--color-cell-empty);
+  border-radius: v.$radius-md;
+}
+
+.store-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.store-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.store-name {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.store-owned {
+  color: var(--color-button);
+  font-size: 0.85rem;
+  margin-left: 0.3rem;
+}
+
+.store-desc {
+  font-size: 0.8rem;
+  color: var(--color-text);
+  opacity: 0.75;
+}
+
+.store-buy {
+  flex-shrink: 0;
+  padding: 0.5rem 0.8rem;
+  min-height: 40px;
+  font-size: 0.95rem;
+}
+
+// --- Oyun içi güç çubuğu ------------------------------------
+
+.power-bar {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: clamp(0.6rem, 2.5vw, 0.9rem);
+  flex-wrap: wrap;
+}
+
+.power-btn {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: v.$radius-md;
+  background: var(--color-board);
+  font-size: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: v.$shadow-soft;
+  transition: transform v.$transition-fast;
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+  &:active {
+    transform: scale(0.92);
+  }
+}
+
+.power-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #e8503a;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// --- Bomba hedefleme bandı ----------------------------------
+
+.bomb-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: #e8503a;
+  color: #fff;
+  font-weight: 700;
+  padding: 0.5rem 0.9rem;
+  border-radius: v.$radius-md;
+  margin-bottom: clamp(0.6rem, 2.5vw, 0.9rem);
+  animation: pulse-low 1.2s ease-in-out infinite;
+}
+
+.bomb-cancel {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  border-radius: v.$radius-sm;
+  padding: 0.2rem 0.7rem;
+  font-weight: 700;
+}
+
+.board-wrap.bomb-active {
+  outline: 3px dashed #e8503a;
+  outline-offset: 4px;
+  border-radius: v.$radius-lg;
+}
+
+// --- İpucu oku ----------------------------------------------
+
+.hint-arrow {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8rem;
+  font-weight: 900;
+  color: rgba(237, 194, 46, 0.92);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  animation: hint-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes hint-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
 // --- Ayarlar paneli -----------------------------------------
 
 .settings-backdrop {

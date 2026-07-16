@@ -37,3 +37,15 @@
   position: absolute;
   inset: var(--gap);
 }
+
+// Bomba modunda kareler tıklanabilir görünsün
+.tiles-layer.bomb-targeting app-tile {
+  cursor: pointer;
+
+  &:hover {
+    outline: 3px solid #e8503a;
+    outline-offset: -3px;
+    border-radius: v.$radius-md;
+    z-index: 5;
+  }
+}

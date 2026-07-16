@@ -10,6 +10,12 @@ import {
 } from '../models/tile.model';
 import { applyMove, hasAnyMove } from '../logic/board-logic';
 import { MAX_LEVEL, levelConfig } from '../models/level.model';
+import {
+  PowerId,
+  PowerInventory,
+  emptyInventory,
+  powerDef,
+} from '../models/power.model';
 
 // ============================================================
 //  2048 — Oyun servisi
@@ -35,6 +41,12 @@ const GOLD_KEY = 'game2048.gold';
 
 /** Ödülü alınmış seviyelerin localStorage anahtarı. */
 const REWARDED_LEVELS_KEY = 'game2048.rewardedLevels';
+
+/** Güç envanterinin localStorage anahtarı. */
+const POWERS_KEY = 'game2048.powers';
+
+/** +30 saniye gücünün eklediği süre. */
+const TIME_POWER_SECONDS = 30;
 
 /** Geri al için saklanan tek adımlık oyun durumu. */
 interface GameSnapshot {
@@ -99,6 +111,21 @@ export class GameService {
   /** Son seviye tamamlamada kazanılan altın (0 → zaten alınmıştı). */
   readonly lastReward = signal<number>(0);
 
+  /** Güç envanteri (her güçten kaç adet). */
+  readonly powers = signal<PowerInventory>(loadPowers());
+
+  /** Bomba hedefleme modu açık mı? (bir kareye dokununca silinir) */
+  readonly bombMode = signal<boolean>(false);
+
+  /** İpucu yönü (kısa süre gösterilir, sonra temizlenir). */
+  readonly hintDirection = signal<Direction | null>(null);
+
+  /** (Seviye modu) geri sayımın toplam süresi (saniye) — +30 gücü bunu artırır. */
+  private countdownTotal = 0;
+
+  /** İpucu temizleme zamanlayıcısı. */
+  private hintTimer: ReturnType<typeof setTimeout> | null = null;
+
   /** (Seviye modu) anlık seviyenin hedef karesi. */
   readonly levelTarget = computed<number>(() => levelConfig(this.level()).target);
 
@@ -141,6 +168,7 @@ export class GameService {
     this.moves.set(0); // hamle sayacı sıfırlanır
     this.keepPlayingAfterWin = false;
     this.history.set(null); // geçmişi de sıfırla
+    this.clearPowerFx();
     this.status.set(GameStatus.Playing);
     this.spawnRandomTile();
     this.spawnRandomTile();
@@ -165,6 +193,7 @@ export class GameService {
     this.lastReward.set(0);
     this.keepPlayingAfterWin = false;
     this.history.set(null);
+    this.clearPowerFx();
     this.status.set(GameStatus.Playing);
     this.spawnRandomTile();
     this.spawnRandomTile();
@@ -201,6 +230,7 @@ export class GameService {
     this.status.set(GameStatus.Idle);
     this.mode.set(GameMode.Classic);
     this.level.set(1);
+    this.clearPowerFx();
     this.stopTimer();
     this.elapsedSeconds.set(0);
     this.remainingSeconds.set(0);
@@ -241,6 +271,159 @@ export class GameService {
     this.status.set(GameStatus.Playing);
     // Süre kaldığı yerden devam etsin (donmuş değerden ileri)
     this.startTimer(this.elapsedSeconds());
+  }
+
+  // --- Güçler (mağaza + kullanım) -----------------------------
+
+  /**
+   * Bir gücü altınla satın alır (envantere ekler).
+   * @returns satın alma başarılıysa true (yeterli altın vs.).
+   */
+  buyPower(id: PowerId): boolean {
+    const price = powerDef(id).price;
+    if (this.gold() < price) return false;
+
+    this.gold.update((g) => g - price);
+    this.powers.update((inv) => ({ ...inv, [id]: inv[id] + 1 }));
+    saveGold(this.gold());
+    savePowers(this.powers());
+    return true;
+  }
+
+  /**
+   * Bir gücü kullanır (envanterden düşer, etkisini uygular).
+   * @returns güç kullanıldıysa true.
+   */
+  usePower(id: PowerId): boolean {
+    if (this.powers()[id] <= 0) return false;
+    if (this.status() !== GameStatus.Playing) return false;
+
+    let applied = false;
+    switch (id) {
+      case 'time':
+        applied = this.applyAddTime();
+        break;
+      case 'bomb':
+        // Bomba: hedefleme modunu aç. Güç, kare gerçekten silinince düşer.
+        this.bombMode.set(true);
+        return true; // henüz tüketilmedi
+      case 'shuffle':
+        applied = this.applyShuffle();
+        break;
+      case 'undo':
+        applied = this.undo();
+        break;
+      case 'hint':
+        applied = this.applyHint();
+        break;
+    }
+
+    if (applied) this.consumePower(id);
+    return applied;
+  }
+
+  /** Bomba hedefleme modundayken bir kareyi siler (gücü tüketir). */
+  removeTileAt(row: number, col: number): boolean {
+    if (!this.bombMode()) return false;
+    const exists = this.tiles().some((t) => t.row === row && t.col === col);
+    if (!exists) return false;
+
+    this.tiles.update((list) =>
+      list.filter((t) => !(t.row === row && t.col === col)),
+    );
+    this.consumePower('bomb');
+    this.bombMode.set(false);
+    return true;
+  }
+
+  /** Bomba modunu iptal eder (güç harcanmaz). */
+  cancelBomb(): void {
+    this.bombMode.set(false);
+  }
+
+  private consumePower(id: PowerId): void {
+    this.powers.update((inv) => ({ ...inv, [id]: Math.max(0, inv[id] - 1) }));
+    savePowers(this.powers());
+  }
+
+  /** +30 saniye: yalnızca seviye modunda ve oynanırken. */
+  private applyAddTime(): boolean {
+    if (this.mode() !== GameMode.Level) return false;
+    this.countdownTotal += TIME_POWER_SECONDS;
+    this.remainingSeconds.update((r) => r + TIME_POWER_SECONDS);
+    return true;
+  }
+
+  /** Karıştır: mevcut karelerin değerlerini rastgele boş hücrelere dağıtır. */
+  private applyShuffle(): boolean {
+    const current = this.tiles();
+    if (current.length === 0) return false;
+
+    // Tüm hücreleri karıştır, ilk N tanesine değerleri yerleştir.
+    const cells: Cell[] = [];
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      for (let c = 0; c < BOARD_SIZE; c++) cells.push({ row: r, col: c });
+    }
+    for (let i = cells.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [cells[i], cells[j]] = [cells[j], cells[i]];
+    }
+
+    // id'ler korunur → kareler yeni yerlerine kayarak animasyonla gider.
+    const shuffled = current.map((t, i) => ({
+      id: t.id,
+      value: t.value,
+      row: cells[i].row,
+      col: cells[i].col,
+    }));
+    this.tiles.set(shuffled);
+    return true;
+  }
+
+  /** İpucu: 1 hamle ileriye bakan basit sezgiyle en iyi yönü işaretler. */
+  private applyHint(): boolean {
+    const dir = this.computeHint();
+    if (!dir) return false;
+
+    this.hintDirection.set(dir);
+    if (this.hintTimer) clearTimeout(this.hintTimer);
+    if (typeof setTimeout !== 'undefined') {
+      this.hintTimer = setTimeout(() => this.hintDirection.set(null), 2500);
+    }
+    return true;
+  }
+
+  /** En iyi yönü seçer: kazanılan puan + sonraki boş hücre sayısı en yüksek. */
+  private computeHint(): Direction | null {
+    const dirs = [
+      Direction.Left,
+      Direction.Right,
+      Direction.Up,
+      Direction.Down,
+    ];
+    let best: Direction | null = null;
+    let bestScore = -1;
+    for (const dir of dirs) {
+      const res = applyMove(this.tiles(), dir);
+      if (!res.moved) continue;
+      const empty = BOARD_SIZE * BOARD_SIZE - res.tiles.length;
+      const score = res.gained + empty; // basit sezgi
+      if (score > bestScore) {
+        bestScore = score;
+        best = dir;
+      }
+    }
+    return best;
+  }
+
+  /** Yeni oyun/seviye/reset'te güç efektlerini temizle. */
+  private clearPowerFx(): void {
+    this.bombMode.set(false);
+    this.hintDirection.set(null);
+    if (this.hintTimer) {
+      clearTimeout(this.hintTimer);
+      this.hintTimer = null;
+    }
   }
 
   /**
@@ -367,6 +550,7 @@ export class GameService {
   private startCountdown(seconds: number): void {
     this.stopTimer();
     this.startTimestamp = Date.now();
+    this.countdownTotal = seconds; // +30 gücü bunu artırabilir
     this.elapsedSeconds.set(0);
     this.remainingSeconds.set(seconds);
 
@@ -374,7 +558,7 @@ export class GameService {
     this.timerId = setInterval(() => {
       const elapsed = Math.floor((Date.now() - this.startTimestamp) / 1000);
       this.elapsedSeconds.set(elapsed);
-      const remaining = Math.max(0, seconds - elapsed);
+      const remaining = Math.max(0, this.countdownTotal - elapsed);
       this.remainingSeconds.set(remaining);
 
       if (remaining <= 0) {
@@ -525,6 +709,34 @@ function saveRewardedLevels(levels: Set<number>): void {
   try {
     if (typeof localStorage === 'undefined') return;
     localStorage.setItem(REWARDED_LEVELS_KEY, JSON.stringify([...levels]));
+  } catch {
+    /* yoksay */
+  }
+}
+
+/** Güç envanterini localStorage'dan okur (yoksa boş). */
+function loadPowers(): PowerInventory {
+  const base = emptyInventory();
+  try {
+    if (typeof localStorage === 'undefined') return base;
+    const raw = localStorage.getItem(POWERS_KEY);
+    if (!raw) return base;
+    const obj = JSON.parse(raw);
+    for (const key of Object.keys(base) as (keyof PowerInventory)[]) {
+      const n = obj?.[key];
+      if (typeof n === 'number' && n >= 0) base[key] = Math.floor(n);
+    }
+    return base;
+  } catch {
+    return base;
+  }
+}
+
+/** Güç envanterini localStorage'a yazar. */
+function savePowers(inv: PowerInventory): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(POWERS_KEY, JSON.stringify(inv));
   } catch {
     /* yoksay */
   }

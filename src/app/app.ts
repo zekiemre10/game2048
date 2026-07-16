@@ -4,6 +4,7 @@ import { BoardComponent } from './components/board/board';
 import { GameService } from './services/game.service';
 import { ThemeService, Theme } from './services/theme.service';
 import { AudioService } from './services/audio.service';
+import { SfxService } from './services/sfx.service';
 import { Direction, GameStatus } from './models/tile.model';
 import { swipeDirection } from './logic/swipe';
 import { formatTime } from './logic/format-time';
@@ -27,6 +28,7 @@ export class App {
   private readonly game = inject(GameService);
   private readonly themeService = inject(ThemeService);
   private readonly audio = inject(AudioService);
+  private readonly sfx = inject(SfxService);
 
   /** Şablonda kullanmak için durumları dışa aç. */
   protected readonly status = this.game.status;
@@ -38,6 +40,7 @@ export class App {
   protected readonly theme = this.themeService.theme;
   protected readonly musicOn = this.audio.musicOn;
   protected readonly volume = this.audio.volume;
+  protected readonly sfxVolume = this.sfx.sfxVolume;
   protected readonly GameStatus = GameStatus;
 
   /** Ayarlar paneli açık mı? */
@@ -48,6 +51,9 @@ export class App {
 
   /** Ses seviyesini yüzde (0-100) olarak gösterir. */
   protected readonly volumePercent = computed(() => Math.round(this.volume() * 100));
+
+  /** Efekt ses seviyesini yüzde (0-100) olarak gösterir. */
+  protected readonly sfxPercent = computed(() => Math.round(this.sfxVolume() * 100));
 
   /** Dokunmatik kaydırmanın başlangıç noktası. */
   private touchStartX = 0;
@@ -86,11 +92,21 @@ export class App {
 
   // --- Ortak giriş noktası ------------------------------------
 
-  /** Girişleri tek noktadan hamleye çevirir (kilit kontrolü burada). */
+  /** Girişleri tek noktadan hamleye çevirir (kilit kontrolü + ses efekti). */
   private tryMove(direction: Direction): void {
     // Oyun bitince (Won/Lost) veya başlamadan giriş alınmaz.
     if (this.status() !== GameStatus.Playing) return;
-    this.game.move(direction);
+
+    const scoreBefore = this.score();
+    const moved = this.game.move(direction);
+    if (!moved) return; // geçersiz hamle → ses yok
+
+    // Skor arttıysa birleşme olmuştur → merge sesi, yoksa hamle sesi.
+    if (this.score() > scoreBefore) {
+      this.sfx.playMerge();
+    } else {
+      this.sfx.playMove();
+    }
   }
 
   /** Yeni oyun / yeniden başlat. */
@@ -130,9 +146,16 @@ export class App {
     this.audio.toggleMusic();
   }
 
-  /** Ses seviyesi kaydırıcısı değişti (0-100 → 0..1). */
+  /** Müzik ses seviyesi kaydırıcısı değişti (0-100 → 0..1). */
   onVolumeInput(event: Event): void {
     const value = Number((event.target as HTMLInputElement).value);
     this.audio.setVolume(value / 100);
+  }
+
+  /** Efekt ses seviyesi kaydırıcısı değişti (0-100 → 0..1). */
+  onSfxInput(event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value);
+    this.sfx.setVolume(value / 100);
+    this.sfx.playMove(); // anlık önizleme: kaydırınca duyulsun
   }
 }

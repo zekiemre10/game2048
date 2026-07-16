@@ -43,7 +43,7 @@
           </button>
         </div>
         <div class="settings-row">
-          <span>Ses seviyesi</span>
+          <span>Müzik sesi</span>
           <div class="volume">
             <input
               type="range"
@@ -53,9 +53,24 @@
               [value]="volumePercent()"
               [disabled]="!musicOn()"
               (input)="onVolumeInput($event)"
-              aria-label="Ses seviyesi"
+              aria-label="Müzik sesi"
             />
             <span class="volume-val">{{ volumePercent() }}</span>
+          </div>
+        </div>
+        <div class="settings-row">
+          <span>Efekt sesleri</span>
+          <div class="volume">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              [value]="sfxPercent()"
+              (input)="onSfxInput($event)"
+              aria-label="Efekt sesleri"
+            />
+            <span class="volume-val">{{ sfxPercent() }}</span>
           </div>
         </div>
       </section>

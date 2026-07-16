@@ -32,8 +32,12 @@ Bilgisayarda **ok tuşlarıyla**, telefonda **parmakla kaydırarak** oynanır.
 
 - 🎯 **Doğru 2048 mantığı** — saf, framework'süz, tam test edilmiş
 - ⌨️ **Klavye + dokunmatik** — ok tuşları ve swipe
+- ⏱️ **Süre ve hamle sayacı** — üstte gösterim, sonuç ekranında toplam
 - ↶ **Geri al** — son hamleyi geri al (kaybettiren hamle dahil)
 - 🏆 **Kalıcı rekor** — en yüksek skor `localStorage`'da saklanır
+- ⚙️ **Ayarlar paneli** — müzik, ses seviyeleri, tema (tercihler kalıcı)
+- 🎵 **Arka plan müziği** — "Calm Mind – Chill Lofi Beat" (Pixabay)
+- 🔊 **Ses efektleri** — Web Audio ile prosedürel (hamle / birleşme)
 - 🌙 **Açık/koyu tema** — tercih kalıcı, sistem tercihini varsayılan alır
 - ✨ **Akıcı animasyonlar** — kayma, pop-in, birleşme "bump"ı
 - 📱 **Responsive** — telefon, tablet, masaüstü
@@ -44,7 +48,8 @@ Bilgisayarda **ok tuşlarıyla**, telefonda **parmakla kaydırarak** oynanır.
 - [Angular 22](https://angular.dev/) — standalone bileşenler, **signals**
 - TypeScript
 - SCSS (CSS değişkenleriyle temalama)
-- Vitest (81 birim/bileşen testi)
+- Web Audio API (prosedürel ses efektleri)
+- Vitest (100 birim/bileşen testi)
 - Backend yok — tamamen istemci tarafı
 
 ## Proje yapısı
@@ -57,11 +62,14 @@ src/
       tile/            # Tek kare: renk, konum, animasyonlar
       start-screen/    # Başlık ekranı
     services/
-      game.service.ts  # Oyun durumu (signals) + skor + geri al
+      game.service.ts  # Oyun durumu (signals) + skor + süre/hamle + geri al
       theme.service.ts # Açık/koyu tema (localStorage)
+      audio.service.ts # Arka plan müziği (loop, ses, kalıcı)
+      sfx.service.ts   # Ses efektleri (Web Audio, prosedürel)
     logic/
       board-logic.ts   # SAF hamle mantığı (kaydırma + birleştirme)
       swipe.ts         # SAF dokunmatik yön tespiti
+      format-time.ts   # SAF süre biçimlendirme (mm:ss)
     models/
       tile.model.ts    # Tile, Grid, Direction, GameStatus
   styles/
@@ -130,5 +138,12 @@ web sunucusuyla servis edilebilir. Canlı sürüm bu dosyaların
 - [x] Geri al (tek adım) + yeni oyun
 - [x] Responsive tasarım (mobil / tablet / masaüstü)
 - [x] Açık/koyu tema (kalıcı), favicon, meta bilgileri
-- [x] Test ve hata ayıklama (81 test, 3 hata giderildi)
+- [x] Test ve hata ayıklama (100 test)
 - [x] **Deploy ve teslim** ✅
+
+### Ek özellikler (Panora iş paketleri)
+
+- [x] Süre ve hamle sayacı (üstte gösterim + sonuç ekranında)
+- [x] Ayarlar paneli (⚙️ sağ üstte): müzik, ses seviyeleri, tema
+- [x] Arka plan müziği (Pixabay, kalıcı, aç/kapa + ses)
+- [x] Ses efektleri (Web Audio ile prosedürel: hamle / birleşme)

@@ -163,3 +163,112 @@ describe('GameService — seviye modu', () => {
     expect(service.remainingSeconds()).toBeGreaterThan(0);
   });
 });
+
+describe('GameService — altın ödül sistemi', () => {
+  let service: GameService;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(GameService);
+  });
+
+  afterEach(() => service.reset());
+
+  /** Anlık seviyeyi hedefe ulaşarak tamamlar. */
+  function completeCurrentLevel() {
+    const half = service.levelTarget() / 2;
+    service.tiles.set([
+      { id: 91, value: half, row: 0, col: 0 },
+      { id: 92, value: half, row: 0, col: 1 },
+    ]);
+    service.move(Direction.Left); // half + half = target
+  }
+
+  it('başlangıçta altın 0', () => {
+    expect(service.gold()).toBe(0);
+  });
+
+  it('seviye tamamlanınca o seviyenin altını verilir', () => {
+    service.startLevelMode();
+    completeCurrentLevel(); // seviye 1 → 50 altın
+    expect(service.status()).toBe(GameStatus.LevelComplete);
+    expect(service.lastReward()).toBe(levelConfig(1).gold); // 50
+    expect(service.gold()).toBe(50);
+  });
+
+  it('seviye yükseldikçe altın artar (50 → 75 → 100)', () => {
+    service.startLevelMode();
+    completeCurrentLevel(); // L1: +50
+    service.nextLevel();
+    completeCurrentLevel(); // L2: +75
+    service.nextLevel();
+    completeCurrentLevel(); // L3: +100
+    expect(service.gold()).toBe(50 + 75 + 100); // 225
+    expect(service.lastReward()).toBe(100);
+  });
+
+  it('başarısız seviyede altın verilmez', () => {
+    service.startLevelMode();
+    service.status.set(GameStatus.Failed); // başarısız
+    // Failed'de awardGold çağrılmaz; altın hâlâ 0
+    expect(service.gold()).toBe(0);
+    expect(service.lastReward()).toBe(0);
+  });
+
+  it('aynı seviyenin tekrar tamamlanması altın vermez (kural)', () => {
+    service.startLevelMode();
+    completeCurrentLevel(); // L1: +50
+    expect(service.gold()).toBe(50);
+
+    // Aynı seviyeyi tekrar dene ve tekrar tamamla
+    service.retryLevel();
+    completeCurrentLevel(); // L1 tekrar → ödül YOK
+    expect(service.lastReward()).toBe(0); // zaten alınmıştı
+    expect(service.gold()).toBe(50); // artmadı
+  });
+
+  it('altın hesapta kalıcı (localStorage)', () => {
+    service.startLevelMode();
+    completeCurrentLevel();
+    expect(localStorage.getItem('game2048.gold')).toBe('50');
+
+    // Yeni servis altını geri yükler
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    const s2 = TestBed.inject(GameService);
+    expect(s2.gold()).toBe(50);
+    s2.reset();
+  });
+
+  it('son seviye tamamlanınca da altın verilir (Won)', () => {
+    service.startLevelMode();
+    service.level.set(MAX_LEVEL);
+    service.status.set(GameStatus.Playing);
+    completeCurrentLevel(); // son seviye hedefi
+    expect(service.status()).toBe(GameStatus.Won);
+    expect(service.gold()).toBe(levelConfig(MAX_LEVEL).gold); // 150
+  });
+
+  it('ödül geçmişi kalıcı: yeniden yüklenince tekrar ödül vermez', () => {
+    service.startLevelMode();
+    completeCurrentLevel(); // L1 ödülü alındı, kaydedildi
+    expect(service.gold()).toBe(50);
+
+    // Yeni servis (aynı localStorage) → L1 tekrar tamamlanırsa ödül yok
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    const s2 = TestBed.inject(GameService);
+    s2.startLevelMode();
+    const half = s2.levelTarget() / 2;
+    s2.tiles.set([
+      { id: 1, value: half, row: 0, col: 0 },
+      { id: 2, value: half, row: 0, col: 1 },
+    ]);
+    s2.move(Direction.Left);
+    expect(s2.lastReward()).toBe(0); // ödül geçmişten geldi
+    expect(s2.gold()).toBe(50); // artmadı
+    s2.reset();
+  });
+});

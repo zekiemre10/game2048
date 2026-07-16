@@ -112,7 +112,12 @@
 } @else {
   <main class="game">
     <header class="topbar">
-      <h1 class="brand">2048</h1>
+      <div class="brand-row">
+        <h1 class="brand">2048</h1>
+        <div class="gold-pill" title="Toplam altın">
+          💰 <strong>{{ gold() }}</strong>
+        </div>
+      </div>
       <div class="scores">
         <div class="score-box">
           <span>SKOR</span>
@@ -185,7 +190,7 @@
                 }
               }
               @case (GameStatus.LevelComplete) {
-                <h2 class="overlay-title">Seviye {{ level() }} Tamam! 🎉</h2>
+                <h2 class="overlay-title">Seviye {{ level() }} Tamamlandı! 🎉</h2>
                 <p class="overlay-sub">Hedefe ulaştın ({{ levelTarget() }})</p>
               }
               @case (GameStatus.Failed) {
@@ -209,6 +214,20 @@
               }
               &nbsp;·&nbsp; 🔀 {{ moves() }} hamle
             </p>
+
+            <!-- Altın ödülü (seviye tamamlama / tüm oyun kazanma) -->
+            @if (
+              status() === GameStatus.LevelComplete ||
+              (status() === GameStatus.Won && mode() === GameMode.Level)
+            ) {
+              @if (lastReward() > 0) {
+                <p class="overlay-gold">💰 +{{ lastReward() }} altın kazandın!</p>
+              } @else {
+                <p class="overlay-gold muted">
+                  💰 Bu seviyenin ödülü zaten alınmıştı
+                </p>
+              }
+            }
 
             <div class="overlay-actions">
               <!-- Seviye tamam → sonraki seviye -->

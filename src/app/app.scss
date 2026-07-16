@@ -25,12 +25,36 @@
   }
 }
 
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
 .brand {
   font-size: clamp(2rem, 9vw, 3rem);
   font-weight: 800;
   margin: 0;
   color: var(--color-text);
   letter-spacing: -1px;
+}
+
+// Altın göstergesi (topbar)
+.gold-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: #f6c945;
+  color: #6b4e00;
+  font-size: clamp(0.85rem, 3.4vw, 1rem);
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  box-shadow: v.$shadow-soft;
+
+  strong {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 .scores {
@@ -422,6 +446,37 @@
   color: var(--color-text);
   opacity: 0.85;
   font-variant-numeric: tabular-nums;
+}
+
+// Altın ödülü (seviye tamamlama overlay'i)
+.overlay-gold {
+  margin: 0 0 clamp(0.75rem, 4vw, 1.25rem);
+  font-size: clamp(1rem, 4vw, 1.25rem);
+  font-weight: 800;
+  color: #b8860b;
+  animation: gold-pop 350ms ease-in-out;
+
+  &.muted {
+    color: var(--color-text);
+    opacity: 0.7;
+    font-weight: 600;
+    font-size: clamp(0.85rem, 3.4vw, 1rem);
+    animation: none;
+  }
+}
+
+@keyframes gold-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .overlay-actions {

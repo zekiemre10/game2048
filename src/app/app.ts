@@ -45,6 +45,8 @@ export class App {
   protected readonly level = this.game.level;
   protected readonly levelTarget = this.game.levelTarget;
   protected readonly remainingSeconds = this.game.remainingSeconds;
+  protected readonly gold = this.game.gold;
+  protected readonly lastReward = this.game.lastReward;
   protected readonly GameStatus = GameStatus;
   protected readonly GameMode = GameMode;
 

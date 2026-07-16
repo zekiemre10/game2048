@@ -101,8 +101,15 @@
   min-width: min(260px, 80%);
 }
 
-.best-level {
+.gold-total {
   margin: 0.9rem 0 0;
+  font-size: clamp(0.9rem, 3.6vw, 1.05rem);
+  color: #b8860b;
+  font-weight: 700;
+}
+
+.best-level {
+  margin: 0.35rem 0 0;
   font-size: clamp(0.85rem, 3.4vw, 0.95rem);
   color: var(--color-text);
   opacity: 0.85;

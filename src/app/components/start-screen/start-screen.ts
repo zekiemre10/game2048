@@ -14,6 +14,9 @@ export class StartScreen {
   /** Ulaşılan en yüksek seviye (kayıt gösterimi için). */
   protected readonly bestLevel = this.game.bestLevel;
 
+  /** Toplam altın. */
+  protected readonly gold = this.game.gold;
+
   /** "Başla" → klasik sonsuz oyun. */
   onStart(): void {
     this.game.startGame();

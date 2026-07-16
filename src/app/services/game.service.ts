@@ -30,6 +30,12 @@ const BEST_SCORE_KEY = 'game2048.bestScore';
 /** Ulaşılan en yüksek seviyenin localStorage anahtarı. */
 const BEST_LEVEL_KEY = 'game2048.bestLevel';
 
+/** Toplam altının localStorage anahtarı. */
+const GOLD_KEY = 'game2048.gold';
+
+/** Ödülü alınmış seviyelerin localStorage anahtarı. */
+const REWARDED_LEVELS_KEY = 'game2048.rewardedLevels';
+
 /** Geri al için saklanan tek adımlık oyun durumu. */
 interface GameSnapshot {
   tiles: Tile[];
@@ -83,6 +89,15 @@ export class GameService {
 
   /** Ulaşılan en yüksek seviye (localStorage'da kalıcı). */
   readonly bestLevel = signal<number>(loadBestLevel());
+
+  /** Toplam altın (hesapta kalıcı). */
+  readonly gold = signal<number>(loadGold());
+
+  /** Ödülü zaten alınmış seviyeler (tekrar tamamlamada altın verilmez). */
+  private readonly rewardedLevels = new Set<number>(loadRewardedLevels());
+
+  /** Son seviye tamamlamada kazanılan altın (0 → zaten alınmıştı). */
+  readonly lastReward = signal<number>(0);
 
   /** (Seviye modu) anlık seviyenin hedef karesi. */
   readonly levelTarget = computed<number>(() => levelConfig(this.level()).target);
@@ -147,6 +162,7 @@ export class GameService {
     this.tiles.set([]);
     this.score.set(0);
     this.moves.set(0);
+    this.lastReward.set(0);
     this.keepPlayingAfterWin = false;
     this.history.set(null);
     this.status.set(GameStatus.Playing);
@@ -295,6 +311,7 @@ export class GameService {
   private checkLevelEnd(): void {
     if (this.tiles().some((t) => t.value >= this.levelTarget())) {
       this.stopTimer();
+      this.awardGold(this.level()); // seviye tamamlandı → altın ver
       this.status.set(
         this.level() >= MAX_LEVEL ? GameStatus.Won : GameStatus.LevelComplete,
       );
@@ -302,8 +319,28 @@ export class GameService {
     }
     if (!hasAnyMove(this.tiles())) {
       this.stopTimer();
+      // Başarısız → altın YOK
       this.status.set(GameStatus.Failed);
     }
+  }
+
+  /**
+   * Seviye tamamlanınca altın verir.
+   * KURAL: Her seviyenin ödülü YALNIZCA İLK tamamlamada verilir.
+   * Aynı seviye tekrar tamamlanırsa altın verilmez (farming önlenir).
+   * `lastReward` = bu tamamlamada kazanılan altın (0 → zaten alınmıştı).
+   */
+  private awardGold(level: number): void {
+    const reward = levelConfig(level).gold;
+    if (this.rewardedLevels.has(level)) {
+      this.lastReward.set(0); // ödül zaten alınmış
+      return;
+    }
+    this.rewardedLevels.add(level);
+    this.gold.update((g) => g + reward);
+    this.lastReward.set(reward);
+    saveGold(this.gold());
+    saveRewardedLevels(this.rewardedLevels);
   }
 
   // --- Süre sayacı --------------------------------------------
@@ -443,6 +480,51 @@ function saveBestLevel(level: number): void {
   try {
     if (typeof localStorage === 'undefined') return;
     localStorage.setItem(BEST_LEVEL_KEY, String(level));
+  } catch {
+    /* yoksay */
+  }
+}
+
+/** localStorage'dan toplam altını okur (yoksa 0). */
+function loadGold(): number {
+  try {
+    if (typeof localStorage === 'undefined') return 0;
+    const raw = localStorage.getItem(GOLD_KEY);
+    const n = raw ? parseInt(raw, 10) : 0;
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Toplam altını localStorage'a yazar. */
+function saveGold(gold: number): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(GOLD_KEY, String(gold));
+  } catch {
+    /* yoksay */
+  }
+}
+
+/** Ödülü alınmış seviyelerin listesini localStorage'dan okur. */
+function loadRewardedLevels(): number[] {
+  try {
+    if (typeof localStorage === 'undefined') return [];
+    const raw = localStorage.getItem(REWARDED_LEVELS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter((x) => typeof x === 'number') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Ödülü alınmış seviyeleri localStorage'a yazar. */
+function saveRewardedLevels(levels: Set<number>): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(REWARDED_LEVELS_KEY, JSON.stringify([...levels]));
   } catch {
     /* yoksay */
   }

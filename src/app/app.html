@@ -180,9 +180,10 @@
 
       <div class="store-grid">
         @switch (storeTab()) {
-          <!-- TEMALAR -->
+          <!-- TEMALAR (yalnızca satın alınabilir; Açık/Koyu Ayarlar'da) -->
           @case ('themes') {
             @for (t of THEMES; track t.id) {
+              @if (t.price > 0) {
               <div
                 class="store-card"
                 [class.active]="theme() === t.id"
@@ -209,6 +210,7 @@
                   </button>
                 }
               </div>
+              }
             }
           }
           <!-- GÜÇLER -->

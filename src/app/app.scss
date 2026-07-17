@@ -531,9 +531,11 @@
 
 // --- Sekmeli mağaza (kart ızgarası) -------------------------
 
-// Mağaza panelini daha geniş yap (ızgara sığsın)
-.store-panel {
-  max-width: min(560px, 94vw);
+// Mağaza panelini geniş yap (ızgara rahat sığsın).
+// Birleşik seçici: .settings-panel'in dar genişliğini kesin ezmek için.
+.settings-panel.store-panel {
+  width: min(96vw, 720px);
+  max-width: none;
 }
 
 .store-top {
@@ -586,10 +588,10 @@
 
 .store-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.7rem;
   margin-bottom: 1rem;
-  max-height: 56vh;
+  max-height: 60vh;
   overflow-y: auto;
 }
 

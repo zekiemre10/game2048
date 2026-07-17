@@ -401,8 +401,9 @@
       </div>
     }
 
-    <div class="board-wrap" [class.bomb-active]="bombMode()">
-      <app-board />
+    <div class="board-area">
+      <div class="board-wrap" [class.bomb-active]="bombMode()">
+        <app-board />
 
       <!-- İpucu oku -->
       @if (hintDirection()) {
@@ -527,6 +528,7 @@
           </div>
         </div>
       }
+      </div>
     </div>
 
     <div class="controls">

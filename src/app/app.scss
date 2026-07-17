@@ -1,28 +1,29 @@
 @use '../styles/variables' as v;
 
-// Oyun alanı: dar ekranda tam genişlik, masaüstünde ortalı ve sınırlı.
+// Oyun alanı: viewport yüksekliğine sığar, ASLA dikey kaydırma olmaz.
+// Flex kolon: üst bilgiler sabit, tahta kalan alana otomatik oturur.
 .game {
   width: min(100%, #{v.$board-size});
-  margin: clamp(0.75rem, 3vw, 2rem) auto;
-  padding: clamp(0.6rem, 3vw, 1rem);
+  height: 100vh;
+  height: 100dvh; // mobil tarayıcı çubuğunu hesaba katar
+  margin: 0 auto;
+  // Üstte sabit profil/mağaza/ayar butonlarına yer bırak
+  padding: clamp(3rem, 11vw, 3.6rem) clamp(0.6rem, 3vw, 1rem)
+    clamp(0.5rem, 2vw, 0.9rem);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .topbar {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: clamp(0.75rem, 3vw, 1.25rem);
+  margin-bottom: clamp(0.4rem, 1.5vw, 0.75rem);
   flex-wrap: wrap;
-}
-
-// Dar ekranda oyun alanı sağ kenara dayanır ve skor kutuları,
-// sabit konumlu tema butonunun ALTINA girer. Butona yer ayır.
-// (Geniş ekranda oyun ortalı/sınırlı olduğu için çakışma olmaz.)
-@media (max-width: 640px) {
-  .topbar {
-    padding-right: 52px;
-  }
 }
 
 .brand-row {
@@ -89,11 +90,12 @@
 
 // Seviye modu: seviye + hedef çubuğu
 .level-bar {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem;
-  margin-bottom: clamp(0.5rem, 2vw, 0.75rem);
+  margin-bottom: clamp(0.4rem, 1.5vw, 0.6rem);
 }
 
 .level-badge {
@@ -117,9 +119,10 @@
 
 // Süre + hamle sayacı satırı (tahtanın hemen üstünde)
 .stats {
+  flex: 0 0 auto;
   display: flex;
   gap: 0.6rem;
-  margin-bottom: clamp(0.6rem, 2.5vw, 1rem);
+  margin-bottom: clamp(0.4rem, 1.5vw, 0.7rem);
 }
 
 // Kalan süre azalınca kırmızı uyarı + nabız
@@ -174,10 +177,11 @@
 }
 
 .controls {
+  flex: 0 0 auto;
   display: flex;
   gap: 0.75rem;
   justify-content: center;
-  margin-top: clamp(0.75rem, 3vw, 1.25rem);
+  margin-top: clamp(0.4rem, 1.5vw, 0.75rem);
   flex-wrap: wrap;
 }
 
@@ -688,10 +692,11 @@
 // --- Oyun içi güç çubuğu ------------------------------------
 
 .power-bar {
+  flex: 0 0 auto;
   display: flex;
   gap: 0.5rem;
   justify-content: center;
-  margin-bottom: clamp(0.6rem, 2.5vw, 0.9rem);
+  margin-bottom: clamp(0.4rem, 1.5vw, 0.6rem);
   flex-wrap: wrap;
 }
 
@@ -736,6 +741,7 @@
 // --- Bomba hedefleme bandı ----------------------------------
 
 .bomb-banner {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -948,10 +954,22 @@
   width: 100%;
 }
 
-// --- Kazandın / Kaybettin overlay ---------------------------
+// --- Tahta alanı: kalan yüksekliğe otomatik sığar -----------
+// board-area kalan tüm alanı kaplar; tahta, container-query birimleriyle
+// (cqi=genişlik, cqb=yükseklik) bu alana sığan EN BÜYÜK KARE olur.
+.board-area {
+  flex: 1 1 auto;
+  min-height: 0;
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
 .board-wrap {
   position: relative;
+  width: min(100cqi, 100cqb);
+  height: min(100cqi, 100cqb);
 }
 
 .overlay {
@@ -1055,26 +1073,41 @@
   }
 }
 
-// --- Yatay (landscape) telefon ------------------------------
-// Ekran alçakken tahta dikeyde taşmasın: genişliği yüksekliğe göre sınırla.
-@media (orientation: landscape) and (max-height: 600px) {
+// --- Kısa ekran (yatay telefon) -----------------------------
+// Yükseklik azken üst boşlukları ve öğe yüksekliklerini kısarak
+// dikey taşmayı önler; tahta yine kalan alana otomatik sığar.
+@media (max-height: 520px) {
   .game {
-    max-width: min(#{v.$board-size}, 58vh);
-    margin: 0.5rem auto;
+    padding-top: 2.6rem;
+    padding-bottom: 0.35rem;
+  }
+
+  .topbar {
+    margin-bottom: 0.3rem;
   }
 
   .brand {
-    font-size: 1.75rem;
+    font-size: 1.5rem;
+  }
+
+  .stats,
+  .level-bar,
+  .power-bar {
+    margin-bottom: 0.3rem;
+  }
+
+  .controls {
+    margin-top: 0.3rem;
   }
 
   .btn-primary {
-    padding: 0.5rem 1rem;
-    min-height: 40px;
+    padding: 0.4rem 0.9rem;
+    min-height: 36px;
   }
 
-  .theme-toggle {
-    width: 38px;
-    height: 38px;
-    min-height: 38px;
+  .profile-btn,
+  .round-btn {
+    transform: scale(0.85);
+    transform-origin: top;
   }
 }

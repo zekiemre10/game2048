@@ -148,72 +148,109 @@
       aria-label="Mağaza"
       (click)="$event.stopPropagation()"
     >
-      <h2 class="settings-title">🛒 Mağaza</h2>
-      <p class="settings-note">
-        Altınlarını güçlere harca. Güçler oyun sırasında kullanılır.
-      </p>
-
-      <div class="store-gold">💰 Altının: <strong>{{ gold() }}</strong></div>
-
-      <h3 class="store-heading">⚡ Güçler</h3>
-      <div class="store-list">
-        @for (p of POWERS; track p.id) {
-          <div class="store-item">
-            <div class="store-icon">{{ p.icon }}</div>
-            <div class="store-info">
-              <div class="store-name">
-                {{ p.name }}
-                @if (powers()[p.id] > 0) {
-                  <span class="store-owned">×{{ powers()[p.id] }}</span>
-                }
-              </div>
-              <div class="store-desc">{{ p.desc }}</div>
-            </div>
-            <button
-              class="btn-primary store-buy"
-              type="button"
-              [disabled]="!canAfford(p.id)"
-              (click)="onBuyPower(p.id)"
-            >
-              💰 {{ p.price }}
-            </button>
-          </div>
-        }
+      <div class="store-top">
+        <h2 class="settings-title">🛒 Mağaza</h2>
+        <div class="store-gold-pill">💰 {{ gold() }}</div>
       </div>
 
-      <h3 class="store-heading">🎨 Temalar</h3>
-      <div class="store-list">
-        @for (t of THEMES; track t.id) {
-          @if (t.price > 0) {
-            <div class="store-item">
-              <span class="swatch-colors store-icon">
-                <span [style.background]="t.swatch[0]"></span>
-                <span [style.background]="t.swatch[1]"></span>
-                <span [style.background]="t.swatch[2]"></span>
-              </span>
-              <div class="store-info">
-                <div class="store-name">{{ t.name }}</div>
-                <div class="store-desc">Renk teması</div>
+      <!-- Sekmeler -->
+      <div class="store-tabs">
+        <button
+          type="button"
+          [class.active]="storeTab() === 'themes'"
+          (click)="setStoreTab('themes')"
+        >
+          🎨 Temalar
+        </button>
+        <button
+          type="button"
+          [class.active]="storeTab() === 'powers'"
+          (click)="setStoreTab('powers')"
+        >
+          ⚡ Güçler
+        </button>
+        <button
+          type="button"
+          [class.active]="storeTab() === 'achievements'"
+          (click)="setStoreTab('achievements')"
+        >
+          🏅 Başarımlar
+        </button>
+      </div>
+
+      <div class="store-grid">
+        @switch (storeTab()) {
+          <!-- TEMALAR -->
+          @case ('themes') {
+            @for (t of THEMES; track t.id) {
+              <div
+                class="store-card"
+                [class.active]="theme() === t.id"
+              >
+                <span
+                  class="card-swatch"
+                  [style.background]="themeGradient(t.swatch)"
+                ></span>
+                <span class="card-name">{{ t.name }}</span>
+                @if (theme() === t.id) {
+                  <span class="card-badge used">✓ Kullanımda</span>
+                } @else if (isThemeOwned(t.id)) {
+                  <button class="card-btn" type="button" (click)="onSelectTheme(t.id)">
+                    Seç
+                  </button>
+                } @else {
+                  <button
+                    class="card-btn buy"
+                    type="button"
+                    [disabled]="gold() < t.price"
+                    (click)="onBuyTheme(t.id)"
+                  >
+                    💰 {{ t.price }}
+                  </button>
+                }
               </div>
-              @if (isThemeOwned(t.id)) {
+            }
+          }
+          <!-- GÜÇLER -->
+          @case ('powers') {
+            @for (p of POWERS; track p.id) {
+              <div class="store-card">
+                <span class="card-icon">{{ p.icon }}</span>
+                <span class="card-name">
+                  {{ p.name }}
+                  @if (powers()[p.id] > 0) {
+                    <span class="card-owned">×{{ powers()[p.id] }}</span>
+                  }
+                </span>
+                <span class="card-desc">{{ p.desc }}</span>
                 <button
-                  class="btn-primary store-buy ghost"
+                  class="card-btn buy"
                   type="button"
-                  (click)="onSelectTheme(t.id)"
+                  [disabled]="!canAfford(p.id)"
+                  (click)="onBuyPower(p.id)"
                 >
-                  {{ theme() === t.id ? '✓ Seçili' : 'Seç' }}
+                  💰 {{ p.price }}
                 </button>
-              } @else {
-                <button
-                  class="btn-primary store-buy"
-                  type="button"
-                  [disabled]="gold() < t.price"
-                  (click)="onBuyTheme(t.id)"
-                >
-                  💰 {{ t.price }}
-                </button>
-              }
-            </div>
+              </div>
+            }
+          }
+          <!-- BAŞARIMLAR -->
+          @case ('achievements') {
+            @for (a of ACHIEVEMENTS; track a.id) {
+              <div
+                class="store-card ach-card"
+                [class.locked]="!isAchievementUnlocked(a.id)"
+              >
+                <span class="card-icon">{{ a.icon }}</span>
+                <span class="card-name">{{ a.name }}</span>
+                <span class="card-desc">{{ a.desc }}</span>
+                @if (isAchievementUnlocked(a.id)) {
+                  <span class="card-badge used">✓ Açıldı</span>
+                } @else {
+                  <span class="card-badge">💰 {{ a.gold }}</span>
+                }
+              </div>
+            }
           }
         }
       </div>
@@ -266,25 +303,14 @@
         <div class="pstat"><strong>{{ totalMoves() }}</strong><span>TOPLAM HAMLE</span></div>
       </div>
 
-      <!-- Başarımlar -->
-      <h3 class="settings-heading">🏅 Başarımlar</h3>
-      <div class="ach-list">
-        @for (a of ACHIEVEMENTS; track a.id) {
-          <div class="ach-item" [class.locked]="!isAchievementUnlocked(a.id)">
-            <span class="ach-icon">{{ a.icon }}</span>
-            <div class="ach-info">
-              <div class="ach-name">
-                {{ a.name }}
-                @if (isAchievementUnlocked(a.id)) {
-                  <span class="ach-check">✓</span>
-                }
-              </div>
-              <div class="ach-desc">{{ a.desc }}</div>
-            </div>
-            <span class="ach-gold">💰 {{ a.gold }}</span>
-          </div>
-        }
-      </div>
+      <!-- Başarımlar: Mağaza → Başarımlar sekmesinde -->
+      <button
+        class="btn-primary ghost profile-ach-link"
+        type="button"
+        (click)="onOpenStore(); setStoreTab('achievements')"
+      >
+        🏅 Başarımları Gör ({{ unlockedAchievements().size }}/{{ ACHIEVEMENTS.length }})
+      </button>
 
       <button class="btn-primary settings-close" type="button" (click)="onCloseProfile()">
         Kapat

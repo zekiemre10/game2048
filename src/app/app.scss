@@ -525,48 +525,164 @@
   opacity: 0.7;
 }
 
-.store-item {
+// --- Sekmeli mağaza (kart ızgarası) -------------------------
+
+// Mağaza panelini daha geniş yap (ızgara sığsın)
+.store-panel {
+  max-width: min(560px, 94vw);
+}
+
+.store-top {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  padding: 0.6rem 0.75rem;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+
+  .settings-title {
+    margin: 0;
+  }
+}
+
+.store-gold-pill {
+  background: #f6c945;
+  color: #6b4e00;
+  font-weight: 800;
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+.store-tabs {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  margin-bottom: 0.9rem;
+
+  button {
+    flex: 0 0 auto;
+    padding: 0.45rem 0.9rem;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    background: var(--color-cell-empty);
+    color: var(--color-text);
+    white-space: nowrap;
+    transition:
+      background-color v.$transition-fast,
+      color v.$transition-fast;
+
+    &.active {
+      background: var(--color-button);
+      color: var(--color-text-light);
+    }
+  }
+}
+
+.store-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  max-height: 56vh;
+  overflow-y: auto;
+}
+
+.store-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.35rem;
+  padding: 0.75rem 0.5rem;
   background: var(--color-cell-empty);
-  border-radius: v.$radius-md;
+  border-radius: v.$radius-lg;
+  border: 2px solid transparent;
+
+  &.active {
+    border-color: #3a9d4a;
+  }
+
+  &.locked {
+    opacity: 0.55;
+    filter: grayscale(0.6);
+  }
 }
 
-.store-icon {
-  font-size: 1.6rem;
+.card-swatch {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  box-shadow: v.$shadow-soft;
+}
+
+.card-icon {
+  font-size: 2.2rem;
   line-height: 1;
-  flex-shrink: 0;
+  height: 56px;
+  display: flex;
+  align-items: center;
 }
 
-.store-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.store-name {
+.card-name {
   font-weight: 700;
+  font-size: 0.92rem;
   color: var(--color-text);
 }
 
-.store-owned {
+.card-owned {
   color: var(--color-button);
-  font-size: 0.85rem;
-  margin-left: 0.3rem;
-}
-
-.store-desc {
   font-size: 0.8rem;
-  color: var(--color-text);
-  opacity: 0.75;
+  margin-left: 0.2rem;
 }
 
-.store-buy {
-  flex-shrink: 0;
-  padding: 0.5rem 0.8rem;
-  min-height: 40px;
-  font-size: 0.95rem;
+.card-desc {
+  font-size: 0.72rem;
+  color: var(--color-text);
+  opacity: 0.72;
+  line-height: 1.2;
+}
+
+.card-btn {
+  margin-top: 0.15rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: v.$radius-md;
+  font-weight: 700;
+  font-size: 0.85rem;
+  background: var(--color-cell-empty);
+  color: var(--color-text);
+  box-shadow: inset 0 0 0 2px var(--color-button);
+
+  &.buy {
+    background: var(--color-button);
+    color: var(--color-text-light);
+    box-shadow: none;
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.card-badge {
+  margin-top: 0.15rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #b8860b;
+
+  &.used {
+    color: #fff;
+    background: #3a9d4a;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+  }
+}
+
+.profile-ach-link {
+  width: 100%;
+  margin-bottom: 0.75rem;
 }
 
 // --- Oyun içi güç çubuğu ------------------------------------

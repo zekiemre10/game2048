@@ -78,6 +78,11 @@ export class App {
   /** Mağaza paneli açık mı? */
   protected readonly storeOpen = signal(false);
 
+  /** Aktif mağaza sekmesi. */
+  protected readonly storeTab = signal<'themes' | 'powers' | 'achievements'>(
+    'themes',
+  );
+
   /** Profil paneli açık mı? */
   protected readonly profileOpen = signal(false);
 
@@ -195,7 +200,18 @@ export class App {
 
   onOpenStore(): void {
     this.settingsOpen.set(false);
+    this.profileOpen.set(false);
     this.storeOpen.set(true);
+  }
+
+  /** Mağaza sekmesini değiştir. */
+  setStoreTab(tab: 'themes' | 'powers' | 'achievements'): void {
+    this.storeTab.set(tab);
+  }
+
+  /** Tema kartı için renkli gradyan (önizleme). */
+  protected themeGradient(swatch: [string, string, string]): string {
+    return `linear-gradient(135deg, ${swatch[1]}, ${swatch[2]})`;
   }
 
   onCloseStore(): void {

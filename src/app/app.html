@@ -7,7 +7,7 @@
 >
   <span class="profile-avatar">👤</span>
   <span class="profile-meta">
-    <span class="profile-name">{{ displayName() }}</span>
+    <span class="profile-name">{{ t('nav.profile') }}</span>
     <span class="profile-streak">🔥 {{ currentStreak() }} · 💰 {{ gold() }}</span>
   </span>
   @if (canClaimDaily()) {
@@ -301,14 +301,12 @@
     >
       <div class="profile-head">
         <span class="profile-head-avatar">👤</span>
-        <input
-          class="profile-name-input"
-          type="text"
-          maxlength="16"
-          [value]="displayName()"
-          (input)="onNameInput($event)"
-          [attr.aria-label]="t('prof.nameLabel')"
-        />
+        <div class="profile-head-info">
+          <span class="profile-head-name">{{ displayName() }}</span>
+          @if (!authUser()) {
+            <span class="profile-head-hint">{{ t('prof.loginForName') }}</span>
+          }
+        </div>
       </div>
 
       <!-- Günlük ödül -->
@@ -907,6 +905,15 @@
   <main class="game">
     <header class="topbar">
       <div class="brand-row">
+        <button
+          class="home-back"
+          type="button"
+          [attr.aria-label]="t('nav.home')"
+          [title]="t('nav.home')"
+          (click)="onGoHome()"
+        >
+          ←
+        </button>
         <h1 class="brand">2048</h1>
         <div class="gold-pill" [title]="t('hud.totalGold')">
           💰 <strong>{{ gold() }}</strong>

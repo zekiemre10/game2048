@@ -52,10 +52,14 @@ export class App {
   /** Aktif dil. */
   protected readonly lang = this.i18n.lang;
 
-  /** Görünen oyuncu adı (varsayılan ise dile göre yerelleştirilir). */
+  /**
+   * Görünen oyuncu adı: giriş yapıldıysa KAYIT NICK'İ (değiştirilemez),
+   * misafirse dile göre yerelleştirilmiş varsayılan ("Oyuncu"/"Player").
+   */
   protected readonly displayName = computed(() => {
-    const n = this.game.playerName();
-    return n === 'Oyuncu' || n === 'Player' ? this.i18n.L('Oyuncu', 'Player') : n;
+    const u = this.authUser();
+    if (u) return u.username;
+    return this.i18n.L('Oyuncu', 'Player');
   });
 
   /** Şablonda kullanmak için durumları dışa aç. */
@@ -379,11 +383,6 @@ export class App {
   /** Günlük ödülü al. */
   onClaimDaily(): void {
     this.game.claimDailyReward();
-  }
-
-  /** Oyuncu adını güncelle (input değişince). */
-  onNameInput(event: Event): void {
-    this.game.setName((event.target as HTMLInputElement).value);
   }
 
   /** Başarım açık mı? */

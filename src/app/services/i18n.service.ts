@@ -131,6 +131,10 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'nav.profile': { tr: 'Profil', en: 'Profile' },
   'nav.home': { tr: 'Ana Ekran', en: 'Home' },
   'prof.nameLabel': { tr: 'Oyuncu adı', en: 'Player name' },
+  'prof.loginForName': {
+    tr: 'Adın için giriş yap (kayıt olduğun kullanıcı adı)',
+    en: 'Log in for your name (your registered username)',
+  },
   'hud.totalGold': { tr: 'Toplam altın', en: 'Total gold' },
 
   // Görevler

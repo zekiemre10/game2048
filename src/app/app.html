@@ -30,6 +30,30 @@
     }
   </button>
   <button
+    class="round-btn friends-btn"
+    type="button"
+    [attr.aria-label]="t('nav.friends')"
+    [attr.title]="t('nav.friends')"
+    (click)="onOpenFriends()"
+  >
+    👥
+    @if (friendsBadge() > 0) {
+      <span class="notif-badge">{{ friendsBadge() }}</span>
+    }
+  </button>
+  <button
+    class="round-btn mp-btn"
+    type="button"
+    [attr.aria-label]="t('nav.multiplayer')"
+    [attr.title]="t('nav.multiplayer')"
+    (click)="onOpenMultiplayer()"
+  >
+    🏁
+    @if (mpRoom()) {
+      <span class="notif-badge dot-badge"></span>
+    }
+  </button>
+  <button
     class="round-btn store-btn"
     type="button"
     [attr.aria-label]="t('nav.store')"
@@ -340,6 +364,24 @@
         {{ t('prof.seeAch') }} ({{ unlockedAchievements().size }}/{{ ACHIEVEMENTS.length }})
       </button>
 
+      <!-- Hesap: giriş / kayıt / çıkış -->
+      <div class="account-box">
+        @if (authUser(); as u) {
+          <div class="account-status">
+            <span class="account-label">{{ t('auth.loggedInAs') }}</span>
+            <strong class="account-user">👤 {{ u.username }}</strong>
+          </div>
+          <p class="account-sync">{{ t('auth.synced') }}</p>
+          <button class="btn-primary ghost" type="button" (click)="onLogout()">
+            {{ t('auth.logout') }}
+          </button>
+        } @else {
+          <button class="btn-primary account-cta" type="button" (click)="onOpenAuth()">
+            {{ t('auth.signInCta') }}
+          </button>
+        }
+      </div>
+
       <button class="btn-primary settings-close" type="button" (click)="onCloseProfile()">
         {{ t('btn.close') }}
       </button>
@@ -431,6 +473,449 @@
   </div>
 }
 
+<!-- Arkadaşlar paneli -->
+@if (friendsOpen()) {
+  <div class="settings-backdrop" (click)="onCloseFriends()">
+    <div
+      class="settings-panel friends-panel"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-label]="t('fr.title')"
+      (click)="$event.stopPropagation()"
+    >
+      <h2 class="settings-title">{{ t('fr.title') }}</h2>
+
+      @if (!authUser()) {
+        <!-- Giriş gerekli -->
+        <p class="settings-note">{{ t('fr.loginNeeded') }}</p>
+        <button class="btn-primary" type="button" (click)="onFriendsLogin()">
+          {{ t('fr.loginCta') }}
+        </button>
+      } @else {
+        <!-- Arama -->
+        <div class="friend-search">
+          <input
+            type="text"
+            [value]="friendSearchTerm()"
+            (input)="onFriendSearch($event)"
+            [placeholder]="t('fr.searchPlaceholder')"
+            [attr.aria-label]="t('fr.searchPlaceholder')"
+          />
+        </div>
+
+        @if (friendSearchTerm().length >= 2) {
+          <div class="friend-results">
+            @if (friendSearching()) {
+              <p class="friend-muted">{{ t('fr.searching') }}</p>
+            } @else if (friendSearchResults().length === 0) {
+              <p class="friend-muted">{{ t('fr.noResults') }}</p>
+            } @else {
+              @for (u of friendSearchResults(); track u.id) {
+                <div class="friend-row">
+                  <span class="friend-avatar">👤</span>
+                  <span class="friend-name">{{ u.username }}</span>
+                  @if (isRequested(u.username)) {
+                    <span class="friend-tag">{{ t('fr.requested') }}</span>
+                  } @else {
+                    <button
+                      class="friend-btn add"
+                      type="button"
+                      (click)="onAddFriend(u.username)"
+                    >
+                      {{ t('fr.add') }}
+                    </button>
+                  }
+                </div>
+              }
+            }
+          </div>
+        }
+
+        <!-- Gelen istekler -->
+        @if (friendsIncoming().length > 0) {
+          <h3 class="settings-heading">
+            {{ t('fr.incoming') }} ({{ friendsIncoming().length }})
+          </h3>
+          <div class="friend-list">
+            @for (f of friendsIncoming(); track f.id) {
+              <div class="friend-row">
+                <span class="friend-avatar">👤</span>
+                <span class="friend-name">{{ f.username }}</span>
+                <button
+                  class="friend-btn add"
+                  type="button"
+                  (click)="onRespondFriend(f.reqId!, true)"
+                >
+                  {{ t('fr.accept') }}
+                </button>
+                <button
+                  class="friend-btn ghost"
+                  type="button"
+                  (click)="onRespondFriend(f.reqId!, false)"
+                >
+                  {{ t('fr.decline') }}
+                </button>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Giden istekler -->
+        @if (friendsOutgoing().length > 0) {
+          <h3 class="settings-heading">
+            {{ t('fr.outgoing') }} ({{ friendsOutgoing().length }})
+          </h3>
+          <div class="friend-list">
+            @for (f of friendsOutgoing(); track f.id) {
+              <div class="friend-row">
+                <span class="friend-avatar">👤</span>
+                <span class="friend-name">{{ f.username }}</span>
+                <span class="friend-tag">{{ t('fr.pending') }}</span>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Arkadaş listesi -->
+        <h3 class="settings-heading">
+          {{ t('fr.myFriends') }} ({{ friendsList().length }})
+        </h3>
+        @if (friendsList().length === 0) {
+          <p class="friend-muted">{{ t('fr.empty') }}</p>
+        } @else {
+          <div class="friend-list">
+            @for (f of friendsList(); track f.id) {
+              <div class="friend-row friend-card">
+                <span class="friend-avatar">
+                  👤
+                  @if (hasUnread(f.id)) { <span class="friend-dot"></span> }
+                </span>
+                <div class="friend-info">
+                  <span class="friend-name">{{ f.username }}</span>
+                  <span class="friend-stats">
+                    {{ t('fr.best') }} {{ f.bestScore }} · {{ t('fr.lvl') }} {{ f.bestLevel }}
+                  </span>
+                </div>
+                <button
+                  class="friend-btn add"
+                  type="button"
+                  (click)="onOpenChat(f)"
+                >
+                  {{ t('fr.chat') }}
+                </button>
+                <button
+                  class="friend-btn ghost"
+                  type="button"
+                  (click)="onRemoveFriend(f.id)"
+                >
+                  {{ t('fr.remove') }}
+                </button>
+              </div>
+            }
+          </div>
+        }
+      }
+
+      <button class="btn-primary ghost settings-close" type="button" (click)="onCloseFriends()">
+        {{ t('btn.close') }}
+      </button>
+    </div>
+  </div>
+}
+
+<!-- Çok oyunculu paneli -->
+@if (mpOpen()) {
+  <div class="settings-backdrop" (click)="onCloseMultiplayer()">
+    <div
+      class="settings-panel mp-panel"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-label]="t('mp.title')"
+      (click)="$event.stopPropagation()"
+    >
+      <h2 class="settings-title">{{ t('mp.title') }}</h2>
+
+      @if (!authUser()) {
+        <p class="settings-note">{{ t('mp.loginNeeded') }}</p>
+        <button class="btn-primary" type="button" (click)="onMpLogin()">
+          {{ t('fr.loginCta') }}
+        </button>
+      } @else if (mpRoom(); as room) {
+        <!-- Oda içi: lobi / yarış / sonuç -->
+        <div class="mp-code-box">
+          <span class="mp-code-label">{{ t('mp.roomCode') }}</span>
+          <div class="mp-code-row">
+            <strong class="mp-code">{{ room.code }}</strong>
+            <button class="friend-btn add" type="button" (click)="onCopyCode()">
+              {{ mpCopied() ? t('mp.copied') : t('mp.copy') }}
+            </button>
+          </div>
+          @if (room.status === 'lobby') {
+            <span class="mp-code-hint">{{ t('mp.share') }}</span>
+          }
+        </div>
+
+        @if (room.status === 'finished') {
+          <div class="mp-result">
+            <h3 class="mp-result-title">{{ t('mp.finished') }}</h3>
+            @if (mpWinner(); as w) {
+              <p class="mp-winner">{{ t('mp.winner') }} 👤 {{ w.username }} — {{ w.score }}</p>
+            }
+          </div>
+        } @else if (room.status === 'lobby') {
+          <p class="settings-note">{{ t('mp.waiting') }}</p>
+        }
+
+        <!-- Oyuncu listesi / sıralama -->
+        <h3 class="settings-heading">
+          @if (room.status === 'lobby') {
+            {{ t('mp.players') }} ({{ mpPlayers().length }})
+          } @else {
+            {{ t('mp.leaderboard') }}
+          }
+        </h3>
+        <div class="mp-players">
+          @for (p of mpPlayers(); track p.id; let i = $index) {
+            <div class="mp-player" [class.me]="isMe(p.id)">
+              @if (room.status !== 'lobby') {
+                <span class="mp-rank">{{ i + 1 }}</span>
+              }
+              <span class="mp-pname">
+                👤 {{ p.username }}
+                @if (isMe(p.id)) { <em>{{ t('mp.you') }}</em> }
+                @if (p.id === room.hostId) { <span class="mp-hosttag">{{ t('mp.host') }}</span> }
+              </span>
+              @if (room.status !== 'lobby') {
+                <span class="mp-score">{{ p.score }}</span>
+                @if (p.done) { <span class="mp-done">{{ t('mp.done') }}</span> }
+              }
+            </div>
+          }
+        </div>
+
+        @if (mpError()) { <p class="auth-error">{{ t(mpError()) }}</p> }
+
+        <!-- Host: başlat (lobide) -->
+        @if (room.status === 'lobby' && mpIsHost()) {
+          <button
+            class="btn-primary"
+            type="button"
+            [disabled]="mpPlayers().length < 2 || mpBusy()"
+            (click)="onStartRace()"
+          >
+            {{ t('mp.startRace') }}
+          </button>
+          @if (mpPlayers().length < 2) {
+            <p class="mp-hint">{{ t('mp.needTwo') }}</p>
+          }
+        }
+
+        <button class="btn-primary ghost" type="button" (click)="onLeaveRoom()">
+          {{ t('mp.leave') }}
+        </button>
+      } @else {
+        <!-- Oda yok: kur / katıl -->
+        <p class="settings-note">{{ t('mp.intro') }}</p>
+        @if (mpNotice()) { <p class="auth-error">{{ t(mpNotice()) }}</p> }
+
+        <section class="settings-section">
+          <h3 class="settings-heading">{{ t('mp.duration') }}</h3>
+          <div class="lang-choice">
+            <button type="button" [class.active]="mpDuration() === 120" (click)="setMpDuration(120)">{{ t('mp.min2') }}</button>
+            <button type="button" [class.active]="mpDuration() === 180" (click)="setMpDuration(180)">{{ t('mp.min3') }}</button>
+            <button type="button" [class.active]="mpDuration() === 300" (click)="setMpDuration(300)">{{ t('mp.min5') }}</button>
+          </div>
+          <button class="btn-primary mp-create" type="button" [disabled]="mpBusy()" (click)="onCreateRoom()">
+            {{ t('mp.create') }}
+          </button>
+        </section>
+
+        <section class="settings-section">
+          <h3 class="settings-heading">{{ t('mp.joinLabel') }}</h3>
+          <form class="mp-join" (submit)="$event.preventDefault(); onJoinRoom()">
+            <input
+              type="text"
+              maxlength="6"
+              [value]="mpJoinCode()"
+              (input)="onMpCodeInput($event)"
+              [placeholder]="t('mp.codePlaceholder')"
+              [attr.aria-label]="t('mp.codePlaceholder')"
+            />
+            <button class="btn-primary" type="submit" [disabled]="mpBusy() || mpJoinCode().trim().length < 4">
+              {{ t('mp.join') }}
+            </button>
+          </form>
+          @if (mpError()) { <p class="auth-error">{{ t(mpError()) }}</p> }
+        </section>
+      }
+
+      <button class="btn-primary ghost settings-close" type="button" (click)="onCloseMultiplayer()">
+        {{ t('btn.close') }}
+      </button>
+    </div>
+  </div>
+}
+
+<!-- Sohbet görünümü -->
+@if (activeChat(); as friend) {
+  <div class="settings-backdrop" (click)="onCloseChat()">
+    <div
+      class="settings-panel chat-panel"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-label]="t('chat.title') + ' — ' + friend.username"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="chat-header">
+        <button class="chat-back" type="button" (click)="onCloseChat()">
+          {{ t('chat.back') }}
+        </button>
+        <span class="chat-peer">👤 {{ friend.username }}</span>
+      </div>
+
+      <div class="chat-messages">
+        @if (chatMessages().length === 0) {
+          <p class="chat-empty">{{ t('chat.empty') }}</p>
+        } @else {
+          @for (m of chatMessages(); track m.id) {
+            <div class="chat-bubble" [class.mine]="isMine(m)">
+              {{ m.body }}
+            </div>
+          }
+        }
+      </div>
+
+      <!-- Emoji şeridi -->
+      <div class="chat-emojis">
+        @for (e of EMOJIS; track e) {
+          <button
+            type="button"
+            class="chat-emoji"
+            [attr.aria-label]="t('chat.emoji')"
+            (click)="onAddEmoji(e)"
+          >
+            {{ e }}
+          </button>
+        }
+      </div>
+
+      <form class="chat-input" (submit)="$event.preventDefault(); onSendChat()">
+        <input
+          type="text"
+          maxlength="500"
+          [value]="chatDraft()"
+          (input)="onChatInput($event)"
+          [placeholder]="t('chat.placeholder')"
+          [attr.aria-label]="t('chat.placeholder')"
+        />
+        <button
+          class="btn-primary chat-send"
+          type="submit"
+          [disabled]="chatSending() || !chatDraft().trim()"
+        >
+          {{ t('chat.send') }}
+        </button>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- Hesap paneli (giriş / kayıt) -->
+@if (authOpen()) {
+  <div class="settings-backdrop" (click)="onCloseAuth()">
+    <div
+      class="settings-panel auth-panel"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-label]="t('auth.title')"
+      (click)="$event.stopPropagation()"
+    >
+      <h2 class="settings-title">{{ t('auth.title') }}</h2>
+      <p class="settings-note">{{ t('auth.note') }}</p>
+
+      <!-- Giriş / Kayıt sekmeleri -->
+      <div class="store-tabs auth-tabs">
+        <button
+          type="button"
+          [class.active]="authTab() === 'login'"
+          (click)="setAuthTab('login')"
+        >
+          {{ t('auth.login') }}
+        </button>
+        <button
+          type="button"
+          [class.active]="authTab() === 'register'"
+          (click)="setAuthTab('register')"
+        >
+          {{ t('auth.register') }}
+        </button>
+      </div>
+
+      <form class="auth-form" (submit)="$event.preventDefault(); onAuthSubmit()">
+        <label class="auth-field">
+          <span>{{ t('auth.username') }}</span>
+          <input
+            type="text"
+            autocomplete="username"
+            maxlength="20"
+            [value]="authName()"
+            (input)="onAuthNameInput($event)"
+          />
+        </label>
+        @if (authTab() === 'register') {
+          <label class="auth-field">
+            <span>{{ t('auth.email') }}</span>
+            <input
+              type="email"
+              autocomplete="email"
+              inputmode="email"
+              placeholder="ornek@mail.com"
+              [value]="authEmail()"
+              (input)="onAuthEmailInput($event)"
+            />
+          </label>
+        }
+        <label class="auth-field">
+          <span>{{ t('auth.password') }}</span>
+          <input
+            type="password"
+            [attr.autocomplete]="authTab() === 'register' ? 'new-password' : 'current-password'"
+            [value]="authPass()"
+            (input)="onAuthPassInput($event)"
+          />
+        </label>
+
+        @if (authError()) {
+          <p class="auth-error">{{ t(authError()) }}</p>
+        }
+
+        <button class="btn-primary auth-submit" type="submit" [disabled]="authBusy()">
+          @if (authBusy()) {
+            {{ t('auth.working') }}
+          } @else {
+            {{ authTab() === 'register' ? t('auth.register') : t('auth.login') }}
+          }
+        </button>
+      </form>
+
+      <button
+        class="auth-switch"
+        type="button"
+        (click)="setAuthTab(authTab() === 'login' ? 'register' : 'login')"
+      >
+        {{ authTab() === 'login' ? t('auth.noAccount') : t('auth.haveAccount') }}
+      </button>
+
+      <button class="btn-primary home-btn" type="button" (click)="onGoHome()">
+        🏠 {{ t('nav.home') }}
+      </button>
+      <button class="btn-primary ghost settings-close" type="button" (click)="onCloseAuth()">
+        {{ t('btn.close') }}
+      </button>
+    </div>
+  </div>
+}
+
 @if (status() === GameStatus.Idle) {
   <app-start-screen />
 } @else {
@@ -466,8 +951,12 @@
 
     <!-- Süre ve hamle sayacı (oyun alanının üstünde) -->
     <div class="stats">
-      @if (mode() === GameMode.Level || mode() === GameMode.TimeAttack) {
-        <!-- Geri sayım (seviye + zaman yarışı) -->
+      @if (
+        mode() === GameMode.Level ||
+        mode() === GameMode.TimeAttack ||
+        mode() === GameMode.Race
+      ) {
+        <!-- Geri sayım (seviye + zaman yarışı + çok oyunculu) -->
         <div class="stat" [class.low]="lowTime()">
           <span class="stat-icon" aria-hidden="true">⏳</span>
           <span class="stat-label">{{ t('hud.remaining') }}</span>
@@ -512,6 +1001,21 @@
             <span class="power-icon">{{ p.icon }}</span>
             <span class="power-count">{{ powers()[p.id] }}</span>
           </button>
+        }
+      </div>
+    }
+
+    <!-- Yarış: canlı sıralama -->
+    @if (mode() === GameMode.Race && mpRoom(); as room) {
+      <div class="race-standings">
+        <span class="race-standings-title">{{ t('mp.leaderboard') }}</span>
+        @for (p of mpPlayers(); track p.id; let i = $index) {
+          <div class="race-row" [class.me]="isMe(p.id)">
+            <span class="race-pos">{{ i + 1 }}.</span>
+            <span class="race-name">{{ p.username }}</span>
+            <span class="race-pts">{{ p.score }}</span>
+            @if (p.done) { <span class="race-flag">🏁</span> }
+          </div>
         }
       </div>
     }
@@ -571,10 +1075,13 @@
                   </p>
                 }
                 @default {
-                  <h2 class="overlay-title">{{ t('ov.gameOver') }}</h2>
+                  <h2 class="overlay-title">
+                    {{ mode() === GameMode.Race ? t('mp.finished') : t('ov.gameOver') }}
+                  </h2>
                   <p class="overlay-sub">
                     {{
-                      mode() === GameMode.TimeAttack && remainingSeconds() <= 0
+                      (mode() === GameMode.TimeAttack || mode() === GameMode.Race) &&
+                      remainingSeconds() <= 0
                         ? t('ov.timeUp')
                         : t('ov.noMoves')
                     }}
@@ -584,7 +1091,11 @@
 
               <p class="overlay-score">{{ t('ov.score') }} <strong>{{ score() }}</strong></p>
               <p class="overlay-stats">
-                @if (mode() === GameMode.Level || mode() === GameMode.TimeAttack) {
+                @if (
+                  mode() === GameMode.Level ||
+                  mode() === GameMode.TimeAttack ||
+                  mode() === GameMode.Race
+                ) {
                   ⏳ {{ remainingLabel() }} {{ t('ov.left') }} &nbsp;·&nbsp;
                 } @else if (mode() === GameMode.Classic) {
                   ⏱️ {{ elapsedLabel() }} &nbsp;·&nbsp;
@@ -607,47 +1118,54 @@
               }
 
               <div class="overlay-actions">
-                <!-- Seviye tamam → sonraki seviye -->
-                @if (status() === GameStatus.LevelComplete) {
-                  <button class="btn-primary" type="button" (click)="onNextLevel()">
-                    {{ t('ov.nextLevel') }}
-                  </button>
-                }
-                <!-- Seviye başarısız → tekrar dene -->
-                @if (status() === GameStatus.Failed) {
-                  <button class="btn-primary" type="button" (click)="onRetryLevel()">
-                    {{ t('ov.retry') }}
-                  </button>
-                }
-                <!-- Klasik kazanma → devam et -->
-                @if (status() === GameStatus.Won && mode() === GameMode.Classic) {
-                  <button class="btn-primary" type="button" (click)="onContinue()">
-                    {{ t('ov.continue') }}
-                  </button>
-                }
-                <!-- Klasik kaybetme → geri al -->
-                @if (status() === GameStatus.Lost && canUndo()) {
-                  <button class="btn-primary" type="button" (click)="onUndo()">
-                    {{ t('btn.undo') }}
-                  </button>
-                }
-                <!-- Her durumda: yeniden başla (moda uygun) -->
-                @if (mode() === GameMode.Level) {
-                  <button
-                    class="btn-primary ghost"
-                    type="button"
-                    (click)="onStartLevelMode()"
-                  >
-                    {{ t('btn.restart') }}
+                @if (mode() === GameMode.Race) {
+                  <!-- Yarış bitti → çok oyunculu panele dön (sonuçlar orada) -->
+                  <button class="btn-primary" type="button" (click)="onOpenMultiplayer()">
+                    🏁 {{ t('mp.backToLobby') }}
                   </button>
                 } @else {
-                  <button
-                    class="btn-primary ghost"
-                    type="button"
-                    (click)="onRestart()"
-                  >
-                    {{ t('btn.newGame') }}
-                  </button>
+                  <!-- Seviye tamam → sonraki seviye -->
+                  @if (status() === GameStatus.LevelComplete) {
+                    <button class="btn-primary" type="button" (click)="onNextLevel()">
+                      {{ t('ov.nextLevel') }}
+                    </button>
+                  }
+                  <!-- Seviye başarısız → tekrar dene -->
+                  @if (status() === GameStatus.Failed) {
+                    <button class="btn-primary" type="button" (click)="onRetryLevel()">
+                      {{ t('ov.retry') }}
+                    </button>
+                  }
+                  <!-- Klasik kazanma → devam et -->
+                  @if (status() === GameStatus.Won && mode() === GameMode.Classic) {
+                    <button class="btn-primary" type="button" (click)="onContinue()">
+                      {{ t('ov.continue') }}
+                    </button>
+                  }
+                  <!-- Klasik kaybetme → geri al -->
+                  @if (status() === GameStatus.Lost && canUndo()) {
+                    <button class="btn-primary" type="button" (click)="onUndo()">
+                      {{ t('btn.undo') }}
+                    </button>
+                  }
+                  <!-- Her durumda: yeniden başla (moda uygun) -->
+                  @if (mode() === GameMode.Level) {
+                    <button
+                      class="btn-primary ghost"
+                      type="button"
+                      (click)="onStartLevelMode()"
+                    >
+                      {{ t('btn.restart') }}
+                    </button>
+                  } @else {
+                    <button
+                      class="btn-primary ghost"
+                      type="button"
+                      (click)="onRestart()"
+                    >
+                      {{ t('btn.newGame') }}
+                    </button>
+                  }
                 }
               </div>
             </div>

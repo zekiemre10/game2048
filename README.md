@@ -47,6 +47,11 @@ Hedefe ulaşınca sonraki seviyeye geçersin. Ulaştığın en yüksek seviye ka
 - 🎯 **Görevler** — günlük ve haftalık görevler; oynadıkça ilerler, altın verir
 - 🌍 **Dil (TR/EN)** — Ayarlar'dan geçiş; arayüzün tamamı iki dilde
 - 🎮 **Modlar** — Klasik · Zen (süresiz) · Zaman Yarışı (3dk) · Seviye + tahta boyutu (3×3/4×4/5×5)
+- 👤 **Hesap** — kayıt/giriş (kullanıcı adı + e-posta), ilerleme buluta kaydı, cihazlar arası senkron
+- 👥 **Arkadaşlar** — kullanıcı ara, istek gönder/kabul et, arkadaş listesi (skor/seviye özeti)
+- 💬 **Sohbet** — arkadaşlar arası mesajlaşma, emoji seçici, okunmamış rozeti (yakın-gerçek zamanlı)
+- 🏁 **Çok oyunculu yarış** — oda kur, 4 haneli kodla davet, ortak tohumla adil yarış + canlı skor tablosu
+- 🏠 **Ana ekran** — hesap panelinden başlığa / mod seçimine dönüş
 - 🏅 **Başarımlar** — altın ödüllü hedefler
 - ↶ **Geri al** — son hamleyi geri al (kaybettiren hamle dahil)
 - 🏆 **Kalıcı rekor** — en yüksek skor `localStorage`'da saklanır
@@ -64,8 +69,9 @@ Hedefe ulaşınca sonraki seviyeye geçersin. Ulaştığın en yüksek seviye ka
 - TypeScript
 - SCSS (CSS değişkenleriyle temalama)
 - Web Audio API (prosedürel ses efektleri)
-- Vitest (111 birim/bileşen testi)
-- Backend yok — tamamen istemci tarafı
+- Vitest (173 birim/bileşen testi)
+- **Backend:** Python standart kütüphanesi — `http.server` + `sqlite3` + `pbkdf2` (hesap,
+  arkadaşlar, sohbet, çok oyunculu yarış). Ek bağımlılık yok; nginx arkasında ayrı serviste çalışır.
 
 ## Proje yapısı
 
@@ -77,19 +83,39 @@ src/
       tile/            # Tek kare: renk, konum, animasyonlar
       start-screen/    # Başlık ekranı
     services/
-      game.service.ts  # Oyun durumu (signals) + skor + süre/hamle + geri al
-      theme.service.ts # Açık/koyu tema (localStorage)
-      audio.service.ts # Arka plan müziği (loop, ses, kalıcı)
-      sfx.service.ts   # Ses efektleri (Web Audio, prosedürel)
+      game.service.ts        # Oyun durumu (signals) + skor + süre/hamle + geri al + yarış (tohumlu RNG)
+      theme.service.ts       # Açık/koyu tema (localStorage)
+      audio.service.ts       # Arka plan müziği (loop, ses, kalıcı)
+      sfx.service.ts         # Ses efektleri (Web Audio, prosedürel)
+      i18n.service.ts        # Dil (TR/EN) — statik metin + model verisi çevirisi
+      auth.service.ts        # Hesap: kayıt/giriş, token, ilerleme senkronu
+      friends.service.ts     # Arkadaşlar: ara/istek/kabul/liste (yoklamalı)
+      chat.service.ts        # Sohbet: mesaj gönder/al, okunmamış rozeti
+      multiplayer.service.ts # Çok oyunculu: oda/kod/başlat + canlı ilerleme
     logic/
       board-logic.ts   # SAF hamle mantığı (kaydırma + birleştirme)
       swipe.ts         # SAF dokunmatik yön tespiti
       format-time.ts   # SAF süre biçimlendirme (mm:ss)
     models/
-      tile.model.ts    # Tile, Grid, Direction, GameStatus
+      tile.model.ts    # Tile, Grid, Direction, GameStatus, GameMode
   styles/
     _variables.scss    # Kare paleti, ölçüler, animasyon süreleri
     _base.scss         # Tema değişkenleri (:root + [data-theme=dark])
+server/
+  app.py               # Backend: hesap + arkadaşlar + sohbet + çok oyunculu (Python stdlib)
+```
+
+## Backend (çevrimiçi özellikler)
+
+Hesap, arkadaşlar, sohbet ve çok oyunculu yarış için `server/app.py` küçük bir
+Python servisidir (yalnızca standart kütüphane — `http.server`, `sqlite3`,
+`hashlib.pbkdf2`). Şifreler tuzlanıp özetlenir; oturumlar Bearer token ile taşınır.
+JSON uçları: `/register` · `/login` · `/me` · `/sync` · `/friends*` · `/messages*` ·
+`/rooms*`. Çok oyunculu yarışta tüm oyunculara **ortak tohum** gönderilir; böylece
+herkes birebir aynı taş dizisini alır (adil yarış), skorlar ~1sn'de bir eşitlenir.
+
+```bash
+python3 server/app.py     # 127.0.0.1:8092 (GAME2048_PORT ile değiştirilebilir)
 ```
 
 **Mimari not:** Oyun mantığı (`logic/`) Angular'dan tamamen bağımsızdır —
@@ -122,7 +148,7 @@ npx ng serve --host 0.0.0.0
 npm test
 ```
 
-**81 test**, hepsi geçiyor. Kapsam ve elle test kontrol listesi: [TEST-NOTES.md](TEST-NOTES.md)
+**173 test**, hepsi geçiyor. Kapsam ve elle test kontrol listesi: [TEST-NOTES.md](TEST-NOTES.md)
 
 ## Derleme ve deploy
 
@@ -170,3 +196,8 @@ web sunucusuyla servis edilebilir. Canlı sürüm bu dosyaların
 - [x] Profil + istatistik (oyun, kazanma %, en iyi kare, seri, toplam hamle)
 - [x] Gün serisi (streak) + günlük ödül (seriye göre altın)
 - [x] Başarımlar (altın ödüllü hedefler)
+- [x] Dil sistemi (TR/EN) — arayüzün tamamı iki dilde
+- [x] Hesap sistemi (kayıt/giriş + e-posta, buluta ilerleme senkronu) — Python backend
+- [x] Arkadaşlar (ara / istek / kabul / liste)
+- [x] Sohbet (emoji'li, yakın-gerçek zamanlı, okunmamış rozeti)
+- [x] Çok oyunculu yarış (oda kur, kodla davet, ortak tohumla canlı yarış)

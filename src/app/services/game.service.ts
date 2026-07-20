@@ -244,6 +244,17 @@ export class GameService {
     () => this.boardSize() * this.boardSize() - this.tiles().length,
   );
 
+  /**
+   * Yarış modunda ortak tohumlu RNG (tüm oyuncular aynı taş dizisini alır).
+   * null ise normal `Math.random` kullanılır.
+   */
+  private raceRng: (() => number) | null = null;
+
+  /** Aktif rastgelelik kaynağı (yarışta tohumlu, aksi halde Math.random). */
+  private rand(): number {
+    return this.raceRng ? this.raceRng() : Math.random();
+  }
+
   constructor() {
     this.ensureMissionsFresh();
   }
@@ -270,6 +281,7 @@ export class GameService {
    * - TimeAttack: sabit geri sayım, en yüksek skor.
    */
   startMode(mode: GameMode, size: number = BOARD_SIZE): void {
+    this.raceRng = null; // normal oyun → gerçek rastgelelik
     this.mode.set(mode);
     this.boardSize.set(size);
     this.tiles.set([]);
@@ -293,6 +305,28 @@ export class GameService {
     this.registerActivity();
   }
 
+  /**
+   * Çok oyunculu yarışı başlatır: ortak `seed` ile tohumlu RNG → tüm
+   * oyuncular birebir aynı taş dizisini alır (adil yarış). `duration`
+   * saniyelik geri sayım; süre bitince skor kalır (Zaman Yarışı gibi).
+   */
+  startRace(seed: number, duration: number): void {
+    this.raceRng = mulberry32(seed >>> 0);
+    this.mode.set(GameMode.Race);
+    this.boardSize.set(BOARD_SIZE); // yarış her zaman 4×4
+    this.tiles.set([]);
+    this.score.set(0);
+    this.moves.set(0);
+    this.keepPlayingAfterWin = true; // 2048'de durma; süre bitene dek yarış
+    this.history.set(null);
+    this.clearPowerFx();
+    this.status.set(GameStatus.Playing);
+    this.spawnRandomTile();
+    this.spawnRandomTile();
+    this.startCountdown(duration);
+    this.registerActivity();
+  }
+
   // --- Seviye modu --------------------------------------------
 
   /** Seviye modunu 1. seviyeden başlatır. */
@@ -305,6 +339,7 @@ export class GameService {
 
   /** Anlık seviyeyi (yeniden) başlatır: boş tahta + geri sayım. */
   private startLevel(): void {
+    this.raceRng = null;
     const cfg = levelConfig(this.level());
     this.boardSize.set(BOARD_SIZE); // seviye modu her zaman 4×4
     this.tiles.set([]);
@@ -324,6 +359,16 @@ export class GameService {
       this.bestLevel.set(this.level());
       saveBestLevel(this.level());
     }
+  }
+
+  /**
+   * Ana (başlık) ekrana döner: oyunu durdurur, durumu Idle'a alır.
+   * Böylece mod/tahta seçim ekranı yeniden görünür.
+   */
+  goHome(): void {
+    this.stopTimer();
+    this.raceRng = null;
+    this.status.set(GameStatus.Idle);
   }
 
   /** Mevcut modu ve boyutu yeniden başlatır (Yeni Oyun / Baştan). */
@@ -588,6 +633,59 @@ export class GameService {
     const clean = name.trim().slice(0, 16) || 'Oyuncu';
     this.playerName.set(clean);
     saveName(clean);
+  }
+
+  // --- Hesap senkronizasyonu ----------------------------------
+
+  /** Hesaba kaydedilecek ilerleme anlık görüntüsü. */
+  accountSnapshot(): Record<string, unknown> {
+    return {
+      gold: this.gold(),
+      totalGoldEarned: this.totalGoldEarned(),
+      bestScore: this.bestScore(),
+      bestLevel: this.bestLevel(),
+      name: this.playerName(),
+      gamesPlayed: this.gamesPlayed(),
+      gamesWon: this.gamesWon(),
+      bestTile: this.bestTile(),
+      totalMoves: this.totalMoves(),
+      achievements: [...this.unlockedAchievements()],
+    };
+  }
+
+  /** Hesaptan gelen ilerlemeyi uygular ve kalıcı kaydeder. */
+  applyAccountSnapshot(d: Record<string, unknown>): void {
+    const num = (v: unknown) => (typeof v === 'number' && v >= 0 ? v : null);
+    const g = num(d['gold']);
+    if (g !== null) this.gold.set(g);
+    const tge = num(d['totalGoldEarned']);
+    if (tge !== null) this.totalGoldEarned.set(tge);
+    const bs = num(d['bestScore']);
+    if (bs !== null) this.bestScore.set(bs);
+    const bl = num(d['bestLevel']);
+    if (bl !== null) this.bestLevel.set(bl);
+    if (typeof d['name'] === 'string') this.playerName.set(d['name'] as string);
+    const gp = num(d['gamesPlayed']);
+    if (gp !== null) this.gamesPlayed.set(gp);
+    const gw = num(d['gamesWon']);
+    if (gw !== null) this.gamesWon.set(gw);
+    const bt = num(d['bestTile']);
+    if (bt !== null) this.bestTile.set(bt);
+    const tm = num(d['totalMoves']);
+    if (tm !== null) this.totalMoves.set(tm);
+    if (Array.isArray(d['achievements'])) {
+      this.unlockedAchievements.set(
+        new Set((d['achievements'] as unknown[]).filter((x) => typeof x === 'string') as string[]),
+      );
+    }
+    // Kalıcı kaydet
+    saveGold(this.gold());
+    saveTotalEarned(this.totalGoldEarned());
+    saveBestScore(this.bestScore());
+    saveBestLevel(this.bestLevel());
+    saveName(this.playerName());
+    this.saveStats();
+    saveAchievements(this.unlockedAchievements());
   }
 
   /** Oyun başlangıcında günün aktivitesini kaydeder (seri). */
@@ -990,8 +1088,8 @@ export class GameService {
     const cells = this.emptyCells();
     if (cells.length === 0) return null;
 
-    const { row, col } = cells[Math.floor(Math.random() * cells.length)];
-    const value = Math.random() < CHANCE_OF_FOUR ? 4 : 2;
+    const { row, col } = cells[Math.floor(this.rand() * cells.length)];
+    const value = this.rand() < CHANCE_OF_FOUR ? 4 : 2;
     const tile: Tile = { id: this.nextId++, value, row, col, isNew: true };
 
     this.tiles.update((list) => [...list, tile]);
@@ -1005,6 +1103,25 @@ export class GameService {
       saveBestScore(this.bestScore());
     }
   }
+}
+
+// ============================================================
+//  Tohumlu RNG (çok oyunculu yarış — adil taş dizisi)
+// ============================================================
+
+/**
+ * mulberry32: hızlı, tohumlu sözde-rastgele üretici.
+ * Aynı tohum → aynı sayı dizisi. Böylece tüm yarışçılar aynı taşları alır.
+ */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 // ============================================================

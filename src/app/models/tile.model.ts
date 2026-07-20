@@ -52,6 +52,8 @@ export enum GameMode {
   Zen = 'zen',
   /** Zaman Yarışı: sabit süre, en yüksek skor. */
   TimeAttack = 'timeAttack',
+  /** Çok oyunculu yarış: ortak tohum, sabit süre, canlı skor tablosu. */
+  Race = 'race',
 }
 
 /** Zaman Yarışı modunun süresi (saniye). */

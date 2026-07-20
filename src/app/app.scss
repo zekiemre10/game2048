@@ -1248,3 +1248,590 @@
     transform-origin: top;
   }
 }
+
+// --- Hesap (profil panelindeki kutu) ------------------------
+.account-box {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--panel-border, rgba(128, 128, 128, 0.25));
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.account-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.account-label {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.account-user {
+  font-size: 1.1rem;
+}
+
+.account-sync {
+  margin: 0;
+  text-align: center;
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+
+.account-cta {
+  width: 100%;
+}
+
+// --- Hesap paneli (giriş / kayıt modalı) --------------------
+.auth-tabs {
+  margin-bottom: 1rem;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  text-align: left;
+
+  span {
+    font-size: 0.8rem;
+    font-weight: 600;
+    opacity: 0.8;
+  }
+
+  input {
+    padding: 0.6rem 0.75rem;
+    border-radius: 10px;
+    border: 1px solid var(--panel-border, rgba(128, 128, 128, 0.35));
+    background: var(--panel-input-bg, rgba(128, 128, 128, 0.08));
+    color: inherit;
+    font-size: 1rem;
+    font-family: inherit;
+
+    &:focus-visible {
+      outline: 2px solid var(--accent, #8f7a66);
+      outline-offset: 1px;
+    }
+  }
+}
+
+.auth-error {
+  margin: 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  background: rgba(220, 60, 60, 0.14);
+  color: #d23c3c;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.auth-submit {
+  margin-top: 0.25rem;
+  width: 100%;
+}
+
+.home-btn {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.auth-switch {
+  display: block;
+  width: 100%;
+  margin: 0.85rem 0 0.25rem;
+  padding: 0.35rem;
+  background: none;
+  border: none;
+  color: var(--accent, #8f7a66);
+  font: inherit;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:hover {
+    opacity: 0.85;
+  }
+}
+
+// --- Arkadaşlar paneli --------------------------------------
+.friends-panel {
+  text-align: left;
+}
+
+.friend-search input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border, rgba(128, 128, 128, 0.35));
+  background: var(--panel-input-bg, rgba(128, 128, 128, 0.08));
+  color: inherit;
+  font: inherit;
+  font-size: 1rem;
+
+  &:focus-visible {
+    outline: 2px solid var(--accent, #8f7a66);
+    outline-offset: 1px;
+  }
+}
+
+.friend-results {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.friend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.friend-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 10px;
+  background: var(--panel-input-bg, rgba(128, 128, 128, 0.08));
+}
+
+.friend-avatar {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.friend-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.friend-name {
+  flex: 1;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.friend-info .friend-name {
+  flex: none;
+}
+
+.friend-stats {
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+
+.friend-btn {
+  flex-shrink: 0;
+  padding: 0.35rem 0.7rem;
+  border-radius: 8px;
+  border: none;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &.add {
+    background: var(--accent, #8f7a66);
+    color: #fff;
+  }
+
+  &.ghost {
+    background: transparent;
+    border: 1px solid var(--panel-border, rgba(128, 128, 128, 0.4));
+    color: inherit;
+  }
+
+  &:hover {
+    opacity: 0.88;
+  }
+}
+
+.friend-tag {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  opacity: 0.65;
+  font-style: italic;
+}
+
+.friend-muted {
+  margin: 0.2rem 0 0.6rem;
+  font-size: 0.88rem;
+  opacity: 0.65;
+  text-align: center;
+}
+
+.friend-avatar {
+  position: relative;
+}
+
+.friend-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e8503a;
+  border: 2px solid var(--panel-bg, #fff);
+}
+
+// --- Sohbet paneli ------------------------------------------
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(88dvh, 640px);
+  padding-top: 0.75rem;
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--panel-border, rgba(128, 128, 128, 0.25));
+}
+
+.chat-back {
+  background: none;
+  border: none;
+  color: var(--accent, #8f7a66);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.2rem 0.3rem;
+}
+
+.chat-peer {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.75rem 0.25rem;
+  min-height: 180px;
+}
+
+.chat-empty {
+  margin: auto;
+  text-align: center;
+  opacity: 0.6;
+  font-size: 0.9rem;
+}
+
+.chat-bubble {
+  max-width: 78%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 14px;
+  background: var(--panel-input-bg, rgba(128, 128, 128, 0.12));
+  align-self: flex-start;
+  word-break: break-word;
+  line-height: 1.35;
+  font-size: 0.95rem;
+
+  &.mine {
+    align-self: flex-end;
+    background: var(--accent, #8f7a66);
+    color: #fff;
+  }
+}
+
+.chat-emojis {
+  display: flex;
+  gap: 0.15rem;
+  overflow-x: auto;
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--panel-border, rgba(128, 128, 128, 0.2));
+}
+
+.chat-emoji {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0.15rem 0.25rem;
+  border-radius: 8px;
+  line-height: 1;
+
+  &:hover {
+    background: var(--panel-input-bg, rgba(128, 128, 128, 0.15));
+  }
+}
+
+.chat-input {
+  display: flex;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+.chat-input input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border, rgba(128, 128, 128, 0.35));
+  background: var(--panel-input-bg, rgba(128, 128, 128, 0.08));
+  color: inherit;
+  font: inherit;
+  font-size: 1rem;
+
+  &:focus-visible {
+    outline: 2px solid var(--accent, #8f7a66);
+    outline-offset: 1px;
+  }
+}
+
+.chat-send {
+  flex-shrink: 0;
+}
+
+// --- Çok oyunculu paneli ------------------------------------
+.mp-panel {
+  text-align: left;
+}
+
+.dot-badge {
+  min-width: 10px;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  font-size: 0;
+}
+
+.mp-create,
+.mp-panel .btn-primary {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.mp-join {
+  display: flex;
+  gap: 0.5rem;
+
+  input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.6rem 0.75rem;
+    border-radius: 10px;
+    border: 1px solid var(--panel-border, rgba(128, 128, 128, 0.35));
+    background: var(--panel-input-bg, rgba(128, 128, 128, 0.08));
+    color: inherit;
+    font: inherit;
+    font-size: 1.05rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    text-align: center;
+
+    &:focus-visible {
+      outline: 2px solid var(--accent, #8f7a66);
+      outline-offset: 1px;
+    }
+  }
+
+  .btn-primary {
+    width: auto;
+    margin-top: 0;
+    flex-shrink: 0;
+  }
+}
+
+.mp-code-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: center;
+  padding: 0.85rem;
+  margin-bottom: 0.75rem;
+  border-radius: 12px;
+  background: var(--panel-input-bg, rgba(128, 128, 128, 0.1));
+}
+
+.mp-code-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+.mp-code-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mp-code {
+  font-size: 1.9rem;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  padding-left: 0.3em;
+}
+
+.mp-code-hint {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.mp-players {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+}
+
+.mp-player {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 10px;
+  background: var(--panel-input-bg, rgba(128, 128, 128, 0.08));
+
+  &.me {
+    outline: 2px solid var(--accent, #8f7a66);
+  }
+}
+
+.mp-rank {
+  font-weight: 800;
+  opacity: 0.7;
+  min-width: 1.2em;
+  text-align: center;
+}
+
+.mp-pname {
+  flex: 1;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  em {
+    font-style: normal;
+    font-size: 0.75rem;
+    opacity: 0.6;
+  }
+}
+
+.mp-hosttag {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--accent, #8f7a66);
+  color: #fff;
+  padding: 0.1rem 0.35rem;
+  border-radius: 6px;
+}
+
+.mp-score {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-done {
+  font-size: 0.72rem;
+  color: #2ea043;
+  font-weight: 700;
+}
+
+.mp-result {
+  text-align: center;
+  margin-bottom: 0.6rem;
+}
+
+.mp-result-title {
+  margin: 0.2rem 0;
+  font-size: 1.3rem;
+}
+
+.mp-winner {
+  margin: 0.2rem 0;
+  font-weight: 700;
+}
+
+.mp-hint,
+.mp-code-hint {
+  font-size: 0.8rem;
+  opacity: 0.7;
+  text-align: center;
+  margin: 0.3rem 0;
+}
+
+// --- Yarış: oyun içi canlı sıralama -------------------------
+.race-standings {
+  width: min(100%, 480px);
+  margin: 0 auto 0.5rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 12px;
+  background: var(--panel-bg, rgba(255, 255, 255, 0.9));
+  border: 1px solid var(--panel-border, rgba(128, 128, 128, 0.25));
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.race-standings-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+  margin-bottom: 0.15rem;
+}
+
+.race-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  padding: 0.15rem 0.25rem;
+  border-radius: 6px;
+
+  &.me {
+    background: var(--panel-input-bg, rgba(143, 122, 102, 0.16));
+    font-weight: 700;
+  }
+}
+
+.race-pos {
+  opacity: 0.6;
+  min-width: 1.3em;
+}
+
+.race-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.race-pts {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}

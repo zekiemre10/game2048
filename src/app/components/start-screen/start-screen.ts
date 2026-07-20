@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { GameService } from '../../services/game.service';
+import { I18nService } from '../../services/i18n.service';
 
 @Component({
   selector: 'app-start-screen',
@@ -10,6 +11,10 @@ import { GameService } from '../../services/game.service';
 })
 export class StartScreen {
   private readonly game = inject(GameService);
+  private readonly i18n = inject(I18nService);
+
+  /** Statik metin çevirisi. */
+  protected readonly t = (key: string) => this.i18n.t(key);
 
   /** Ulaşılan en yüksek seviye (kayıt gösterimi için). */
   protected readonly bestLevel = this.game.bestLevel;

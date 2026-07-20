@@ -2,9 +2,7 @@
   <div class="hero">
     <div class="logo">2048</div>
     <h1 class="title">2048</h1>
-    <p class="subtitle">
-      Taşları birleştir, <strong>2048</strong>'e ulaş!
-    </p>
+    <p class="subtitle" [innerHTML]="t('start.subtitle')"></p>
 
     <div class="preview">
       <span class="mini-tile t2">2</span>
@@ -15,23 +13,23 @@
 
     <div class="start-buttons">
       <button class="btn-primary start-btn" type="button" (click)="onStart()">
-        Başla
+        {{ t('start.play') }}
       </button>
       <button
         class="btn-primary ghost start-btn"
         type="button"
         (click)="onStartLevel()"
       >
-        🎯 Seviye Modu
+        {{ t('start.levelMode') }}
       </button>
     </div>
 
-    <p class="gold-total">💰 Toplam altın: {{ gold() }}</p>
+    <p class="gold-total">{{ t('start.totalGold') }} {{ gold() }}</p>
 
     @if (bestLevel() > 0) {
-      <p class="best-level">🏅 Ulaşılan en yüksek seviye: {{ bestLevel() }}</p>
+      <p class="best-level">{{ t('start.bestLevel') }} {{ bestLevel() }}</p>
     }
 
-    <p class="hint">Ok tuşlarıyla oyna · Aynı sayıları birleştir</p>
+    <p class="hint">{{ t('start.hint') }}</p>
   </div>
 </section>

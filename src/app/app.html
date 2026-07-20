@@ -2,16 +2,16 @@
 <button
   class="profile-btn"
   type="button"
-  aria-label="Profil"
+  [attr.aria-label]="t('nav.profile')"
   (click)="onOpenProfile()"
 >
   <span class="profile-avatar">👤</span>
   <span class="profile-meta">
-    <span class="profile-name">{{ playerName() }}</span>
+    <span class="profile-name">{{ displayName() }}</span>
     <span class="profile-streak">🔥 {{ currentStreak() }} · 💰 {{ gold() }}</span>
   </span>
   @if (canClaimDaily()) {
-    <span class="profile-badge" title="Günlük ödül hazır">🎁</span>
+    <span class="profile-badge" title="{{ t('prof.claimDaily') }}">🎁</span>
   }
 </button>
 
@@ -20,8 +20,8 @@
   <button
     class="round-btn mission-btn"
     type="button"
-    aria-label="Görevler"
-    title="Görevler"
+    [attr.aria-label]="t('nav.missions')"
+    [attr.title]="t('nav.missions')"
     (click)="onOpenMissions()"
   >
     🎯
@@ -32,17 +32,17 @@
   <button
     class="round-btn store-btn"
     type="button"
-    aria-label="Mağaza"
-    title="Mağaza"
+    [attr.aria-label]="t('nav.store')"
+    [attr.title]="t('nav.store')"
     (click)="onOpenStore()"
   >
-    🛒 <span class="store-btn-label">Mağaza</span>
+    🛒 <span class="store-btn-label">{{ t('nav.store') }}</span>
   </button>
   <button
     class="round-btn"
     type="button"
-    aria-label="Ayarlar"
-    title="Ayarlar"
+    [attr.aria-label]="t('nav.settings')"
+    [attr.title]="t('nav.settings')"
     (click)="onOpenSettings()"
   >
     ⚙️
@@ -56,19 +56,17 @@
       class="settings-panel"
       role="dialog"
       aria-modal="true"
-      aria-label="Ayarlar"
+      [attr.aria-label]="t('nav.settings')"
       (click)="$event.stopPropagation()"
     >
-      <h2 class="settings-title">⚙️ Ayarlar</h2>
-      <p class="settings-note">
-        Ayarların otomatik kaydedilir ve oyunu tekrar açtığında korunur.
-      </p>
+      <h2 class="settings-title">{{ t('set.title') }}</h2>
+      <p class="settings-note">{{ t('set.note') }}</p>
 
       <!-- SES -->
       <section class="settings-section">
-        <h3 class="settings-heading">🔊 SES</h3>
+        <h3 class="settings-heading">{{ t('set.sound') }}</h3>
         <div class="settings-row">
-          <span>Müzik</span>
+          <span>{{ t('set.music') }}</span>
           <button
             class="switch"
             type="button"
@@ -81,7 +79,7 @@
           </button>
         </div>
         <div class="settings-row">
-          <span>Müzik sesi</span>
+          <span>{{ t('set.musicVol') }}</span>
           <div class="volume">
             <input
               type="range"
@@ -91,13 +89,13 @@
               [value]="volumePercent()"
               [disabled]="!musicOn()"
               (input)="onVolumeInput($event)"
-              aria-label="Müzik sesi"
+              [attr.aria-label]="t('set.musicVol')"
             />
             <span class="volume-val">{{ volumePercent() }}</span>
           </div>
         </div>
         <div class="settings-row">
-          <span>Efekt sesleri</span>
+          <span>{{ t('set.sfxVol') }}</span>
           <div class="volume">
             <input
               type="range"
@@ -106,45 +104,64 @@
               step="1"
               [value]="sfxPercent()"
               (input)="onSfxInput($event)"
-              aria-label="Efekt sesleri"
+              [attr.aria-label]="t('set.sfxVol')"
             />
             <span class="volume-val">{{ sfxPercent() }}</span>
           </div>
         </div>
       </section>
 
+      <!-- DİL / LANGUAGE -->
+      <section class="settings-section">
+        <h3 class="settings-heading">{{ t('set.lang') }}</h3>
+        <div class="lang-choice">
+          <button
+            type="button"
+            [class.active]="lang() === 'tr'"
+            (click)="onSetLang('tr')"
+          >
+            🇹🇷 Türkçe
+          </button>
+          <button
+            type="button"
+            [class.active]="lang() === 'en'"
+            (click)="onSetLang('en')"
+          >
+            🇬🇧 English
+          </button>
+        </div>
+      </section>
+
       <!-- TEMA -->
       <section class="settings-section">
-        <h3 class="settings-heading">🎨 TEMA</h3>
+        <h3 class="settings-heading">{{ t('set.theme') }}</h3>
         <div class="theme-swatches">
-          @for (t of THEMES; track t.id) {
-            @if (isThemeOwned(t.id)) {
+          @for (th of THEMES; track th.id) {
+            @if (isThemeOwned(th.id)) {
               <button
                 type="button"
                 class="theme-swatch"
-                [class.active]="theme() === t.id"
-                [title]="t.name"
-                (click)="onSelectTheme(t.id)"
+                [class.active]="theme() === th.id"
+                [title]="L(th.name, th.nameEn)"
+                (click)="onSelectTheme(th.id)"
               >
                 <span class="swatch-colors">
-                  <span [style.background]="t.swatch[0]"></span>
-                  <span [style.background]="t.swatch[1]"></span>
-                  <span [style.background]="t.swatch[2]"></span>
+                  <span [style.background]="th.swatch[0]"></span>
+                  <span [style.background]="th.swatch[1]"></span>
+                  <span [style.background]="th.swatch[2]"></span>
                 </span>
-                <span class="swatch-name">{{ t.name }}</span>
+                <span class="swatch-name">{{ L(th.name, th.nameEn) }}</span>
               </button>
             }
           }
         </div>
-        <p class="theme-hint">Daha fazla tema 🛒 Mağaza'da</p>
+        <p class="theme-hint">{{ t('set.moreThemes') }}</p>
       </section>
 
-      <p class="settings-credit">
-        🎵 “Calm Mind – Chill Lofi Beat” — FASSounds · Pixabay · Ücretsiz lisans
-      </p>
+      <p class="settings-credit">{{ t('set.credit') }}</p>
 
       <button class="btn-primary settings-close" type="button" (click)="onCloseSettings()">
-        Kapat
+        {{ t('btn.close') }}
       </button>
     </div>
   </div>
@@ -157,11 +174,11 @@
       class="settings-panel store-panel"
       role="dialog"
       aria-modal="true"
-      aria-label="Mağaza"
+      [attr.aria-label]="t('nav.store')"
       (click)="$event.stopPropagation()"
     >
       <div class="store-top">
-        <h2 class="settings-title">🛒 Mağaza</h2>
+        <h2 class="settings-title">{{ t('store.title') }}</h2>
         <div class="store-gold-pill">💰 {{ gold() }}</div>
       </div>
 
@@ -172,21 +189,21 @@
           [class.active]="storeTab() === 'themes'"
           (click)="setStoreTab('themes')"
         >
-          🎨 Temalar
+          {{ t('store.tabThemes') }}
         </button>
         <button
           type="button"
           [class.active]="storeTab() === 'powers'"
           (click)="setStoreTab('powers')"
         >
-          ⚡ Güçler
+          {{ t('store.tabPowers') }}
         </button>
         <button
           type="button"
           [class.active]="storeTab() === 'achievements'"
           (click)="setStoreTab('achievements')"
         >
-          🏅 Başarımlar
+          {{ t('store.tabAch') }}
         </button>
       </div>
 
@@ -194,34 +211,31 @@
         @switch (storeTab()) {
           <!-- TEMALAR (yalnızca satın alınabilir; Açık/Koyu Ayarlar'da) -->
           @case ('themes') {
-            @for (t of THEMES; track t.id) {
-              @if (t.price > 0) {
-              <div
-                class="store-card"
-                [class.active]="theme() === t.id"
-              >
-                <span
-                  class="card-swatch"
-                  [style.background]="themeGradient(t.swatch)"
-                ></span>
-                <span class="card-name">{{ t.name }}</span>
-                @if (theme() === t.id) {
-                  <span class="card-badge used">✓ Kullanımda</span>
-                } @else if (isThemeOwned(t.id)) {
-                  <button class="card-btn" type="button" (click)="onSelectTheme(t.id)">
-                    Seç
-                  </button>
-                } @else {
-                  <button
-                    class="card-btn buy"
-                    type="button"
-                    [disabled]="gold() < t.price"
-                    (click)="onBuyTheme(t.id)"
-                  >
-                    💰 {{ t.price }}
-                  </button>
-                }
-              </div>
+            @for (th of THEMES; track th.id) {
+              @if (th.price > 0) {
+                <div class="store-card" [class.active]="theme() === th.id">
+                  <span
+                    class="card-swatch"
+                    [style.background]="themeGradient(th.swatch)"
+                  ></span>
+                  <span class="card-name">{{ L(th.name, th.nameEn) }}</span>
+                  @if (theme() === th.id) {
+                    <span class="card-badge used">{{ t('store.used') }}</span>
+                  } @else if (isThemeOwned(th.id)) {
+                    <button class="card-btn" type="button" (click)="onSelectTheme(th.id)">
+                      {{ t('store.select') }}
+                    </button>
+                  } @else {
+                    <button
+                      class="card-btn buy"
+                      type="button"
+                      [disabled]="gold() < th.price"
+                      (click)="onBuyTheme(th.id)"
+                    >
+                      💰 {{ th.price }}
+                    </button>
+                  }
+                </div>
               }
             }
           }
@@ -231,12 +245,12 @@
               <div class="store-card">
                 <span class="card-icon">{{ p.icon }}</span>
                 <span class="card-name">
-                  {{ p.name }}
+                  {{ L(p.name, p.nameEn) }}
                   @if (powers()[p.id] > 0) {
                     <span class="card-owned">×{{ powers()[p.id] }}</span>
                   }
                 </span>
-                <span class="card-desc">{{ p.desc }}</span>
+                <span class="card-desc">{{ L(p.desc, p.descEn) }}</span>
                 <button
                   class="card-btn buy"
                   type="button"
@@ -256,10 +270,10 @@
                 [class.locked]="!isAchievementUnlocked(a.id)"
               >
                 <span class="card-icon">{{ a.icon }}</span>
-                <span class="card-name">{{ a.name }}</span>
-                <span class="card-desc">{{ a.desc }}</span>
+                <span class="card-name">{{ L(a.name, a.nameEn) }}</span>
+                <span class="card-desc">{{ L(a.desc, a.descEn) }}</span>
                 @if (isAchievementUnlocked(a.id)) {
-                  <span class="card-badge used">✓ Açıldı</span>
+                  <span class="card-badge used">{{ t('store.unlocked') }}</span>
                 } @else {
                   <span class="card-badge">💰 {{ a.gold }}</span>
                 }
@@ -270,7 +284,7 @@
       </div>
 
       <button class="btn-primary settings-close" type="button" (click)="onCloseStore()">
-        Kapat
+        {{ t('btn.close') }}
       </button>
     </div>
   </div>
@@ -283,7 +297,7 @@
       class="settings-panel profile-panel"
       role="dialog"
       aria-modal="true"
-      aria-label="Profil"
+      [attr.aria-label]="t('nav.profile')"
       (click)="$event.stopPropagation()"
     >
       <div class="profile-head">
@@ -292,29 +306,29 @@
           class="profile-name-input"
           type="text"
           maxlength="16"
-          [value]="playerName()"
+          [value]="displayName()"
           (input)="onNameInput($event)"
-          aria-label="Oyuncu adı"
+          [attr.aria-label]="t('prof.nameLabel')"
         />
       </div>
 
       <!-- Günlük ödül -->
       @if (canClaimDaily()) {
         <button class="btn-primary daily-btn" type="button" (click)="onClaimDaily()">
-          🎁 Günlük Ödülü Al
+          {{ t('prof.claimDaily') }}
         </button>
       } @else {
-        <div class="daily-done">✓ Günlük ödül alındı — yarın tekrar gel!</div>
+        <div class="daily-done">{{ t('prof.dailyDone') }}</div>
       }
 
       <!-- İstatistikler -->
       <div class="profile-stats">
-        <div class="pstat"><strong>{{ gamesPlayed() }}</strong><span>OYUN</span></div>
-        <div class="pstat"><strong>%{{ winRate() }}</strong><span>KAZANMA</span></div>
-        <div class="pstat"><strong>{{ bestTile() }}</strong><span>EN İYİ KARE</span></div>
-        <div class="pstat"><strong>🔥 {{ currentStreak() }}</strong><span>SERİ</span></div>
-        <div class="pstat"><strong>{{ bestStreak() }}</strong><span>EN İYİ SERİ</span></div>
-        <div class="pstat"><strong>{{ totalMoves() }}</strong><span>TOPLAM HAMLE</span></div>
+        <div class="pstat"><strong>{{ gamesPlayed() }}</strong><span>{{ t('prof.games') }}</span></div>
+        <div class="pstat"><strong>%{{ winRate() }}</strong><span>{{ t('prof.winrate') }}</span></div>
+        <div class="pstat"><strong>{{ bestTile() }}</strong><span>{{ t('prof.bestTile') }}</span></div>
+        <div class="pstat"><strong>🔥 {{ currentStreak() }}</strong><span>{{ t('prof.streak') }}</span></div>
+        <div class="pstat"><strong>{{ bestStreak() }}</strong><span>{{ t('prof.bestStreak') }}</span></div>
+        <div class="pstat"><strong>{{ totalMoves() }}</strong><span>{{ t('prof.totalMoves') }}</span></div>
       </div>
 
       <!-- Başarımlar: Mağaza → Başarımlar sekmesinde -->
@@ -323,11 +337,11 @@
         type="button"
         (click)="onOpenStore(); setStoreTab('achievements')"
       >
-        🏅 Başarımları Gör ({{ unlockedAchievements().size }}/{{ ACHIEVEMENTS.length }})
+        {{ t('prof.seeAch') }} ({{ unlockedAchievements().size }}/{{ ACHIEVEMENTS.length }})
       </button>
 
       <button class="btn-primary settings-close" type="button" (click)="onCloseProfile()">
-        Kapat
+        {{ t('btn.close') }}
       </button>
     </div>
   </div>
@@ -340,21 +354,19 @@
       class="settings-panel"
       role="dialog"
       aria-modal="true"
-      aria-label="Görevler"
+      [attr.aria-label]="t('nav.missions')"
       (click)="$event.stopPropagation()"
     >
-      <h2 class="settings-title">🎯 Görevler</h2>
-      <p class="settings-note">
-        Görevleri tamamla, altın kazan. Günlük her gün, haftalık her hafta yenilenir.
-      </p>
+      <h2 class="settings-title">{{ t('mis.title') }}</h2>
+      <p class="settings-note">{{ t('mis.note') }}</p>
 
-      <h3 class="settings-heading">📅 Günlük</h3>
+      <h3 class="settings-heading">{{ t('mis.daily') }}</h3>
       <div class="mission-list">
         @for (m of dailyView(); track m.id) {
           <div class="mission-item" [class.done]="m.progress >= m.def.target">
             <span class="mission-icon">{{ m.def.icon }}</span>
             <div class="mission-info">
-              <div class="mission-desc">{{ m.def.desc }}</div>
+              <div class="mission-desc">{{ L(m.def.desc, m.def.descEn) }}</div>
               <div class="mission-bar">
                 <span
                   class="mission-fill"
@@ -380,13 +392,13 @@
         }
       </div>
 
-      <h3 class="settings-heading">🗓️ Haftalık</h3>
+      <h3 class="settings-heading">{{ t('mis.weekly') }}</h3>
       <div class="mission-list">
         @for (m of weeklyView(); track m.id) {
           <div class="mission-item" [class.done]="m.progress >= m.def.target">
             <span class="mission-icon">{{ m.def.icon }}</span>
             <div class="mission-info">
-              <div class="mission-desc">{{ m.def.desc }}</div>
+              <div class="mission-desc">{{ L(m.def.desc, m.def.descEn) }}</div>
               <div class="mission-bar">
                 <span
                   class="mission-fill"
@@ -413,7 +425,7 @@
       </div>
 
       <button class="btn-primary settings-close" type="button" (click)="onCloseMissions()">
-        Kapat
+        {{ t('btn.close') }}
       </button>
     </div>
   </div>
@@ -426,17 +438,17 @@
     <header class="topbar">
       <div class="brand-row">
         <h1 class="brand">2048</h1>
-        <div class="gold-pill" title="Toplam altın">
+        <div class="gold-pill" [title]="t('hud.totalGold')">
           💰 <strong>{{ gold() }}</strong>
         </div>
       </div>
       <div class="scores">
         <div class="score-box">
-          <span>SKOR</span>
+          <span>{{ t('hud.score') }}</span>
           <strong>{{ score() }}</strong>
         </div>
         <div class="score-box best">
-          <span>EN İYİ</span>
+          <span>{{ t('hud.best') }}</span>
           <strong>{{ bestScore() }}</strong>
         </div>
       </div>
@@ -445,9 +457,9 @@
     <!-- Seviye modu: seviye + hedef bilgisi -->
     @if (mode() === GameMode.Level) {
       <div class="level-bar">
-        <span class="level-badge">Seviye {{ level() }}</span>
+        <span class="level-badge">{{ t('hud.level') }} {{ level() }}</span>
         <span class="level-target">
-          Hedef: <strong>{{ levelTarget() }}</strong>
+          {{ t('hud.target') }} <strong>{{ levelTarget() }}</strong>
         </span>
       </div>
     }
@@ -457,19 +469,19 @@
       @if (mode() === GameMode.Level) {
         <div class="stat" [class.low]="lowTime()">
           <span class="stat-icon" aria-hidden="true">⏳</span>
-          <span class="stat-label">KALAN</span>
+          <span class="stat-label">{{ t('hud.remaining') }}</span>
           <strong class="stat-value">{{ remainingLabel() }}</strong>
         </div>
       } @else {
         <div class="stat">
           <span class="stat-icon" aria-hidden="true">⏱️</span>
-          <span class="stat-label">SÜRE</span>
+          <span class="stat-label">{{ t('hud.time') }}</span>
           <strong class="stat-value">{{ elapsedLabel() }}</strong>
         </div>
       }
       <div class="stat">
         <span class="stat-icon" aria-hidden="true">🔀</span>
-        <span class="stat-label">HAMLE</span>
+        <span class="stat-label">{{ t('hud.moves') }}</span>
         <strong class="stat-value">{{ moves() }}</strong>
       </div>
     </div>
@@ -477,9 +489,9 @@
     <!-- Bomba hedefleme bandı -->
     @if (bombMode()) {
       <div class="bomb-banner">
-        💣 Silmek için bir kareye dokun
+        {{ t('bomb.hint') }}
         <button type="button" class="bomb-cancel" (click)="onCancelBomb()">
-          İptal
+          {{ t('bomb.cancel') }}
         </button>
       </div>
     }
@@ -491,7 +503,7 @@
           <button
             class="power-btn"
             type="button"
-            [title]="p.name + ' — ' + p.desc"
+            [title]="L(p.name, p.nameEn) + ' — ' + L(p.desc, p.descEn)"
             (click)="onUsePower(p.id)"
           >
             <span class="power-icon">{{ p.icon }}</span>
@@ -505,129 +517,133 @@
       <div class="board-wrap" [class.bomb-active]="bombMode()">
         <app-board />
 
-      <!-- İpucu oku -->
-      @if (hintDirection()) {
-        <div class="hint-arrow" [attr.data-dir]="hintDirection()">
-          @switch (hintDirection()) {
-            @case (Direction.Left) { ← }
-            @case (Direction.Right) { → }
-            @case (Direction.Up) { ↑ }
-            @case (Direction.Down) { ↓ }
-          }
-        </div>
-      }
+        <!-- İpucu oku -->
+        @if (hintDirection()) {
+          <div class="hint-arrow" [attr.data-dir]="hintDirection()">
+            @switch (hintDirection()) {
+              @case (Direction.Left) { ← }
+              @case (Direction.Right) { → }
+              @case (Direction.Up) { ↑ }
+              @case (Direction.Down) { ↓ }
+            }
+          </div>
+        }
 
-      @if (
-        status() === GameStatus.Won ||
-        status() === GameStatus.Lost ||
-        status() === GameStatus.LevelComplete ||
-        status() === GameStatus.Failed
-      ) {
-        <div
-          class="overlay"
-          [class.win]="
-            status() === GameStatus.Won || status() === GameStatus.LevelComplete
-          "
-        >
-          <div class="overlay-card">
-            <!-- Başlık + alt metin (duruma göre) -->
-            @switch (status()) {
-              @case (GameStatus.Won) {
-                @if (mode() === GameMode.Level) {
-                  <h2 class="overlay-title">Tebrikler! 🏆</h2>
-                  <p class="overlay-sub">Tüm seviyeleri bitirdin</p>
-                } @else {
-                  <h2 class="overlay-title">Kazandın! 🎉</h2>
-                  <p class="overlay-sub">2048'e ulaştın</p>
+        @if (
+          status() === GameStatus.Won ||
+          status() === GameStatus.Lost ||
+          status() === GameStatus.LevelComplete ||
+          status() === GameStatus.Failed
+        ) {
+          <div
+            class="overlay"
+            [class.win]="
+              status() === GameStatus.Won || status() === GameStatus.LevelComplete
+            "
+          >
+            <div class="overlay-card">
+              <!-- Başlık + alt metin (duruma göre) -->
+              @switch (status()) {
+                @case (GameStatus.Won) {
+                  @if (mode() === GameMode.Level) {
+                    <h2 class="overlay-title">{{ t('ov.wonAllTitle') }}</h2>
+                    <p class="overlay-sub">{{ t('ov.wonAllSub') }}</p>
+                  } @else {
+                    <h2 class="overlay-title">{{ t('ov.wonTitle') }}</h2>
+                    <p class="overlay-sub">{{ t('ov.wonSub') }}</p>
+                  }
+                }
+                @case (GameStatus.LevelComplete) {
+                  <h2 class="overlay-title">
+                    {{ t('ov.levelDoneTitle', { n: level() }) }}
+                  </h2>
+                  <p class="overlay-sub">
+                    {{ t('ov.levelDoneSub', { x: levelTarget() }) }}
+                  </p>
+                }
+                @case (GameStatus.Failed) {
+                  <h2 class="overlay-title">{{ t('ov.failTitle') }}</h2>
+                  <p class="overlay-sub">
+                    {{ remainingSeconds() <= 0 ? t('ov.timeUp') : t('ov.noMoves') }}
+                  </p>
+                }
+                @default {
+                  <h2 class="overlay-title">{{ t('ov.gameOver') }}</h2>
+                  <p class="overlay-sub">{{ t('ov.noMoves') }}</p>
                 }
               }
-              @case (GameStatus.LevelComplete) {
-                <h2 class="overlay-title">Seviye {{ level() }} Tamamlandı! 🎉</h2>
-                <p class="overlay-sub">Hedefe ulaştın ({{ levelTarget() }})</p>
-              }
-              @case (GameStatus.Failed) {
-                <h2 class="overlay-title">Başarısız</h2>
-                <p class="overlay-sub">
-                  {{ remainingSeconds() <= 0 ? 'Süre doldu!' : 'Hamle kalmadı' }}
-                </p>
-              }
-              @default {
-                <h2 class="overlay-title">Oyun Bitti</h2>
-                <p class="overlay-sub">Hamle kalmadı</p>
-              }
-            }
 
-            <p class="overlay-score">Skor: <strong>{{ score() }}</strong></p>
-            <p class="overlay-stats">
-              @if (mode() === GameMode.Level) {
-                ⏳ {{ remainingLabel() }} kaldı
-              } @else {
-                ⏱️ {{ elapsedLabel() }}
-              }
-              &nbsp;·&nbsp; 🔀 {{ moves() }} hamle
-            </p>
+              <p class="overlay-score">{{ t('ov.score') }} <strong>{{ score() }}</strong></p>
+              <p class="overlay-stats">
+                @if (mode() === GameMode.Level) {
+                  ⏳ {{ remainingLabel() }} {{ t('ov.left') }}
+                } @else {
+                  ⏱️ {{ elapsedLabel() }}
+                }
+                &nbsp;·&nbsp; 🔀 {{ moves() }} {{ t('ov.movesSuffix') }}
+              </p>
 
-            <!-- Altın ödülü (seviye tamamlama / tüm oyun kazanma) -->
-            @if (
-              status() === GameStatus.LevelComplete ||
-              (status() === GameStatus.Won && mode() === GameMode.Level)
-            ) {
-              @if (lastReward() > 0) {
-                <p class="overlay-gold">💰 +{{ lastReward() }} altın kazandın!</p>
-              } @else {
-                <p class="overlay-gold muted">
-                  💰 Bu seviyenin ödülü zaten alınmıştı
-                </p>
+              <!-- Altın ödülü (seviye tamamlama / tüm oyun kazanma) -->
+              @if (
+                status() === GameStatus.LevelComplete ||
+                (status() === GameStatus.Won && mode() === GameMode.Level)
+              ) {
+                @if (lastReward() > 0) {
+                  <p class="overlay-gold">
+                    {{ t('ov.goldWon', { g: lastReward() }) }}
+                  </p>
+                } @else {
+                  <p class="overlay-gold muted">{{ t('ov.goldAlready') }}</p>
+                }
               }
-            }
 
-            <div class="overlay-actions">
-              <!-- Seviye tamam → sonraki seviye -->
-              @if (status() === GameStatus.LevelComplete) {
-                <button class="btn-primary" type="button" (click)="onNextLevel()">
-                  Sonraki Seviye →
-                </button>
-              }
-              <!-- Seviye başarısız → tekrar dene -->
-              @if (status() === GameStatus.Failed) {
-                <button class="btn-primary" type="button" (click)="onRetryLevel()">
-                  ↻ Tekrar Dene
-                </button>
-              }
-              <!-- Klasik kazanma → devam et -->
-              @if (status() === GameStatus.Won && mode() === GameMode.Classic) {
-                <button class="btn-primary" type="button" (click)="onContinue()">
-                  Devam Et
-                </button>
-              }
-              <!-- Klasik kaybetme → geri al -->
-              @if (status() === GameStatus.Lost && canUndo()) {
-                <button class="btn-primary" type="button" (click)="onUndo()">
-                  ↶ Geri Al
-                </button>
-              }
-              <!-- Her durumda: yeniden başla (moda uygun) -->
-              @if (mode() === GameMode.Level) {
-                <button
-                  class="btn-primary ghost"
-                  type="button"
-                  (click)="onStartLevelMode()"
-                >
-                  Baştan
-                </button>
-              } @else {
-                <button
-                  class="btn-primary ghost"
-                  type="button"
-                  (click)="onRestart()"
-                >
-                  Yeni Oyun
-                </button>
-              }
+              <div class="overlay-actions">
+                <!-- Seviye tamam → sonraki seviye -->
+                @if (status() === GameStatus.LevelComplete) {
+                  <button class="btn-primary" type="button" (click)="onNextLevel()">
+                    {{ t('ov.nextLevel') }}
+                  </button>
+                }
+                <!-- Seviye başarısız → tekrar dene -->
+                @if (status() === GameStatus.Failed) {
+                  <button class="btn-primary" type="button" (click)="onRetryLevel()">
+                    {{ t('ov.retry') }}
+                  </button>
+                }
+                <!-- Klasik kazanma → devam et -->
+                @if (status() === GameStatus.Won && mode() === GameMode.Classic) {
+                  <button class="btn-primary" type="button" (click)="onContinue()">
+                    {{ t('ov.continue') }}
+                  </button>
+                }
+                <!-- Klasik kaybetme → geri al -->
+                @if (status() === GameStatus.Lost && canUndo()) {
+                  <button class="btn-primary" type="button" (click)="onUndo()">
+                    {{ t('btn.undo') }}
+                  </button>
+                }
+                <!-- Her durumda: yeniden başla (moda uygun) -->
+                @if (mode() === GameMode.Level) {
+                  <button
+                    class="btn-primary ghost"
+                    type="button"
+                    (click)="onStartLevelMode()"
+                  >
+                    {{ t('btn.restart') }}
+                  </button>
+                } @else {
+                  <button
+                    class="btn-primary ghost"
+                    type="button"
+                    (click)="onRestart()"
+                  >
+                    {{ t('btn.newGame') }}
+                  </button>
+                }
+              </div>
             </div>
           </div>
-        </div>
-      }
+        }
       </div>
     </div>
 
@@ -638,15 +654,15 @@
         [disabled]="!canUndo()"
         (click)="onUndo()"
       >
-        ↶ Geri Al
+        {{ t('btn.undo') }}
       </button>
       @if (mode() === GameMode.Level) {
         <button class="btn-primary" type="button" (click)="onStartLevelMode()">
-          Baştan
+          {{ t('btn.restart') }}
         </button>
       } @else {
         <button class="btn-primary" type="button" (click)="onRestart()">
-          Yeni Oyun
+          {{ t('btn.newGame') }}
         </button>
       }
     </div>

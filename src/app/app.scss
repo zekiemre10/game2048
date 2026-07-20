@@ -1025,6 +1025,34 @@
   opacity: 0.8;
 }
 
+// Dil seçimi
+.lang-choice {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.lang-choice button {
+  flex: 1;
+  padding: 0.6rem;
+  border-radius: v.$radius-md;
+  font-weight: 700;
+  background: var(--color-cell-empty);
+  color: var(--color-text);
+  transition:
+    background-color v.$transition-fast,
+    box-shadow v.$transition-fast;
+
+  &.active {
+    box-shadow: inset 0 0 0 2px var(--color-button);
+    background: color-mix(in srgb, var(--color-button) 14%, transparent);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--color-button);
+    outline-offset: 2px;
+  }
+}
+
 // Tema seçimi
 .theme-choice {
   display: flex;

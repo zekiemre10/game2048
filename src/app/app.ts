@@ -4,6 +4,7 @@ import { BoardComponent } from './components/board/board';
 import { GameService } from './services/game.service';
 import { ThemeService } from './services/theme.service';
 import { THEMES, themeDef } from './models/theme.model';
+import { I18nService, Lang } from './services/i18n.service';
 import { AudioService } from './services/audio.service';
 import { SfxService } from './services/sfx.service';
 import { Direction, GameMode, GameStatus } from './models/tile.model';
@@ -33,6 +34,21 @@ export class App {
   private readonly themeService = inject(ThemeService);
   private readonly audio = inject(AudioService);
   private readonly sfx = inject(SfxService);
+  private readonly i18n = inject(I18nService);
+
+  /** Statik metin çevirisi (şablonda {{ t('key') }}). */
+  protected readonly t = (key: string, params?: Record<string, string | number>) =>
+    this.i18n.t(key, params);
+  /** Model verisi çevirisi (TR/EN). */
+  protected readonly L = (tr: string, en: string) => this.i18n.L(tr, en);
+  /** Aktif dil. */
+  protected readonly lang = this.i18n.lang;
+
+  /** Görünen oyuncu adı (varsayılan ise dile göre yerelleştirilir). */
+  protected readonly displayName = computed(() => {
+    const n = this.game.playerName();
+    return n === 'Oyuncu' || n === 'Player' ? this.i18n.L('Oyuncu', 'Player') : n;
+  });
 
   /** Şablonda kullanmak için durumları dışa aç. */
   protected readonly status = this.game.status;
@@ -329,6 +345,11 @@ export class App {
   /** Bir tema sahip olunuyor mu? */
   protected isThemeOwned(id: string): boolean {
     return this.themeService.isOwned(id);
+  }
+
+  /** Dili ayarla. */
+  onSetLang(lang: Lang): void {
+    this.i18n.set(lang);
   }
 
   /** Müziği aç/kapat. */

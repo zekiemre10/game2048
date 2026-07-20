@@ -23,6 +23,16 @@ import {
   streakAfterActivity,
   yesterdayKey,
 } from '../logic/daily';
+import {
+  DAILY_COUNT,
+  DAILY_POOL,
+  MissionMetric,
+  MissionProgress,
+  WEEKLY_COUNT,
+  WEEKLY_POOL,
+  missionDef,
+} from '../models/mission.model';
+import { pickMissions, weekKey } from '../logic/missions';
 
 // ============================================================
 //  2048 — Oyun servisi
@@ -64,6 +74,8 @@ const STATS_KEY = 'game2048.stats';
 const STREAK_KEY = 'game2048.streak';
 const DAILY_KEY = 'game2048.dailyDay';
 const ACHIEVEMENTS_KEY = 'game2048.achievements';
+const DAILY_MISSIONS_KEY = 'game2048.dailyMissions';
+const WEEKLY_MISSIONS_KEY = 'game2048.weeklyMissions';
 
 /** Geri al için saklanan tek adımlık oyun durumu. */
 interface GameSnapshot {
@@ -176,6 +188,22 @@ export class GameService {
   /** Açılmış başarım id'leri. */
   readonly unlockedAchievements = signal<Set<string>>(loadAchievements());
 
+  /** Günlük görevler (id, ilerleme, alındı). */
+  readonly dailyMissions = signal<MissionProgress[]>([]);
+
+  /** Haftalık görevler. */
+  readonly weeklyMissions = signal<MissionProgress[]>([]);
+
+  /** Alınmayı bekleyen (tamamlanmış ama alınmamış) görev sayısı. */
+  readonly claimableMissions = computed<number>(() => {
+    const count = (list: MissionProgress[]) =>
+      list.filter((m) => {
+        const def = missionDef(m.id);
+        return def && !m.claimed && m.progress >= def.target;
+      }).length;
+    return count(this.dailyMissions()) + count(this.weeklyMissions());
+  });
+
   /** Kazanma yüzdesi (0-100). */
   readonly winRate = computed<number>(() => {
     const played = this.gamesPlayed();
@@ -211,6 +239,10 @@ export class GameService {
   readonly emptyCount = computed<number>(
     () => BOARD_SIZE * BOARD_SIZE - this.tiles().length,
   );
+
+  constructor() {
+    this.ensureMissionsFresh();
+  }
 
   // --- Fabrika / kurulum fonksiyonları ------------------------
 
@@ -338,13 +370,14 @@ export class GameService {
 
   // --- Altın ekonomisi ----------------------------------------
 
-  /** Altın ekler (kazanç sayılır → toplam kazanç + başarım kontrolü). */
+  /** Altın ekler (kazanç sayılır → toplam kazanç + başarım + görev). */
   addGold(amount: number): void {
     if (amount <= 0) return;
     this.gold.update((g) => g + amount);
     this.totalGoldEarned.update((t) => t + amount);
     saveGold(this.gold());
     saveTotalEarned(this.totalGoldEarned());
+    this.trackMission('gold', amount); // görev: altın kazan
   }
 
   /** Altın harcar. Yeterli değilse harcamaz. @returns başarılıysa true. */
@@ -428,6 +461,7 @@ export class GameService {
   private consumePower(id: PowerId): void {
     this.powers.update((inv) => ({ ...inv, [id]: Math.max(0, inv[id] - 1) }));
     savePowers(this.powers());
+    this.trackMission('powers', 1); // görev: güç kullan
   }
 
   /** +30 saniye: yalnızca seviye modunda ve oynanırken. */
@@ -561,6 +595,8 @@ export class GameService {
     this.totalMoves.update((n) => n + this.moves());
     this.saveStats();
     this.checkAchievements();
+    this.trackMission('games', 1);
+    if (won) this.trackMission('wins', 1);
   }
 
   /** Tahtadaki en yüksek kareyi izler (başarım için). */
@@ -623,6 +659,84 @@ export class GameService {
     });
   }
 
+  // --- Görevler (günlük + haftalık) ---------------------------
+
+  /** Gün/hafta değiştiyse görevleri yeniden üretir (tohumlu, deterministik). */
+  private ensureMissionsFresh(): void {
+    const now = new Date();
+    const today = dayKey(now);
+    const week = weekKey(now);
+
+    const daily = loadMissions(DAILY_MISSIONS_KEY);
+    if (daily.period !== today) {
+      const defs = pickMissions(DAILY_POOL, DAILY_COUNT, today);
+      const list = defs.map((d) => ({ id: d.id, progress: 0, claimed: false }));
+      this.dailyMissions.set(list);
+      saveMissions(DAILY_MISSIONS_KEY, today, list);
+    } else {
+      this.dailyMissions.set(daily.list);
+    }
+
+    const weekly = loadMissions(WEEKLY_MISSIONS_KEY);
+    if (weekly.period !== week) {
+      const defs = pickMissions(WEEKLY_POOL, WEEKLY_COUNT, week);
+      const list = defs.map((d) => ({ id: d.id, progress: 0, claimed: false }));
+      this.weeklyMissions.set(list);
+      saveMissions(WEEKLY_MISSIONS_KEY, week, list);
+    } else {
+      this.weeklyMissions.set(weekly.list);
+    }
+  }
+
+  /** Bir metrik için görev ilerlemesini artırır (günlük + haftalık). */
+  private trackMission(metric: MissionMetric, amount: number): void {
+    if (amount <= 0) return;
+    this.bumpMissions(this.dailyMissions, DAILY_MISSIONS_KEY, metric, amount);
+    this.bumpMissions(this.weeklyMissions, WEEKLY_MISSIONS_KEY, metric, amount);
+  }
+
+  private bumpMissions(
+    sig: typeof this.dailyMissions,
+    key: string,
+    metric: MissionMetric,
+    amount: number,
+  ): void {
+    let changed = false;
+    const next = sig().map((m) => {
+      const def = missionDef(m.id);
+      if (!def || def.metric !== metric || m.claimed) return m;
+      const progress = Math.min(def.target, m.progress + amount);
+      if (progress !== m.progress) changed = true;
+      return { ...m, progress };
+    });
+    if (changed) {
+      sig.set(next);
+      // period'u koru (bu gün/hafta)
+      const stored = loadMissions(key);
+      saveMissions(key, stored.period, next);
+    }
+  }
+
+  /** Tamamlanmış bir görevin ödülünü alır. */
+  claimMission(id: string, type: 'daily' | 'weekly'): boolean {
+    const sig = type === 'daily' ? this.dailyMissions : this.weeklyMissions;
+    const key = type === 'daily' ? DAILY_MISSIONS_KEY : WEEKLY_MISSIONS_KEY;
+    const def = missionDef(id);
+    if (!def) return false;
+
+    const mission = sig().find((m) => m.id === id);
+    if (!mission || mission.claimed || mission.progress < def.target) {
+      return false;
+    }
+
+    this.addGold(def.gold);
+    const next = sig().map((m) => (m.id === id ? { ...m, claimed: true } : m));
+    sig.set(next);
+    const stored = loadMissions(key);
+    saveMissions(key, stored.period, next);
+    return true;
+  }
+
   /**
    * Verilen yöne hamle yapar.
    * - Izgara değişmediyse (geçersiz hamle) hiçbir şey yapmaz, yeni kare üretmez.
@@ -649,6 +763,17 @@ export class GameService {
 
     // Yeni durum (birleşenlerde `merged` işaretli; `isNew` temizlenmiş olur)
     this.tiles.set(result.tiles);
+
+    // Görev takibi: hamle + birleşme + kare hedefleri
+    this.trackMission('moves', 1);
+    const mergedTiles = result.tiles.filter((t) => t.merged);
+    if (mergedTiles.length > 0) {
+      this.trackMission('merges', mergedTiles.length);
+      const maxMerged = Math.max(...mergedTiles.map((t) => t.value));
+      if (maxMerged >= 256) this.trackMission('reach256', 1);
+      if (maxMerged >= 512) this.trackMission('reach512', 1);
+      if (maxMerged >= 1024) this.trackMission('reach1024', 1);
+    }
 
     if (result.gained > 0) {
       this.score.update((s) => s + result.gained);
@@ -695,6 +820,7 @@ export class GameService {
     if (this.tiles().some((t) => t.value >= this.levelTarget())) {
       this.stopTimer();
       this.awardGold(this.level()); // seviye tamamlandı → altın ver
+      this.trackMission('levels', 1); // görev: seviye tamamla
       if (this.level() >= MAX_LEVEL) {
         this.status.set(GameStatus.Won);
         this.recordGameEnd(true); // tüm seviyeler bitti = kazanılmış oyun
@@ -1077,6 +1203,41 @@ function loadAchievements(): Set<string> {
 function saveAchievements(set: Set<string>): void {
   try {
     localStorage?.setItem(ACHIEVEMENTS_KEY, JSON.stringify([...set]));
+  } catch {
+    /* yoksay */
+  }
+}
+
+/** Görevleri okur: { period, list }. */
+function loadMissions(key: string): {
+  period: string | null;
+  list: MissionProgress[];
+} {
+  try {
+    if (typeof localStorage === 'undefined') return { period: null, list: [] };
+    const raw = localStorage.getItem(key);
+    if (!raw) return { period: null, list: [] };
+    const obj = JSON.parse(raw);
+    const list = Array.isArray(obj?.list)
+      ? obj.list.filter(
+          (m: unknown): m is MissionProgress =>
+            !!m && typeof (m as MissionProgress).id === 'string',
+        )
+      : [];
+    return { period: typeof obj?.period === 'string' ? obj.period : null, list };
+  } catch {
+    return { period: null, list: [] };
+  }
+}
+
+/** Görevleri yazar. */
+function saveMissions(
+  key: string,
+  period: string | null,
+  list: MissionProgress[],
+): void {
+  try {
+    localStorage?.setItem(key, JSON.stringify({ period, list }));
   } catch {
     /* yoksay */
   }

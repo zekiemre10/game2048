@@ -235,6 +235,113 @@
   }
 }
 
+// Bildirim rozeti (görev butonu vb.)
+.mission-btn {
+  position: relative;
+}
+
+.notif-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #e8503a;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// --- Görevler paneli ----------------------------------------
+
+.mission-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.mission-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  background: var(--color-cell-empty);
+  border-radius: v.$radius-md;
+
+  &.done {
+    box-shadow: inset 0 0 0 2px #3a9d4a;
+  }
+}
+
+.mission-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.mission-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mission-desc {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.mission-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-text) 18%, transparent);
+  overflow: hidden;
+  margin: 0.3rem 0 0.15rem;
+}
+
+.mission-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-button);
+  transition: width 250ms ease;
+}
+
+.mission-prog {
+  font-size: 0.72rem;
+  color: var(--color-text);
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.mission-reward {
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  color: #b8860b;
+  font-weight: 700;
+}
+
+.mission-claim {
+  flex-shrink: 0;
+  padding: 0.4rem 0.7rem;
+  min-height: 36px;
+  font-size: 0.85rem;
+  background: #f6c945;
+  color: #6b4e00;
+  animation: pulse-low 1.2s ease-in-out infinite;
+}
+
+.mission-claimed {
+  flex-shrink: 0;
+  color: #3a9d4a;
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
 // Mağaza butonu: ikon + yazı (yuvarlak değil, hap şekli)
 .store-btn {
   width: auto;

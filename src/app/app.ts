@@ -11,6 +11,7 @@ import { swipeDirection } from './logic/swipe';
 import { formatTime } from './logic/format-time';
 import { POWERS, PowerId } from './models/power.model';
 import { ACHIEVEMENTS } from './models/achievement.model';
+import { missionDef } from './models/mission.model';
 
 /** Ok tuşu → yön eşlemesi. */
 const KEY_TO_DIRECTION: Record<string, Direction> = {
@@ -71,6 +72,23 @@ export class App {
   protected readonly bestStreak = this.game.bestStreak;
   protected readonly canClaimDaily = this.game.canClaimDaily;
   protected readonly unlockedAchievements = this.game.unlockedAchievements;
+  protected readonly claimableMissions = this.game.claimableMissions;
+
+  /** Günlük görevleri tanımlarıyla birleştirir (UI için). */
+  protected readonly dailyView = computed(() =>
+    this.game
+      .dailyMissions()
+      .map((m) => ({ ...m, def: missionDef(m.id)! }))
+      .filter((m) => m.def),
+  );
+
+  /** Haftalık görevleri tanımlarıyla birleştirir. */
+  protected readonly weeklyView = computed(() =>
+    this.game
+      .weeklyMissions()
+      .map((m) => ({ ...m, def: missionDef(m.id)! }))
+      .filter((m) => m.def),
+  );
 
   /** Ayarlar paneli açık mı? */
   protected readonly settingsOpen = signal(false);
@@ -85,6 +103,9 @@ export class App {
 
   /** Profil paneli açık mı? */
   protected readonly profileOpen = signal(false);
+
+  /** Görevler paneli açık mı? */
+  protected readonly missionsOpen = signal(false);
 
   /** Envanterde en az 1 tane olan güçler (oyun içi güç çubuğu için). */
   protected readonly ownedPowers = computed(() =>
@@ -264,6 +285,23 @@ export class App {
   /** Başarım açık mı? */
   protected isAchievementUnlocked(id: string): boolean {
     return this.unlockedAchievements().has(id);
+  }
+
+  // --- Görevler ----------------------------------------------
+
+  onOpenMissions(): void {
+    this.settingsOpen.set(false);
+    this.storeOpen.set(false);
+    this.profileOpen.set(false);
+    this.missionsOpen.set(true);
+  }
+
+  onCloseMissions(): void {
+    this.missionsOpen.set(false);
+  }
+
+  onClaimMission(id: string, type: 'daily' | 'weekly'): void {
+    this.game.claimMission(id, type);
   }
 
   // --- Ayarlar paneli -----------------------------------------

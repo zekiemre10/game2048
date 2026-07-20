@@ -15,8 +15,20 @@
   }
 </button>
 
-<!-- Sağ üst: mağaza + ayarlar -->
+<!-- Sağ üst: görevler + mağaza + ayarlar -->
 <div class="top-actions">
+  <button
+    class="round-btn mission-btn"
+    type="button"
+    aria-label="Görevler"
+    title="Görevler"
+    (click)="onOpenMissions()"
+  >
+    🎯
+    @if (claimableMissions() > 0) {
+      <span class="notif-badge">{{ claimableMissions() }}</span>
+    }
+  </button>
   <button
     class="round-btn store-btn"
     type="button"
@@ -315,6 +327,92 @@
       </button>
 
       <button class="btn-primary settings-close" type="button" (click)="onCloseProfile()">
+        Kapat
+      </button>
+    </div>
+  </div>
+}
+
+<!-- Görevler paneli -->
+@if (missionsOpen()) {
+  <div class="settings-backdrop" (click)="onCloseMissions()">
+    <div
+      class="settings-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Görevler"
+      (click)="$event.stopPropagation()"
+    >
+      <h2 class="settings-title">🎯 Görevler</h2>
+      <p class="settings-note">
+        Görevleri tamamla, altın kazan. Günlük her gün, haftalık her hafta yenilenir.
+      </p>
+
+      <h3 class="settings-heading">📅 Günlük</h3>
+      <div class="mission-list">
+        @for (m of dailyView(); track m.id) {
+          <div class="mission-item" [class.done]="m.progress >= m.def.target">
+            <span class="mission-icon">{{ m.def.icon }}</span>
+            <div class="mission-info">
+              <div class="mission-desc">{{ m.def.desc }}</div>
+              <div class="mission-bar">
+                <span
+                  class="mission-fill"
+                  [style.width.%]="(m.progress / m.def.target) * 100"
+                ></span>
+              </div>
+              <div class="mission-prog">{{ m.progress }} / {{ m.def.target }}</div>
+            </div>
+            @if (m.claimed) {
+              <span class="mission-claimed">✓</span>
+            } @else if (m.progress >= m.def.target) {
+              <button
+                class="btn-primary mission-claim"
+                type="button"
+                (click)="onClaimMission(m.id, 'daily')"
+              >
+                💰 {{ m.def.gold }}
+              </button>
+            } @else {
+              <span class="mission-reward">💰 {{ m.def.gold }}</span>
+            }
+          </div>
+        }
+      </div>
+
+      <h3 class="settings-heading">🗓️ Haftalık</h3>
+      <div class="mission-list">
+        @for (m of weeklyView(); track m.id) {
+          <div class="mission-item" [class.done]="m.progress >= m.def.target">
+            <span class="mission-icon">{{ m.def.icon }}</span>
+            <div class="mission-info">
+              <div class="mission-desc">{{ m.def.desc }}</div>
+              <div class="mission-bar">
+                <span
+                  class="mission-fill"
+                  [style.width.%]="(m.progress / m.def.target) * 100"
+                ></span>
+              </div>
+              <div class="mission-prog">{{ m.progress }} / {{ m.def.target }}</div>
+            </div>
+            @if (m.claimed) {
+              <span class="mission-claimed">✓</span>
+            } @else if (m.progress >= m.def.target) {
+              <button
+                class="btn-primary mission-claim"
+                type="button"
+                (click)="onClaimMission(m.id, 'weekly')"
+              >
+                💰 {{ m.def.gold }}
+              </button>
+            } @else {
+              <span class="mission-reward">💰 {{ m.def.gold }}</span>
+            }
+          </div>
+        }
+      </div>
+
+      <button class="btn-primary settings-close" type="button" (click)="onCloseMissions()">
         Kapat
       </button>
     </div>

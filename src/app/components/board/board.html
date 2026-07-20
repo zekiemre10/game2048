@@ -1,7 +1,7 @@
-<div class="board">
+<div class="board" [style.--n]="boardSize()">
   <!-- Izgara zemini: 4×4 boş hücreler -->
   <div class="grid-bg">
-    @for (cell of backgroundCells; track $index) {
+    @for (cell of backgroundCells(); track $index) {
       <div class="cell-bg"></div>
     }
   </div>

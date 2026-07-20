@@ -46,6 +46,7 @@ Hedefe ulaşınca sonraki seviyeye geçersin. Ulaştığın en yüksek seviye ka
 - 🎁 **Günlük ödül + seri** — her gün oyna, seriye göre altın kazan
 - 🎯 **Görevler** — günlük ve haftalık görevler; oynadıkça ilerler, altın verir
 - 🌍 **Dil (TR/EN)** — Ayarlar'dan geçiş; arayüzün tamamı iki dilde
+- 🎮 **Modlar** — Klasik · Zen (süresiz) · Zaman Yarışı (3dk) · Seviye + tahta boyutu (3×3/4×4/5×5)
 - 🏅 **Başarımlar** — altın ödüllü hedefler
 - ↶ **Geri al** — son hamleyi geri al (kaybettiren hamle dahil)
 - 🏆 **Kalıcı rekor** — en yüksek skor `localStorage`'da saklanır

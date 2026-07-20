@@ -48,7 +48,17 @@ export enum GameMode {
   Classic = 'classic',
   /** Seviye modu (hedef + geri sayım). */
   Level = 'level',
+  /** Zen: süresiz, baskısız (2048'de durmaz). */
+  Zen = 'zen',
+  /** Zaman Yarışı: sabit süre, en yüksek skor. */
+  TimeAttack = 'timeAttack',
 }
+
+/** Zaman Yarışı modunun süresi (saniye). */
+export const TIME_ATTACK_SECONDS = 180;
+
+/** Seçilebilir tahta boyutları. */
+export const BOARD_SIZES = [3, 4, 5] as const;
 
 /** Tahta boyutu (4x4). */
 export const BOARD_SIZE = 4;

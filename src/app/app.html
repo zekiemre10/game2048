@@ -466,19 +466,22 @@
 
     <!-- Süre ve hamle sayacı (oyun alanının üstünde) -->
     <div class="stats">
-      @if (mode() === GameMode.Level) {
+      @if (mode() === GameMode.Level || mode() === GameMode.TimeAttack) {
+        <!-- Geri sayım (seviye + zaman yarışı) -->
         <div class="stat" [class.low]="lowTime()">
           <span class="stat-icon" aria-hidden="true">⏳</span>
           <span class="stat-label">{{ t('hud.remaining') }}</span>
           <strong class="stat-value">{{ remainingLabel() }}</strong>
         </div>
-      } @else {
+      } @else if (mode() === GameMode.Classic) {
+        <!-- Yukarı sayan süre (klasik) -->
         <div class="stat">
           <span class="stat-icon" aria-hidden="true">⏱️</span>
           <span class="stat-label">{{ t('hud.time') }}</span>
           <strong class="stat-value">{{ elapsedLabel() }}</strong>
         </div>
       }
+      <!-- Zen: süre yok, sadece hamle -->
       <div class="stat">
         <span class="stat-icon" aria-hidden="true">🔀</span>
         <span class="stat-label">{{ t('hud.moves') }}</span>
@@ -569,18 +572,24 @@
                 }
                 @default {
                   <h2 class="overlay-title">{{ t('ov.gameOver') }}</h2>
-                  <p class="overlay-sub">{{ t('ov.noMoves') }}</p>
+                  <p class="overlay-sub">
+                    {{
+                      mode() === GameMode.TimeAttack && remainingSeconds() <= 0
+                        ? t('ov.timeUp')
+                        : t('ov.noMoves')
+                    }}
+                  </p>
                 }
               }
 
               <p class="overlay-score">{{ t('ov.score') }} <strong>{{ score() }}</strong></p>
               <p class="overlay-stats">
-                @if (mode() === GameMode.Level) {
-                  ⏳ {{ remainingLabel() }} {{ t('ov.left') }}
-                } @else {
-                  ⏱️ {{ elapsedLabel() }}
+                @if (mode() === GameMode.Level || mode() === GameMode.TimeAttack) {
+                  ⏳ {{ remainingLabel() }} {{ t('ov.left') }} &nbsp;·&nbsp;
+                } @else if (mode() === GameMode.Classic) {
+                  ⏱️ {{ elapsedLabel() }} &nbsp;·&nbsp;
                 }
-                &nbsp;·&nbsp; 🔀 {{ moves() }} {{ t('ov.movesSuffix') }}
+                🔀 {{ moves() }} {{ t('ov.movesSuffix') }}
               </p>
 
               <!-- Altın ödülü (seviye tamamlama / tüm oyun kazanma) -->

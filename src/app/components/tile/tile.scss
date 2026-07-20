@@ -13,7 +13,8 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: calc((100% - var(--gap) * 3) / 4);
+  // NxN: hücre genişliği = (toplam - (N-1)*gap) / N  (--n board'dan gelir)
+  width: calc((100% - var(--gap) * (var(--n, 4) - 1)) / var(--n, 4));
   aspect-ratio: 1 / 1;
   // Bir adım = bir hücre genişliği (100%) + hücreler arası boşluk
   transform: translate(

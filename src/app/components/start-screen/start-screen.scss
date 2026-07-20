@@ -90,17 +90,85 @@
   }
 }
 
-.start-buttons {
+// Tahta boyutu seçici
+.size-row {
   display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
   align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
 }
 
-.start-btn {
-  font-size: clamp(1.05rem, 4.5vw, 1.3rem);
-  padding: 0.9rem clamp(2rem, 10vw, 3rem);
-  min-width: min(260px, 80%);
+.size-label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  opacity: 0.6;
+  color: var(--color-text);
+}
+
+.size-choice {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.size-choice button {
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  background: var(--color-cell-empty);
+  color: var(--color-text);
+
+  &.active {
+    background: var(--color-button);
+    color: var(--color-text-light);
+  }
+}
+
+// Mod kartları
+.mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+}
+
+.mode-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.9rem 0.6rem;
+  border-radius: v.$radius-lg;
+  background: var(--color-cell-empty);
+  color: var(--color-text);
+  transition: transform v.$transition-fast;
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+  &:active {
+    transform: scale(0.97);
+  }
+
+  &.level {
+    box-shadow: inset 0 0 0 2px var(--color-button);
+  }
+}
+
+.mode-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.mode-name {
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.mode-desc {
+  font-size: 0.72rem;
+  opacity: 0.72;
 }
 
 .gold-total {
@@ -153,17 +221,25 @@
     display: none; // yer kazan
   }
 
-  .start-buttons {
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.5rem;
+  .size-row {
+    margin-bottom: 0.5rem;
   }
 
-  .start-btn {
-    font-size: 0.95rem;
-    padding: 0.5rem 1.3rem;
-    min-width: 0;
+  .mode-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.4rem;
+  }
+
+  .mode-card {
+    padding: 0.5rem 0.3rem;
+  }
+
+  .mode-icon {
+    font-size: 1.3rem;
+  }
+
+  .mode-desc {
+    display: none;
   }
 
   .gold-total {

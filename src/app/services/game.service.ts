@@ -6,6 +6,7 @@ import {
   Grid,
   GameMode,
   GameStatus,
+  TIME_ATTACK_SECONDS,
   Tile,
 } from '../models/tile.model';
 import { applyMove, hasAnyMove } from '../logic/board-logic';
@@ -122,8 +123,11 @@ export class GameService {
   /** Oyunun anlık durumu. */
   readonly status = signal<GameStatus>(GameStatus.Idle);
 
-  /** Oyun modu (klasik / seviye). */
+  /** Oyun modu (klasik / seviye / zen / zaman yarışı). */
   readonly mode = signal<GameMode>(GameMode.Classic);
+
+  /** Anlık tahta boyutu (NxN). Seviye modu her zaman 4. */
+  readonly boardSize = signal<number>(BOARD_SIZE);
 
   /** (Seviye modu) anlık seviye. */
   readonly level = signal<number>(1);
@@ -226,7 +230,7 @@ export class GameService {
 
   // --- Türetilmiş sinyaller -----------------------------------
 
-  /** `tiles` listesinden üretilen 4×4 ızgara (okumak/çizmek için). */
+  /** `tiles` listesinden üretilen NxN ızgara (okumak/çizmek için). */
   readonly grid = computed<Grid>(() => {
     const g = this.createEmptyGrid();
     for (const tile of this.tiles()) {
@@ -237,7 +241,7 @@ export class GameService {
 
   /** Boştaki hücre sayısı (hamle üretmek/oyun sonu için). */
   readonly emptyCount = computed<number>(
-    () => BOARD_SIZE * BOARD_SIZE - this.tiles().length,
+    () => this.boardSize() * this.boardSize() - this.tiles().length,
   );
 
   constructor() {
@@ -246,27 +250,47 @@ export class GameService {
 
   // --- Fabrika / kurulum fonksiyonları ------------------------
 
-  /** 4×4 boş ızgara üretir (tüm hücreler null). */
+  /** NxN boş ızgara üretir (tüm hücreler null). */
   createEmptyGrid(): Grid {
-    return Array.from({ length: BOARD_SIZE }, () =>
-      Array.from({ length: BOARD_SIZE }, () => null),
+    const n = this.boardSize();
+    return Array.from({ length: n }, () =>
+      Array.from({ length: n }, () => null),
     );
   }
 
-  /** Klasik (sonsuz) oyunu başlatır: boş tahta + 2 rastgele taş, süre yukarı sayar. */
-  startGame(): void {
-    this.mode.set(GameMode.Classic);
+  /** Klasik (sonsuz) oyunu başlatır (geriye dönük uyumluluk). */
+  startGame(size: number = BOARD_SIZE): void {
+    this.startMode(GameMode.Classic, size);
+  }
+
+  /**
+   * Belirtilen modu ve tahta boyutunu başlatır.
+   * - Classic: süre yukarı sayar, 2048'de kazanma.
+   * - Zen: süresiz, 2048'de durmaz.
+   * - TimeAttack: sabit geri sayım, en yüksek skor.
+   */
+  startMode(mode: GameMode, size: number = BOARD_SIZE): void {
+    this.mode.set(mode);
+    this.boardSize.set(size);
     this.tiles.set([]);
     this.score.set(0);
-    this.moves.set(0); // hamle sayacı sıfırlanır
+    this.moves.set(0);
     this.keepPlayingAfterWin = false;
-    this.history.set(null); // geçmişi de sıfırla
+    this.history.set(null);
     this.clearPowerFx();
     this.status.set(GameStatus.Playing);
     this.spawnRandomTile();
     this.spawnRandomTile();
-    this.startTimer(0); // süre sıfırdan başlar
-    this.registerActivity(); // gün serisi
+
+    if (mode === GameMode.TimeAttack) {
+      this.startCountdown(TIME_ATTACK_SECONDS);
+    } else if (mode === GameMode.Zen) {
+      this.stopTimer(); // süresiz
+      this.elapsedSeconds.set(0);
+    } else {
+      this.startTimer(0); // Classic: yukarı sayar
+    }
+    this.registerActivity();
   }
 
   // --- Seviye modu --------------------------------------------
@@ -282,6 +306,7 @@ export class GameService {
   /** Anlık seviyeyi (yeniden) başlatır: boş tahta + geri sayım. */
   private startLevel(): void {
     const cfg = levelConfig(this.level());
+    this.boardSize.set(BOARD_SIZE); // seviye modu her zaman 4×4
     this.tiles.set([]);
     this.score.set(0);
     this.moves.set(0);
@@ -298,6 +323,15 @@ export class GameService {
     if (this.level() > this.bestLevel()) {
       this.bestLevel.set(this.level());
       saveBestLevel(this.level());
+    }
+  }
+
+  /** Mevcut modu ve boyutu yeniden başlatır (Yeni Oyun / Baştan). */
+  restartCurrent(): void {
+    if (this.mode() === GameMode.Level) {
+      this.startLevelMode();
+    } else {
+      this.startMode(this.mode(), this.boardSize());
     }
   }
 
@@ -324,6 +358,7 @@ export class GameService {
     this.history.set(null);
     this.status.set(GameStatus.Idle);
     this.mode.set(GameMode.Classic);
+    this.boardSize.set(BOARD_SIZE);
     this.level.set(1);
     this.clearPowerFx();
     this.stopTimer();
@@ -478,9 +513,10 @@ export class GameService {
     if (current.length === 0) return false;
 
     // Tüm hücreleri karıştır, ilk N tanesine değerleri yerleştir.
+    const n = this.boardSize();
     const cells: Cell[] = [];
-    for (let r = 0; r < BOARD_SIZE; r++) {
-      for (let c = 0; c < BOARD_SIZE; c++) cells.push({ row: r, col: c });
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) cells.push({ row: r, col: c });
     }
     for (let i = cells.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -521,10 +557,11 @@ export class GameService {
     ];
     let best: Direction | null = null;
     let bestScore = -1;
+    const n = this.boardSize();
     for (const dir of dirs) {
-      const res = applyMove(this.tiles(), dir);
+      const res = applyMove(this.tiles(), dir, n);
       if (!res.moved) continue;
-      const empty = BOARD_SIZE * BOARD_SIZE - res.tiles.length;
+      const empty = n * n - res.tiles.length;
       const score = res.gained + empty; // basit sezgi
       if (score > bestScore) {
         bestScore = score;
@@ -746,7 +783,7 @@ export class GameService {
   move(direction: Direction): boolean {
     if (this.status() !== GameStatus.Playing) return false;
 
-    const result = applyMove(this.tiles(), direction);
+    const result = applyMove(this.tiles(), direction, this.boardSize());
     if (!result.moved) return false; // geçersiz hamle → sayaç ARTMAZ
 
     // Geçerli hamle → hamle sayısını artır.
@@ -784,10 +821,17 @@ export class GameService {
     this.spawnRandomTile();
     this.updateBestTile(); // en yüksek kare istatistiği
 
-    if (this.mode() === GameMode.Level) {
-      this.checkLevelEnd();
-    } else {
-      this.checkClassicEnd();
+    switch (this.mode()) {
+      case GameMode.Level:
+        this.checkLevelEnd();
+        break;
+      case GameMode.Classic:
+        this.checkClassicEnd();
+        break;
+      // Zen & Zaman Yarışı: 2048'de durmaz; sadece hamle kalmayınca biter.
+      // (Zaman Yarışı'nda süre dolması geri sayım içinde yönetilir.)
+      default:
+        this.checkEndlessEnd();
     }
 
     return true;
@@ -804,7 +848,16 @@ export class GameService {
       this.recordGameEnd(true);
       return;
     }
-    if (!hasAnyMove(this.tiles())) {
+    if (!hasAnyMove(this.tiles(), this.boardSize())) {
+      this.stopTimer();
+      this.status.set(GameStatus.Lost);
+      this.recordGameEnd(false);
+    }
+  }
+
+  /** Zen / Zaman Yarışı: kazanma yok; hamle kalmayınca oyun biter. */
+  private checkEndlessEnd(): void {
+    if (!hasAnyMove(this.tiles(), this.boardSize())) {
       this.stopTimer();
       this.status.set(GameStatus.Lost);
       this.recordGameEnd(false);
@@ -829,7 +882,7 @@ export class GameService {
       }
       return;
     }
-    if (!hasAnyMove(this.tiles())) {
+    if (!hasAnyMove(this.tiles(), this.boardSize())) {
       this.stopTimer();
       this.status.set(GameStatus.Failed); // Başarısız → altın YOK
       this.recordGameEnd(false);
@@ -892,7 +945,13 @@ export class GameService {
       if (remaining <= 0) {
         this.stopTimer();
         if (this.status() === GameStatus.Playing) {
-          this.status.set(GameStatus.Failed); // süre doldu
+          // Seviye modunda başarısız; Zaman Yarışı'nda oyun biter (skor kalır).
+          if (this.mode() === GameMode.Level) {
+            this.status.set(GameStatus.Failed);
+          } else {
+            this.status.set(GameStatus.Lost);
+            this.recordGameEnd(false);
+          }
         }
       }
     }, 250);
@@ -910,13 +969,12 @@ export class GameService {
 
   /** Boş hücrelerin konum listesini döndürür. */
   emptyCells(): Cell[] {
-    const occupied = new Set(
-      this.tiles().map((t) => t.row * BOARD_SIZE + t.col),
-    );
+    const n = this.boardSize();
+    const occupied = new Set(this.tiles().map((t) => t.row * n + t.col));
     const cells: Cell[] = [];
-    for (let row = 0; row < BOARD_SIZE; row++) {
-      for (let col = 0; col < BOARD_SIZE; col++) {
-        if (!occupied.has(row * BOARD_SIZE + col)) {
+    for (let row = 0; row < n; row++) {
+      for (let col = 0; col < n; col++) {
+        if (!occupied.has(row * n + col)) {
           cells.push({ row, col });
         }
       }

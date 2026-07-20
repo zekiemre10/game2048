@@ -4,23 +4,43 @@
     <h1 class="title">2048</h1>
     <p class="subtitle" [innerHTML]="t('start.subtitle')"></p>
 
-    <div class="preview">
-      <span class="mini-tile t2">2</span>
-      <span class="mini-tile t4">4</span>
-      <span class="mini-tile t8">8</span>
-      <span class="mini-tile t16">16</span>
+    <!-- Tahta boyutu (Seviye modu hariç) -->
+    <div class="size-row">
+      <span class="size-label">{{ t('start.sizeLabel') }}</span>
+      <div class="size-choice">
+        @for (n of BOARD_SIZES; track n) {
+          <button
+            type="button"
+            [class.active]="selectedSize() === n"
+            (click)="onSelectSize(n)"
+          >
+            {{ n }}×{{ n }}
+          </button>
+        }
+      </div>
     </div>
 
-    <div class="start-buttons">
-      <button class="btn-primary start-btn" type="button" (click)="onStart()">
-        {{ t('start.play') }}
+    <!-- Mod seçimi -->
+    <div class="mode-grid">
+      <button class="mode-card" type="button" (click)="onStartMode(GameMode.Classic)">
+        <span class="mode-icon">🎮</span>
+        <span class="mode-name">{{ t('mode.classic') }}</span>
+        <span class="mode-desc">{{ t('mode.classicDesc') }}</span>
       </button>
-      <button
-        class="btn-primary ghost start-btn"
-        type="button"
-        (click)="onStartLevel()"
-      >
-        {{ t('start.levelMode') }}
+      <button class="mode-card" type="button" (click)="onStartMode(GameMode.Zen)">
+        <span class="mode-icon">🧘</span>
+        <span class="mode-name">{{ t('mode.zen') }}</span>
+        <span class="mode-desc">{{ t('mode.zenDesc') }}</span>
+      </button>
+      <button class="mode-card" type="button" (click)="onStartMode(GameMode.TimeAttack)">
+        <span class="mode-icon">⚡</span>
+        <span class="mode-name">{{ t('mode.timeAttack') }}</span>
+        <span class="mode-desc">{{ t('mode.timeAttackDesc') }}</span>
+      </button>
+      <button class="mode-card level" type="button" (click)="onStartLevel()">
+        <span class="mode-icon">🎯</span>
+        <span class="mode-name">{{ t('mode.level') }}</span>
+        <span class="mode-desc">{{ t('mode.levelDesc') }}</span>
       </button>
     </div>
 

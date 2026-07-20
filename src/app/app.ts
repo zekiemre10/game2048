@@ -136,9 +136,12 @@ export class App {
     formatTime(this.remainingSeconds()),
   );
 
-  /** Kalan süre azaldı mı? (görsel uyarı için). */
+  /** Kalan süre azaldı mı? (geri sayımlı modlarda görsel uyarı). */
   protected readonly lowTime = computed(
-    () => this.mode() === GameMode.Level && this.remainingSeconds() <= 10,
+    () =>
+      (this.mode() === GameMode.Level ||
+        this.mode() === GameMode.TimeAttack) &&
+      this.remainingSeconds() <= 10,
   );
 
   /** Ses seviyesini yüzde (0-100) olarak gösterir. */
@@ -201,9 +204,9 @@ export class App {
     }
   }
 
-  /** Yeni oyun / yeniden başlat. */
+  /** Yeni oyun / yeniden başlat (mevcut mod + boyut). */
   onRestart(): void {
-    this.game.startGame();
+    this.game.restartCurrent();
   }
 
   /** Kazandıktan sonra oyuna devam et. */

@@ -1,7 +1,7 @@
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { GameService } from '../../services/game.service';
 import { TileComponent } from '../tile/tile';
-import { BOARD_SIZE, Tile } from '../../models/tile.model';
+import { Tile } from '../../models/tile.model';
 
 @Component({
   selector: 'app-board',
@@ -16,11 +16,16 @@ export class BoardComponent {
   /** Ekrandaki kareler (signal — track id ile render edilir). */
   readonly tiles = this.game.tiles;
 
+  /** Tahta boyutu (NxN). */
+  readonly boardSize = this.game.boardSize;
+
   /** Bomba hedefleme modu (kareleri tıklanabilir yapar). */
   readonly bombMode = this.game.bombMode;
 
-  /** Zemindeki boş hücreler (4×4 = 16 adet, yalnızca görsel). */
-  readonly backgroundCells = Array.from({ length: BOARD_SIZE * BOARD_SIZE });
+  /** Zemindeki boş hücreler (N×N adet, yalnızca görsel). */
+  readonly backgroundCells = computed(() =>
+    Array.from({ length: this.boardSize() * this.boardSize() }),
+  );
 
   /** Bomba modundayken bir kareye tıklanınca onu siler. */
   onTileClick(tile: Tile): void {

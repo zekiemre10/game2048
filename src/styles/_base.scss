@@ -19,6 +19,10 @@
   --color-overlay: #{v.$color-overlay};
   --color-overlay-win: rgba(237, 194, 46, 0.5);
 
+  // Arka plan "ışıma" blob'ları (her temaya uygun iki yumuşak renk)
+  --bg-a: rgba(242, 177, 121, 0.30);
+  --bg-b: rgba(120, 165, 210, 0.22);
+
   // Responsive: hücreler arası boşluk ekranla ölçeklenir.
   // Tahta ve karelerin tüm hesapları bunu kullanır → tek yerden ölçek.
   --gap: clamp(6px, 2.4vw, #{v.$gap});
@@ -34,6 +38,8 @@
   --color-button-hover: #b09c86;
   --color-overlay: rgba(26, 25, 23, 0.82);
   --color-overlay-win: rgba(237, 194, 46, 0.45);
+  --bg-a: rgba(210, 170, 120, 0.16);
+  --bg-b: rgba(96, 120, 160, 0.16);
 }
 
 // --- Satın alınabilir temalar -------------------------------
@@ -49,6 +55,8 @@
   --color-button-hover: #9d4edd;
   --color-overlay: rgba(13, 2, 33, 0.82);
   --color-overlay-win: rgba(157, 78, 221, 0.5);
+  --bg-a: rgba(157, 78, 221, 0.34);
+  --bg-b: rgba(0, 200, 255, 0.20);
 }
 
 [data-theme='ocean'] {
@@ -61,6 +69,8 @@
   --color-button-hover: #34a0d8;
   --color-overlay: rgba(10, 37, 64, 0.82);
   --color-overlay-win: rgba(72, 202, 228, 0.5);
+  --bg-a: rgba(52, 160, 216, 0.32);
+  --bg-b: rgba(72, 202, 228, 0.22);
 }
 
 [data-theme='forest'] {
@@ -73,6 +83,8 @@
   --color-button-hover: #5fa055;
   --color-overlay: rgba(233, 245, 225, 0.82);
   --color-overlay-win: rgba(78, 138, 69, 0.5);
+  --bg-a: rgba(120, 170, 100, 0.30);
+  --bg-b: rgba(196, 220, 150, 0.30);
 }
 
 [data-theme='sunset'] {
@@ -85,6 +97,8 @@
   --color-button-hover: #f47a52;
   --color-overlay: rgba(42, 26, 46, 0.82);
   --color-overlay-win: rgba(232, 98, 58, 0.5);
+  --bg-a: rgba(244, 122, 82, 0.32);
+  --bg-b: rgba(200, 80, 130, 0.26);
 }
 
 * {
@@ -100,9 +114,15 @@ body {
   overflow-x: hidden;
 }
 
+// Temel zemin (blob'lar bunun üstünde yumuşar)
+html {
+  background-color: var(--color-bg);
+  transition: background-color 250ms ease;
+}
+
 body {
   font-family: v.$font-family;
-  background: var(--color-bg);
+  background: transparent; // dekoratif katman görünsün
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -113,6 +133,21 @@ body {
   transition:
     background-color 250ms ease,
     color 250ms ease;
+}
+
+// Dekoratif arka plan: köşelerde yumuşak renkli "ışıma" blob'ları.
+// İçeriğin arkasında (z-index:-1), sabit; tüm temalarda uyumlu.
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(65vw 65vw at 8% -5%, var(--bg-a), transparent 58%),
+    radial-gradient(60vw 60vw at 102% 104%, var(--bg-b), transparent 58%),
+    radial-gradient(48vw 48vw at 95% 4%, var(--bg-b), transparent 62%);
+  transition: background 300ms ease;
 }
 
 button {

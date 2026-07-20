@@ -19,6 +19,12 @@ Bilgisayarda **ok tuşlarıyla**, telefonda **parmakla kaydırarak** oynanır.
 |---------------|-------|
 | ![Başlık ekranı](docs/screenshot-start.png) | <img src="docs/screenshot-mobile.png" width="260"> |
 
+### Çevrimiçi özellikler
+
+| Arkadaşlar | Sohbet | Çok oyunculu yarış |
+|-----------|--------|--------------------|
+| ![Arkadaşlar](docs/screenshot-friends.png) | ![Sohbet](docs/screenshot-chat.png) | ![Çok oyunculu](docs/screenshot-multiplayer.png) |
+
 ## Nasıl oynanır
 
 - Ok tuşlarıyla (↑ ↓ ← →) veya parmakla kaydırarak kareleri it.

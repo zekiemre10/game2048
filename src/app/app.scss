@@ -230,6 +230,7 @@
 }
 
 .round-btn {
+  position: relative; // rozetler (.notif-badge) kendi butonuna yapışsın
   width: 44px;
   height: 44px;
   min-height: 44px;

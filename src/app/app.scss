@@ -793,9 +793,20 @@
   }
 }
 
-.profile-ach-link {
-  width: 100%;
-  margin-bottom: 0.75rem;
+// Profil içindeki başarımlar ızgarası (mağazadan taşındı)
+.prof-ach-heading {
+  margin-top: 0.5rem;
+  text-align: left;
+}
+
+.profile-ach-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 // --- Oyun içi güç çubuğu ------------------------------------

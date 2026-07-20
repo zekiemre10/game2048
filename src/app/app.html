@@ -222,13 +222,6 @@
         >
           {{ t('store.tabPowers') }}
         </button>
-        <button
-          type="button"
-          [class.active]="storeTab() === 'achievements'"
-          (click)="setStoreTab('achievements')"
-        >
-          {{ t('store.tabAch') }}
-        </button>
       </div>
 
       <div class="store-grid">
@@ -286,24 +279,6 @@
               </div>
             }
           }
-          <!-- BAŞARIMLAR -->
-          @case ('achievements') {
-            @for (a of ACHIEVEMENTS; track a.id) {
-              <div
-                class="store-card ach-card"
-                [class.locked]="!isAchievementUnlocked(a.id)"
-              >
-                <span class="card-icon">{{ a.icon }}</span>
-                <span class="card-name">{{ L(a.name, a.nameEn) }}</span>
-                <span class="card-desc">{{ L(a.desc, a.descEn) }}</span>
-                @if (isAchievementUnlocked(a.id)) {
-                  <span class="card-badge used">{{ t('store.unlocked') }}</span>
-                } @else {
-                  <span class="card-badge">💰 {{ a.gold }}</span>
-                }
-              </div>
-            }
-          }
         }
       </div>
 
@@ -355,14 +330,24 @@
         <div class="pstat"><strong>{{ totalMoves() }}</strong><span>{{ t('prof.totalMoves') }}</span></div>
       </div>
 
-      <!-- Başarımlar: Mağaza → Başarımlar sekmesinde -->
-      <button
-        class="btn-primary ghost profile-ach-link"
-        type="button"
-        (click)="onOpenStore(); setStoreTab('achievements')"
-      >
-        {{ t('prof.seeAch') }} ({{ unlockedAchievements().size }}/{{ ACHIEVEMENTS.length }})
-      </button>
+      <!-- Başarımlar (profilde) -->
+      <h3 class="settings-heading prof-ach-heading">
+        {{ t('prof.achievements') }} ({{ unlockedAchievements().size }}/{{ ACHIEVEMENTS.length }})
+      </h3>
+      <div class="profile-ach-grid">
+        @for (a of ACHIEVEMENTS; track a.id) {
+          <div class="store-card ach-card" [class.locked]="!isAchievementUnlocked(a.id)">
+            <span class="card-icon">{{ a.icon }}</span>
+            <span class="card-name">{{ L(a.name, a.nameEn) }}</span>
+            <span class="card-desc">{{ L(a.desc, a.descEn) }}</span>
+            @if (isAchievementUnlocked(a.id)) {
+              <span class="card-badge used">{{ t('store.unlocked') }}</span>
+            } @else {
+              <span class="card-badge">💰 {{ a.gold }}</span>
+            }
+          </div>
+        }
+      </div>
 
       <!-- Hesap: giriş / kayıt / çıkış -->
       <div class="account-box">

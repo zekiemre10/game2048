@@ -122,6 +122,7 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'prof.bestStreak': { tr: 'EN İYİ SERİ', en: 'BEST STREAK' },
   'prof.totalMoves': { tr: 'TOPLAM HAMLE', en: 'TOTAL MOVES' },
   'prof.seeAch': { tr: '🏅 Başarımları Gör', en: '🏅 View Achievements' },
+  'prof.achievements': { tr: '🏅 Başarımlar', en: '🏅 Achievements' },
 
   // Navigasyon / erişilebilirlik
   'nav.missions': { tr: 'Görevler', en: 'Missions' },

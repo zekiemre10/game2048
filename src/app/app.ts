@@ -121,9 +121,7 @@ export class App {
   protected readonly storeOpen = signal(false);
 
   /** Aktif mağaza sekmesi. */
-  protected readonly storeTab = signal<'themes' | 'powers' | 'achievements'>(
-    'themes',
-  );
+  protected readonly storeTab = signal<'themes' | 'powers'>('themes');
 
   /** Profil paneli açık mı? */
   protected readonly profileOpen = signal(false);
@@ -332,7 +330,7 @@ export class App {
   }
 
   /** Mağaza sekmesini değiştir. */
-  setStoreTab(tab: 'themes' | 'powers' | 'achievements'): void {
+  setStoreTab(tab: 'themes' | 'powers'): void {
     this.storeTab.set(tab);
   }
 

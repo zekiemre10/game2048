@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { GameService } from './game.service';
 
 // ============================================================
@@ -41,10 +41,59 @@ export class AuthService {
     return this.token ? { Authorization: `Bearer ${this.token}` } : null;
   }
 
+  /** Otomatik yükleme için geciktirme zamanlayıcısı. */
+  private syncTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Hesaptaki veri UYGULANANA kadar yükleme yapılmaz. Aksi hâlde açılışta
+   * boş yerel durum sunucuya yazılıp hesaptaki ilerlemeyi silebilirdi.
+   */
+  private syncReady = false;
+
   constructor() {
     // Sayfa açılışında token varsa oturumu geri yükle
     if (this.token) void this.refresh();
+    else this.syncReady = true; // misafir: yükleyecek hesap yok
+
+    // İlerleme değiştikçe buluta yaz. Daha önce yükleme YALNIZCA çıkış
+    // yaparken olduğu için sekmeyi kapatan herkes o oturumun ilerlemesini
+    // kaybediyordu (açılışta /me eski anlık görüntüyle üzerine yazıyordu).
+    effect(() => {
+      const snapshot = this.game.accountSnapshot(); // kalıcı sinyalleri izler
+      if (!this.token || !this.syncReady) return;
+      this.scheduleSync(snapshot);
+    });
+
+    // Sekme kapanırken/gizlenirken bekleyen yazmayı hemen gönder.
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') this.flushSync();
+      });
+      window.addEventListener('pagehide', () => this.flushSync());
+    }
   }
+
+  /** Yükleme isteğini geciktirir (art arda değişikliklerde tek istek). */
+  private scheduleSync(snapshot: Record<string, unknown>): void {
+    this.pendingSnapshot = snapshot;
+    if (typeof setTimeout === 'undefined') return;
+    if (this.syncTimer !== null) clearTimeout(this.syncTimer);
+    this.syncTimer = setTimeout(() => {
+      this.syncTimer = null;
+      void this.syncUp();
+    }, 2500);
+  }
+
+  /** Bekleyen yükleme varsa gecikmeyi beklemeden gönderir. */
+  private flushSync(): void {
+    if (this.syncTimer === null) return;
+    clearTimeout(this.syncTimer);
+    this.syncTimer = null;
+    void this.syncUp();
+  }
+
+  /** En son gönderilmeyi bekleyen anlık görüntü. */
+  private pendingSnapshot: Record<string, unknown> | null = null;
 
   /** Kayıt ol — mevcut yerel ilerlemeyi hesaba taşır. */
   async register(username: string, password: string, email = ''): Promise<AuthResult> {
@@ -76,6 +125,7 @@ export class AuthService {
       this.setToken(json.token);
       this.user.set(json.user);
       if (endpoint === 'login') await this.refresh(); // hesaptaki veriyi uygula
+      else this.syncReady = true; // kayıtta yerel ilerleme zaten yüklendi
       return { ok: true };
     } catch {
       return { ok: false, error: 'network' };
@@ -100,6 +150,8 @@ export class AuthService {
       if (json.data && typeof json.data === 'object') {
         this.game.applyAccountSnapshot(json.data);
       }
+      // Hesap verisi uygulandı → artık yerelden buluta yazmak güvenli.
+      this.syncReady = true;
     } catch {
       /* çevrimdışı — sessiz geç */
     }
@@ -108,6 +160,8 @@ export class AuthService {
   /** Yerel ilerlemeyi hesaba yükle (giriş varsa). */
   async syncUp(): Promise<void> {
     if (!this.token) return;
+    const data = this.pendingSnapshot ?? this.game.accountSnapshot();
+    this.pendingSnapshot = null;
     try {
       await fetch(`${API}/sync`, {
         method: 'POST',
@@ -115,7 +169,9 @@ export class AuthService {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.token}`,
         },
-        body: JSON.stringify({ data: this.game.accountSnapshot() }),
+        body: JSON.stringify({ data }),
+        // Sekme kapanırken de isteğin tamamlanmasını sağlar.
+        keepalive: true,
       });
     } catch {
       /* sessiz */
@@ -149,6 +205,12 @@ export class AuthService {
 
   private clear(): void {
     this.token = null;
+    this.syncReady = false;
+    this.pendingSnapshot = null;
+    if (this.syncTimer !== null) {
+      clearTimeout(this.syncTimer);
+      this.syncTimer = null;
+    }
     this.user.set(null);
     try {
       localStorage.removeItem(TOKEN_KEY);

@@ -44,6 +44,28 @@
       </button>
     </div>
 
+    <!-- Başarımlar: ana ekranda özet şerit, tıklayınca tam liste -->
+    <button class="ach-strip" type="button" (click)="openAchievements.emit()">
+      <span class="ach-strip-top">
+        <!-- Çeviri metni zaten 🏅 ile başlıyor, ayrıca simge eklenmez -->
+        <span class="ach-strip-title">{{ t('prof.achievements') }}</span>
+        <span class="ach-strip-count">{{ unlockedCount() }}/{{ totalCount }}</span>
+      </span>
+      <span class="ach-strip-icons">
+        @for (a of ACHIEVEMENTS; track a.id) {
+          <span
+            class="ach-strip-icon"
+            [class.locked]="!isUnlocked(a.id)"
+            [title]="L(a.name, a.nameEn)"
+            >{{ a.icon }}</span
+          >
+        }
+      </span>
+      <span class="mission-bar">
+        <span class="mission-fill" [style.width.%]="percent()"></span>
+      </span>
+    </button>
+
     <p class="gold-total">{{ t('start.totalGold') }} {{ gold() }}</p>
 
     @if (bestLevel() > 0) {

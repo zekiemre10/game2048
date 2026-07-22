@@ -10,6 +10,17 @@ import {
   Tile,
 } from '../models/tile.model';
 import { applyMove, hasAnyMove } from '../logic/board-logic';
+import {
+  AiLevel,
+  MoveReview,
+  ValueGrid,
+  bestMove,
+  emptyGrid,
+  mulberry32,
+  positionHealth,
+  reviewMove,
+} from '../logic/ai';
+import { rankFor, rankPoints } from '../logic/rank';
 import { MAX_LEVEL, levelConfig } from '../models/level.model';
 import {
   PowerId,
@@ -71,6 +82,14 @@ const TIME_POWER_SECONDS = 30;
 
 /** Profil/meta localStorage anahtarları. */
 const NAME_KEY = 'game2048.name';
+const AVATAR_KEY = 'game2048.avatar';
+const ASSISTANT_KEY = 'game2048.assistant';
+
+/** Seçilebilir profil avatarları (ilk sıradaki varsayılan). */
+export const AVATARS = [
+  '👤', '😎', '🤖', '🐱', '🐉', '🌟', '🦊', '🐼',
+  '👾', '🦁', '🐧', '🦄', '🍀', '🔥', '⚡', '🎩',
+];
 const STATS_KEY = 'game2048.stats';
 const STREAK_KEY = 'game2048.streak';
 const DAILY_KEY = 'game2048.dailyDay';
@@ -82,8 +101,22 @@ const WEEKLY_MISSIONS_KEY = 'game2048.weeklyMissions';
 interface GameSnapshot {
   tiles: Tile[];
   score: number;
+  moves: number;
   status: GameStatus;
   keepPlayingAfterWin: boolean;
+}
+
+/**
+ * YZ gösterimi öncesi tam oyun durumu.
+ * `GameSnapshot`ten farkı: süre sayaçlarını ve öneri hakkını da taşır,
+ * çünkü gösterim oyuncunun süresini ve haklarını tüketmemeli.
+ */
+interface AiDemoSnapshot extends GameSnapshot {
+  history: GameSnapshot | null;
+  elapsedSeconds: number;
+  remainingSeconds: number;
+  countdownTotal: number;
+  assistHintsLeft: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -158,6 +191,9 @@ export class GameService {
 
   /** (Seviye modu) geri sayımın toplam süresi (saniye) — +30 gücü bunu artırır. */
   private countdownTotal = 0;
+
+  /** Geri sayım yeniden başlatılırken korunan "geçen süre" birikimi (saniye). */
+  private elapsedOffset = 0;
 
   /** İpucu temizleme zamanlayıcısı. */
   private hintTimer: ReturnType<typeof setTimeout> | null = null;
@@ -239,6 +275,15 @@ export class GameService {
     return g;
   });
 
+  /**
+   * ŞU ANKİ tahtadaki en yüksek kare. `bestTile` tüm zamanların
+   * istatistiğidir; yarış tablosunda o gösterilirse oyuncunun geçmiş
+   * rekoru o yarışta yapmış gibi görünür.
+   */
+  readonly currentBestTile = computed<number>(() =>
+    this.tiles().reduce((max, t) => (t.value > max ? t.value : max), 0),
+  );
+
   /** Boştaki hücre sayısı (hamle üretmek/oyun sonu için). */
   readonly emptyCount = computed<number>(
     () => this.boardSize() * this.boardSize() - this.tiles().length,
@@ -282,6 +327,11 @@ export class GameService {
    */
   startMode(mode: GameMode, size: number = BOARD_SIZE): void {
     this.raceRng = null; // normal oyun → gerçek rastgelelik
+    this.cancelAutoplay(); // sürüyorsa gösterimi bitir, eski durumu ATMA
+    this.paused.set(false);
+    this.aiAssisted.set(false); // yeni oyun → temiz sayfa
+    this.resetAssistHints();
+    this.resetMoveReview();
     this.mode.set(mode);
     this.boardSize.set(size);
     this.tiles.set([]);
@@ -311,6 +361,11 @@ export class GameService {
    * saniyelik geri sayım; süre bitince skor kalır (Zaman Yarışı gibi).
    */
   startRace(seed: number, duration: number): void {
+    this.cancelAutoplay();
+    this.paused.set(false);
+    this.aiAssisted.set(false); // yeni yarış → temiz sayfa
+    this.resetAssistHints();
+    this.resetMoveReview();
     this.raceRng = mulberry32(seed >>> 0);
     this.mode.set(GameMode.Race);
     this.boardSize.set(BOARD_SIZE); // yarış her zaman 4×4
@@ -327,6 +382,251 @@ export class GameService {
     this.registerActivity();
   }
 
+  // --- YZ Asistanı ------------------------------------------
+
+  /**
+   * Asistan açık mı? (Ayarlar'daki anahtar)
+   * Öneri, hamle kalitesi ve pozisyon göstergesinin tamamını yönetir.
+   */
+  readonly assistantOn = signal<boolean>(loadAssistant());
+
+  setAssistant(on: boolean): void {
+    this.assistantOn.set(on);
+    saveAssistant(on);
+    if (!on) this.resetMoveReview();
+  }
+
+  // --- Hamle kalitesi + doğruluk ------------------------------
+
+  /** Son hamlenin YZ değerlendirmesi (bir sonraki hamlede yenilenir). */
+  readonly lastMoveReview = signal<MoveReview | null>(null);
+
+  /** Bu oyundaki hamle kalitesi sayaçları. */
+  readonly moveRatings = signal({ best: 0, good: 0, inaccurate: 0 });
+
+  /** Değerlendirilen toplam hamle. */
+  readonly ratedMoves = computed(() => {
+    const r = this.moveRatings();
+    return r.best + r.good + r.inaccurate;
+  });
+
+  /** Doğruluk yüzdesi: en iyi + yakın hamlelerin oranı. */
+  readonly accuracy = computed(() => {
+    const total = this.ratedMoves();
+    if (total === 0) return 100;
+    const r = this.moveRatings();
+    return Math.round(((r.best + r.good) / total) * 100);
+  });
+
+  /** Tahtanın anlık sağlığı (arama yapmaz, ucuzdur). */
+  readonly health = computed(() => positionHealth(this.toValueGrid()));
+
+  private resetMoveReview(): void {
+    this.lastMoveReview.set(null);
+    this.moveRatings.set({ best: 0, good: 0, inaccurate: 0 });
+  }
+
+  // --- YZ Asistanı: oyun başına sınırlı hamle önerisi --------
+
+  /** Bir oyunda verilebilecek en fazla öneri sayısı. */
+  static readonly ASSIST_HINT_QUOTA = 5;
+
+  /** Bu oyunda kalan öneri hakkı. */
+  readonly assistHintsLeft = signal(GameService.ASSIST_HINT_QUOTA);
+
+  /** Şu an gösterilen öneri yönü (hamle yapılınca temizlenir). */
+  readonly assistHintDir = signal<Direction | null>(null);
+
+  /** Öneri iste: hak varsa en iyi hamleyi hesaplar ve bir hak düşer. */
+  requestAssistHint(): void {
+    if (this.status() !== GameStatus.Playing) return;
+    if (this.paused() || this.autoplaying()) return;
+    if (this.assistHintsLeft() <= 0) return;
+    const dir = bestMove(this.toValueGrid(), 'expert');
+    if (!dir) return;
+    this.assistHintDir.set(dir);
+    this.assistHintsLeft.update((n) => n - 1);
+  }
+
+  /** Yeni oyunda öneri hakkını yenile. */
+  private resetAssistHints(): void {
+    this.assistHintsLeft.set(GameService.ASSIST_HINT_QUOTA);
+    this.assistHintDir.set(null);
+  }
+
+  // --- Yapay zekâ: otomatik oynatma ("YZ'yi izle") -----------
+
+  /** YZ şu an otomatik mi oynuyor? */
+  readonly autoplaying = signal(false);
+
+  /**
+   * Bu oyunda YZ EN AZ BİR hamle yaptı mı?
+   * Yalnızca yeni oyun başlayınca sıfırlanır. `autoplaying` anlık bayrak
+   * olduğundan tek başına yetmez: YZ'yi durdurup tek bir manuel hamle yapmak
+   * YZ'nin kurduğu tahtayı rekor/görev/altın olarak yazdırabiliyordu.
+   */
+  readonly aiAssisted = signal(false);
+
+  /** İlerleme (rekor, görev, istatistik, altın) sayılmamalı mı? */
+  aiPlayed(): boolean {
+    return this.autoplaying() || this.aiAssisted();
+  }
+
+  private autoplayTimer: ReturnType<typeof setTimeout> | null = null;
+  private autoplayLevel: AiLevel = 'expert';
+
+  /** Mevcut taşları YZ için değer ızgarasına (number[][]) çevirir. */
+  toValueGrid(): ValueGrid {
+    const n = this.boardSize();
+    const g = emptyGrid(n);
+    for (const t of this.tiles()) g[t.row][t.col] = t.value;
+    return g;
+  }
+
+  /**
+   * YZ gösterimi başlamadan ÖNCEKİ oyun durumu.
+   * YZ yalnızca bir örnektir: durdurulunca oyuncu kendi tahtasına,
+   * kendi skoruna ve kendi süresine geri döner.
+   */
+  private preAiSnapshot: AiDemoSnapshot | null = null;
+
+  /** Gösterim bitince YZ'nin ulaştığı skor (kısa süre gösterilir). */
+  readonly aiDemoResult = signal<number | null>(null);
+  private demoNoticeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** YZ otomatik oynatmayı başlat/durdur. */
+  toggleAutoplay(level: AiLevel = 'expert'): void {
+    if (this.autoplaying()) this.stopAutoplay();
+    else this.startAutoplay(level);
+  }
+
+  /** YZ gösterimini başlatır (mevcut tahtadan devam ederek oynar). */
+  startAutoplay(level: AiLevel = 'expert'): void {
+    if (this.autoplaying()) return;
+    if (this.status() !== GameStatus.Playing) return;
+
+    // Oyuncunun durumunu sakla — gösterim bitince aynen geri yüklenecek.
+    this.preAiSnapshot = {
+      tiles: this.tiles().map((t) => ({ ...t })),
+      score: this.score(),
+      moves: this.moves(),
+      status: this.status(),
+      keepPlayingAfterWin: this.keepPlayingAfterWin,
+      history: this.history(),
+      elapsedSeconds: this.elapsedSeconds(),
+      remainingSeconds: this.remainingSeconds(),
+      countdownTotal: this.countdownTotal,
+      assistHintsLeft: this.assistHintsLeft(),
+    };
+
+    this.aiDemoResult.set(null);
+    this.autoplayLevel = level;
+    this.autoplaying.set(true);
+    this.autoplayStep();
+  }
+
+  /** Gösterimi durdurur ve oyuncunun kendi oyununu geri yükler. */
+  stopAutoplay(): void {
+    const wasPlaying = this.autoplaying();
+    this.haltAutoplayTimer();
+    if (wasPlaying) this.restorePreAi();
+  }
+
+  /**
+   * Gösterimi iptal eder ve kaydı ATAR (geri yükleme yok).
+   * Yeni oyun başlarken kullanılır: eski oyunun durumu geri gelmemeli.
+   */
+  private cancelAutoplay(): void {
+    this.haltAutoplayTimer();
+    this.preAiSnapshot = null;
+    this.aiDemoResult.set(null);
+  }
+
+  private haltAutoplayTimer(): void {
+    this.autoplaying.set(false);
+    if (this.autoplayTimer !== null) {
+      clearTimeout(this.autoplayTimer);
+      this.autoplayTimer = null;
+    }
+  }
+
+  /** Oyuncunun gösterim öncesi durumunu geri yükler. */
+  private restorePreAi(): void {
+    const snap = this.preAiSnapshot;
+    this.preAiSnapshot = null;
+    if (!snap) return;
+
+    const aiScore = this.score(); // gösterimde YZ'nin ulaştığı skor
+
+    this.tiles.set(snap.tiles);
+    this.score.set(snap.score);
+    this.moves.set(snap.moves);
+    this.keepPlayingAfterWin = snap.keepPlayingAfterWin;
+    this.history.set(snap.history);
+    this.status.set(snap.status);
+    this.assistHintsLeft.set(snap.assistHintsLeft);
+    this.assistHintDir.set(null);
+    this.clearPowerFx();
+
+    // Süre de geri gelir: gösterim oyuncunun süresini yemez.
+    this.countdownTotal = snap.countdownTotal;
+    this.elapsedSeconds.set(snap.elapsedSeconds);
+    this.remainingSeconds.set(snap.remainingSeconds);
+    if (snap.status === GameStatus.Playing && !this.paused()) {
+      this.resumeTimerForMode();
+    }
+
+    // YZ'nin oynadığı her şey atıldı → oyuncu bir avantaj devralmıyor,
+    // dolayısıyla bu oyun artık "YZ destekli" sayılmaz.
+    this.aiAssisted.set(false);
+
+    this.aiDemoResult.set(aiScore);
+    if (typeof setTimeout !== 'undefined') {
+      if (this.demoNoticeTimer) clearTimeout(this.demoNoticeTimer);
+      this.demoNoticeTimer = setTimeout(() => this.aiDemoResult.set(null), 5000);
+    }
+  }
+
+  /** İki YZ hamlesi arası bekleme (ms) — izlenebilir olsun diye. */
+  private autoplaySpeed = 400;
+
+  /** Otomatik oynatma hızını ayarla (ms/hamle). */
+  setAutoplaySpeed(ms: number): void {
+    this.autoplaySpeed = Math.max(120, Math.min(1200, ms));
+  }
+
+  /** Tek YZ hamlesi + bir sonrakini zamanla. */
+  private autoplayStep(): void {
+    if (!this.autoplaying()) return;
+    if (this.status() !== GameStatus.Playing) {
+      this.stopAutoplay();
+      return;
+    }
+    if (typeof setTimeout === 'undefined') return;
+    // Duraklatıldıysa hamle yapma, sadece beklemeye devam et.
+    if (this.paused()) {
+      this.autoplayTimer = setTimeout(() => this.autoplayStep(), 200);
+      return;
+    }
+    const dir = bestMove(this.toValueGrid(), this.autoplayLevel);
+    if (!dir) {
+      this.stopAutoplay();
+      return;
+    }
+    // Gösterim boyunca hiçbir ilerleme sayılmaz (geri yükleme başarısız
+    // olsa bile oyuncu YZ'nin tahtasından avantaj devralmasın).
+    this.aiAssisted.set(true);
+    this.move(dir);
+
+    // YZ oyunu bitirdiyse hemen dur: oyun sonu ekranı bir an bile
+    // görünmeden oyuncunun kendi tahtası geri gelir.
+    if (this.status() !== GameStatus.Playing) {
+      this.stopAutoplay();
+      return;
+    }
+    this.autoplayTimer = setTimeout(() => this.autoplayStep(), this.autoplaySpeed);
+  }
+
   // --- Seviye modu --------------------------------------------
 
   /** Seviye modunu 1. seviyeden başlatır. */
@@ -340,6 +640,11 @@ export class GameService {
   /** Anlık seviyeyi (yeniden) başlatır: boş tahta + geri sayım. */
   private startLevel(): void {
     this.raceRng = null;
+    this.cancelAutoplay(); // sürüyorsa gösterimi bitir, eski durumu ATMA
+    this.paused.set(false);
+    this.aiAssisted.set(false); // yeni seviye → temiz sayfa
+    this.resetAssistHints();
+    this.resetMoveReview();
     const cfg = levelConfig(this.level());
     this.boardSize.set(BOARD_SIZE); // seviye modu her zaman 4×4
     this.tiles.set([]);
@@ -366,13 +671,18 @@ export class GameService {
    * Böylece mod/tahta seçim ekranı yeniden görünür.
    */
   goHome(): void {
+    this.cancelAutoplay(); // ana ekrana dönerken geri yüklenecek bir şey yok
     this.stopTimer();
+    this.paused.set(false);
     this.raceRng = null;
     this.status.set(GameStatus.Idle);
   }
 
   /** Mevcut modu ve boyutu yeniden başlatır (Yeni Oyun / Baştan). */
   restartCurrent(): void {
+    // Yarış sırasında "Yeni Oyun" YOK: tohumlu yarışı tohumsuz/süresiz bir
+    // tek kişilik oyuna çevirip skoru sunucuya bildirmeye devam ederdi.
+    if (this.mode() === GameMode.Race) return;
     if (this.mode() === GameMode.Level) {
       this.startLevelMode();
     } else {
@@ -418,6 +728,10 @@ export class GameService {
    * @returns geri alma yapıldıysa true.
    */
   undo(): boolean {
+    // Yarışta geri alma YOK: tohumlu taş dizisi geri sarılamaz; geri alınca
+    // oyuncunun taş akışı diğer yarışçılardan sapar (haksız yeniden çekiliş).
+    if (this.mode() === GameMode.Race) return false;
+
     const snapshot = this.history();
     if (!snapshot) return false;
 
@@ -431,12 +745,33 @@ export class GameService {
       })),
     );
     this.score.set(snapshot.score);
+    this.moves.set(snapshot.moves);
     this.keepPlayingAfterWin = snapshot.keepPlayingAfterWin;
     this.status.set(snapshot.status);
 
     // Tek adımlık geçmiş: geri aldıktan sonra tekrar geri alınamaz
     this.history.set(null);
+
+    // Biten oyun (Kayıp/Başarısız/Kazanç) geri alma ile yeniden oynanır
+    // hâle geldiyse sayaç da yeniden başlamalı. Aksi hâlde süre donmuş
+    // kalır ve oyuncu sınırsız süreyle oynardı.
+    if (snapshot.status === GameStatus.Playing) this.resumeTimerForMode();
     return true;
+  }
+
+  /** Mevcut moda uygun sayacı kaldığı yerden sürdürür. */
+  private resumeTimerForMode(): void {
+    const m = this.mode();
+    if (m === GameMode.Zen) {
+      this.stopTimer(); // süresiz mod
+      return;
+    }
+    if (m === GameMode.Classic) {
+      this.startTimer(this.elapsedSeconds()); // yukarı sayan
+      return;
+    }
+    // Level / TimeAttack / Race → kalan süreden geri sayım
+    this.startCountdown(this.remainingSeconds(), this.elapsedSeconds());
   }
 
   /** Kazandıktan sonra "Devam Et": oyuna geri dön, kazanmayı bir daha tetikleme. */
@@ -524,6 +859,8 @@ export class GameService {
     );
     this.consumePower('bomb');
     this.bombMode.set(false);
+    // Geri alma bombalanan kareyi geri getirip gücü boşa harcatırdı.
+    this.history.set(null);
 
     if (!this.bombUsed()) {
       this.bombUsed.set(true);
@@ -557,25 +894,43 @@ export class GameService {
     const current = this.tiles();
     if (current.length === 0) return false;
 
-    // Tüm hücreleri karıştır, ilk N tanesine değerleri yerleştir.
     const n = this.boardSize();
     const cells: Cell[] = [];
     for (let r = 0; r < n; r++) {
       for (let c = 0; c < n; c++) cells.push({ row: r, col: c });
     }
-    for (let i = cells.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [cells[i], cells[j]] = [cells[j], cells[i]];
+
+    // Karıştırma oyuncunun PARAYLA aldığı bir güç: kendisini oynanamaz bir
+    // tahtaya kilitlememeli. Hamlesi kalan bir dizilim bulunana dek dene.
+    let shuffled: Tile[] = [];
+    for (let attempt = 0; attempt < 30; attempt++) {
+      for (let i = cells.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [cells[i], cells[j]] = [cells[j], cells[i]];
+      }
+      // id'ler korunur → kareler yeni yerlerine kayarak animasyonla gider.
+      shuffled = current.map((t, i) => ({
+        id: t.id,
+        value: t.value,
+        row: cells[i].row,
+        col: cells[i].col,
+      }));
+      if (hasAnyMove(shuffled, n)) break;
     }
 
-    // id'ler korunur → kareler yeni yerlerine kayarak animasyonla gider.
-    const shuffled = current.map((t, i) => ({
-      id: t.id,
-      value: t.value,
-      row: cells[i].row,
-      col: cells[i].col,
-    }));
     this.tiles.set(shuffled);
+
+    // Tahta yine de kilitliyse (ör. dolu tahtada eş kare yok) oyunu
+    // usulünce bitir; sessizce donmuş bir ekranda bırakma.
+    if (!hasAnyMove(shuffled, n)) {
+      this.stopTimer();
+      if (this.mode() === GameMode.Level) {
+        this.status.set(GameStatus.Failed);
+      } else {
+        this.status.set(GameStatus.Lost);
+      }
+      this.recordGameEnd(false);
+    }
     return true;
   }
 
@@ -592,28 +947,12 @@ export class GameService {
     return true;
   }
 
-  /** En iyi yönü seçer: kazanılan puan + sonraki boş hücre sayısı en yüksek. */
+  /**
+   * En iyi hamleyi YAPAY ZEKÂ (expectimax) ile seçer — "sonraki hamle önerisi".
+   * Aynı motoru otomatik oynatma ve çok oyunculu bot da kullanır.
+   */
   private computeHint(): Direction | null {
-    const dirs = [
-      Direction.Left,
-      Direction.Right,
-      Direction.Up,
-      Direction.Down,
-    ];
-    let best: Direction | null = null;
-    let bestScore = -1;
-    const n = this.boardSize();
-    for (const dir of dirs) {
-      const res = applyMove(this.tiles(), dir, n);
-      if (!res.moved) continue;
-      const empty = n * n - res.tiles.length;
-      const score = res.gained + empty; // basit sezgi
-      if (score > bestScore) {
-        bestScore = score;
-        best = dir;
-      }
-    }
-    return best;
+    return bestMove(this.toValueGrid(), 'expert');
   }
 
   /** Yeni oyun/seviye/reset'te güç efektlerini temizle. */
@@ -635,6 +974,16 @@ export class GameService {
     saveName(clean);
   }
 
+  /** Seçili profil avatarı (kalıcı + hesapla senkron). */
+  readonly avatar = signal<string>(loadAvatar());
+
+  /** Avatarı değiştirir; listede olmayan bir değer yok sayılır. */
+  setAvatar(a: string): void {
+    if (!AVATARS.includes(a)) return;
+    this.avatar.set(a);
+    saveAvatar(a);
+  }
+
   // --- Hesap senkronizasyonu ----------------------------------
 
   /** Hesaba kaydedilecek ilerleme anlık görüntüsü. */
@@ -645,6 +994,7 @@ export class GameService {
       bestScore: this.bestScore(),
       bestLevel: this.bestLevel(),
       name: this.playerName(),
+      avatar: this.avatar(),
       gamesPlayed: this.gamesPlayed(),
       gamesWon: this.gamesWon(),
       bestTile: this.bestTile(),
@@ -665,6 +1015,10 @@ export class GameService {
     const bl = num(d['bestLevel']);
     if (bl !== null) this.bestLevel.set(bl);
     if (typeof d['name'] === 'string') this.playerName.set(d['name'] as string);
+    if (typeof d['avatar'] === 'string' && AVATARS.includes(d['avatar'] as string)) {
+      this.avatar.set(d['avatar'] as string);
+      saveAvatar(d['avatar'] as string);
+    }
     const gp = num(d['gamesPlayed']);
     if (gp !== null) this.gamesPlayed.set(gp);
     const gw = num(d['gamesWon']);
@@ -725,6 +1079,7 @@ export class GameService {
 
   /** Oyun sonunda istatistikleri günceller. */
   private recordGameEnd(won: boolean): void {
+    if (this.aiPlayed()) return; // YZ oynadıysa ilerleme sayılmaz
     this.gamesPlayed.update((n) => n + 1);
     if (won) this.gamesWon.update((n) => n + 1);
     this.totalMoves.update((n) => n + this.moves());
@@ -736,6 +1091,7 @@ export class GameService {
 
   /** Tahtadaki en yüksek kareyi izler (başarım için). */
   private updateBestTile(): void {
+    if (this.aiPlayed()) return; // YZ oynadıysa istatistik sayılmaz
     let max = this.bestTile();
     for (const t of this.tiles()) if (t.value > max) max = t.value;
     if (max !== this.bestTile()) {
@@ -744,6 +1100,52 @@ export class GameService {
       this.checkAchievements();
     }
   }
+
+  /**
+   * Bir başarımın ilerlemesi: `{ current, target }`.
+   * Profilde "ne kadar yaklaştım" çubuğunu çizmek için kullanılır;
+   * kilitli başarımlar artık sadece gri bir kutu değil.
+   */
+  achievementProgress(id: string): { current: number; target: number } {
+    const clamp = (cur: number, target: number) => ({
+      current: Math.min(cur, target),
+      target,
+    });
+    switch (id) {
+      case 'tile-512':
+        return clamp(this.bestTile(), 512);
+      case 'tile-1024':
+        return clamp(this.bestTile(), 1024);
+      case 'first-win':
+        return clamp(this.bestTile(), WIN_VALUE);
+      case 'level-3':
+        return clamp(this.bestLevel(), 3);
+      case 'games-10':
+        return clamp(this.gamesPlayed(), 10);
+      case 'streak-3':
+        return clamp(this.bestStreak(), 3);
+      case 'streak-7':
+        return clamp(this.bestStreak(), 7);
+      case 'bomb-use':
+        return clamp(this.bombUsed() ? 1 : 0, 1);
+      case 'rich':
+        return clamp(this.totalGoldEarned(), 1000);
+      default:
+        return { current: 0, target: 1 };
+    }
+  }
+
+  /** Oyuncu ünvanı: toplam ilerlemeyi tek bir rütbeye indirger. */
+  readonly rankInfo = computed(() =>
+    rankFor(
+      rankPoints({
+        gamesPlayed: this.gamesPlayed(),
+        bestScore: this.bestScore(),
+        bestLevel: this.bestLevel(),
+        achievements: this.unlockedAchievements().size,
+      }),
+    ),
+  );
 
   /** Koşulu sağlanan yeni başarımları açar ve altın verir. */
   private checkAchievements(): void {
@@ -796,11 +1198,20 @@ export class GameService {
 
   // --- Görevler (günlük + haftalık) ---------------------------
 
+  /** En son tazelenen dönem — her çağrıda diskten okumayı önler. */
+  private missionPeriod = { day: '', week: '' };
+
   /** Gün/hafta değiştiyse görevleri yeniden üretir (tohumlu, deterministik). */
   private ensureMissionsFresh(): void {
     const now = new Date();
     const today = dayKey(now);
     const week = weekKey(now);
+
+    // Dönem değişmediyse iş yok (sık çağrılır: her hamlede).
+    if (this.missionPeriod.day === today && this.missionPeriod.week === week) {
+      return;
+    }
+    this.missionPeriod = { day: today, week };
 
     const daily = loadMissions(DAILY_MISSIONS_KEY);
     if (daily.period !== today) {
@@ -826,6 +1237,10 @@ export class GameService {
   /** Bir metrik için görev ilerlemesini artırır (günlük + haftalık). */
   private trackMission(metric: MissionMetric, amount: number): void {
     if (amount <= 0) return;
+    // Sekme gece yarısını aşarak açık kalmış olabilir: ilerlemeden önce
+    // dönemi tazele, yoksa dünün görevleri ilerlemeye devam ederdi.
+    this.ensureMissionsFresh();
+    if (this.aiPlayed()) return; // YZ oynadıysa görevler ilerlemez
     this.bumpMissions(this.dailyMissions, DAILY_MISSIONS_KEY, metric, amount);
     this.bumpMissions(this.weeklyMissions, WEEKLY_MISSIONS_KEY, metric, amount);
   }
@@ -854,6 +1269,7 @@ export class GameService {
 
   /** Tamamlanmış bir görevin ödülünü alır. */
   claimMission(id: string, type: 'daily' | 'weekly'): boolean {
+    this.ensureMissionsFresh(); // dün açık kalan sekmeden ödül alınmasın
     const sig = type === 'daily' ? this.dailyMissions : this.weeklyMissions;
     const key = type === 'daily' ? DAILY_MISSIONS_KEY : WEEKLY_MISSIONS_KEY;
     const def = missionDef(id);
@@ -884,17 +1300,35 @@ export class GameService {
     const result = applyMove(this.tiles(), direction, this.boardSize());
     if (!result.moved) return false; // geçersiz hamle → sayaç ARTMAZ
 
-    // Geçerli hamle → hamle sayısını artır.
-    this.moves.update((m) => m + 1);
+    // Hamle kalitesi: YALNIZCA insan hamleleri, asistan açıkken ve tahta
+    // henüz DEĞİŞMEDEN değerlendirilir (kıyas hamle öncesi pozisyona göre).
+    if (this.assistantOn() && !this.autoplaying()) {
+      const review = reviewMove(this.toValueGrid(), direction, 'medium');
+      this.lastMoveReview.set(review);
+      if (review) {
+        this.moveRatings.update((r) => ({
+          ...r,
+          [review.rating]: r[review.rating] + 1,
+        }));
+      }
+    }
+
+    this.assistHintDir.set(null); // öneri yalnızca gösterildiği tahta içindi
 
     // Geçerli hamle → hamle ÖNCESİ durumu sakla (geri al için).
     // applyMove saf olduğundan this.tiles() hâlâ hamle öncesi listedir.
+    // NOT: anlık görüntü hamle sayacı ARTMADAN alınır, böylece geri alınca
+    // sayaç da doğru değere döner (istatistik şişmesi olmaz).
     this.history.set({
       tiles: this.tiles(),
       score: this.score(),
+      moves: this.moves(),
       status: this.status(),
       keepPlayingAfterWin: this.keepPlayingAfterWin,
     });
+
+    // Geçerli hamle → hamle sayısını artır.
+    this.moves.update((m) => m + 1);
 
     // Yeni durum (birleşenlerde `merged` işaretli; `isNew` temizlenmiş olur)
     this.tiles.set(result.tiles);
@@ -970,8 +1404,10 @@ export class GameService {
   private checkLevelEnd(): void {
     if (this.tiles().some((t) => t.value >= this.levelTarget())) {
       this.stopTimer();
-      this.awardGold(this.level()); // seviye tamamlandı → altın ver
-      this.trackMission('levels', 1); // görev: seviye tamamla
+      // Ödül YALNIZCA ilk tamamlamada verilir; görev de yalnızca o zaman
+      // ilerler (aynı seviyeyi tekrar bitirip görev çiftlemek engellenir).
+      const firstTime = this.awardGold(this.level());
+      if (firstTime) this.trackMission('levels', 1); // görev: seviye tamamla
       if (this.level() >= MAX_LEVEL) {
         this.status.set(GameStatus.Won);
         this.recordGameEnd(true); // tüm seviyeler bitti = kazanılmış oyun
@@ -993,16 +1429,21 @@ export class GameService {
    * Aynı seviye tekrar tamamlanırsa altın verilmez (farming önlenir).
    * `lastReward` = bu tamamlamada kazanılan altın (0 → zaten alınmıştı).
    */
-  private awardGold(level: number): void {
+  private awardGold(level: number): boolean {
+    if (this.aiPlayed()) {
+      this.lastReward.set(0); // YZ oynadıysa altın verilmez
+      return false;
+    }
     const reward = levelConfig(level).gold;
     if (this.rewardedLevels.has(level)) {
       this.lastReward.set(0); // ödül zaten alınmış
-      return;
+      return false;
     }
     this.rewardedLevels.add(level);
     this.addGold(reward);
     this.lastReward.set(reward);
     saveRewardedLevels(this.rewardedLevels);
+    return true;
   }
 
   // --- Süre sayacı --------------------------------------------
@@ -1026,17 +1467,20 @@ export class GameService {
    * (Seviye modu) geri sayım: belirtilen saniyeden 0'a sayar.
    * 0'a ulaşınca — hâlâ oynanıyorsa — seviye başarısız olur.
    */
-  private startCountdown(seconds: number): void {
+  private startCountdown(seconds: number, fromElapsed = 0): void {
     this.stopTimer();
     this.startTimestamp = Date.now();
     this.countdownTotal = seconds; // +30 gücü bunu artırabilir
-    this.elapsedSeconds.set(0);
+    // Duraklat/devam ve geri alma sonrasında geçen süre sıfırlanmaz:
+    // geri sayım kalan süreden, "geçen süre" göstergesi ise birikimden sürer.
+    this.elapsedOffset = fromElapsed;
+    this.elapsedSeconds.set(fromElapsed);
     this.remainingSeconds.set(seconds);
 
     if (typeof setInterval === 'undefined') return;
     this.timerId = setInterval(() => {
       const elapsed = Math.floor((Date.now() - this.startTimestamp) / 1000);
-      this.elapsedSeconds.set(elapsed);
+      this.elapsedSeconds.set(this.elapsedOffset + elapsed);
       const remaining = Math.max(0, this.countdownTotal - elapsed);
       this.remainingSeconds.set(remaining);
 
@@ -1046,6 +1490,9 @@ export class GameService {
           // Seviye modunda başarısız; Zaman Yarışı'nda oyun biter (skor kalır).
           if (this.mode() === GameMode.Level) {
             this.status.set(GameStatus.Failed);
+            // Süreden kaybetmek de oynanmış bir oyundur: hamle kalmayınca
+            // olduğu gibi burada da istatistik/görev sayılmalı.
+            this.recordGameEnd(false);
           } else {
             this.status.set(GameStatus.Lost);
             this.recordGameEnd(false);
@@ -1053,6 +1500,32 @@ export class GameService {
         }
       }
     }, 250);
+  }
+
+  // --- Duraklat / Devam --------------------------------------
+
+  /** Oyun duraklatıldı mı? (sayaç durur, giriş kilitlenir, tahta örtülür) */
+  readonly paused = signal(false);
+
+  /** Duraklat/Devam arasında geçiş (yalnızca oynanırken). */
+  togglePause(): void {
+    if (this.status() !== GameStatus.Playing) return;
+    if (this.paused()) this.resumeGame();
+    else this.pauseGame();
+  }
+
+  /** Oyunu duraklat: sayacı dondur. */
+  pauseGame(): void {
+    if (this.paused() || this.status() !== GameStatus.Playing) return;
+    this.paused.set(true);
+    this.stopTimer();
+  }
+
+  /** Oyuna devam et: sayacı kaldığı yerden sürdür. */
+  resumeGame(): void {
+    if (!this.paused()) return;
+    this.paused.set(false);
+    this.resumeTimerForMode();
   }
 
   /** Süre sayacını durdurur. */
@@ -1098,30 +1571,12 @@ export class GameService {
 
   /** Anlık skor en yüksek skoru geçtiyse güncelle ve kalıcı kaydet. */
   private updateBestScore(): void {
+    if (this.aiPlayed()) return; // YZ oynadıysa rekor sayılmaz
     if (this.score() > this.bestScore()) {
       this.bestScore.set(this.score());
       saveBestScore(this.bestScore());
     }
   }
-}
-
-// ============================================================
-//  Tohumlu RNG (çok oyunculu yarış — adil taş dizisi)
-// ============================================================
-
-/**
- * mulberry32: hızlı, tohumlu sözde-rastgele üretici.
- * Aynı tohum → aynı sayı dizisi. Böylece tüm yarışçılar aynı taşları alır.
- */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return function () {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 // ============================================================
@@ -1280,6 +1735,39 @@ function loadName(): string {
 function saveName(name: string): void {
   try {
     localStorage?.setItem(NAME_KEY, name);
+  } catch {
+    /* yoksay */
+  }
+}
+
+function loadAssistant(): boolean {
+  try {
+    return localStorage?.getItem(ASSISTANT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function saveAssistant(on: boolean): void {
+  try {
+    localStorage?.setItem(ASSISTANT_KEY, on ? '1' : '0');
+  } catch {
+    /* yoksay */
+  }
+}
+
+function loadAvatar(): string {
+  try {
+    const v = localStorage?.getItem(AVATAR_KEY);
+    return v && AVATARS.includes(v) ? v : AVATARS[0];
+  } catch {
+    return AVATARS[0];
+  }
+}
+
+function saveAvatar(a: string): void {
+  try {
+    localStorage?.setItem(AVATAR_KEY, a);
   } catch {
     /* yoksay */
   }

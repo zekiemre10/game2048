@@ -1,7 +1,8 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, output, signal } from '@angular/core';
 import { GameService } from '../../services/game.service';
 import { I18nService } from '../../services/i18n.service';
 import { BOARD_SIZES, GameMode } from '../../models/tile.model';
+import { ACHIEVEMENTS } from '../../models/achievement.model';
 
 @Component({
   selector: 'app-start-screen',
@@ -23,6 +24,26 @@ export class StartScreen {
 
   protected readonly bestLevel = this.game.bestLevel;
   protected readonly gold = this.game.gold;
+
+  // --- Başarım şeridi (tam liste App'teki panelde açılır) ----
+  /** Şerite tıklandı → App başarımlar panelini açar. */
+  readonly openAchievements = output<void>();
+
+  protected readonly ACHIEVEMENTS = ACHIEVEMENTS;
+  protected readonly totalCount = ACHIEVEMENTS.length;
+  protected readonly unlockedCount = computed(
+    () => this.game.unlockedAchievements().size,
+  );
+  protected readonly percent = computed(() =>
+    Math.round((this.unlockedCount() / ACHIEVEMENTS.length) * 100),
+  );
+
+  protected isUnlocked(id: string): boolean {
+    return this.game.unlockedAchievements().has(id);
+  }
+
+  /** Dile göre metin seçer (TR/EN). */
+  protected readonly L = (tr: string, en: string) => this.i18n.L(tr, en);
 
   onSelectSize(n: number): void {
     this.selectedSize.set(n);

@@ -5,7 +5,7 @@
   [attr.aria-label]="t('nav.profile')"
   (click)="onOpenProfile()"
 >
-  <span class="profile-avatar">👤</span>
+  <span class="profile-avatar">{{ avatar() }}</span>
   <span class="profile-meta">
     <span class="profile-name">{{ t('nav.profile') }}</span>
     <span class="profile-streak">🔥 {{ currentStreak() }} · 💰 {{ gold() }}</span>
@@ -95,6 +95,7 @@
             class="switch"
             type="button"
             role="switch"
+            [attr.aria-label]="t('set.music')"
             [attr.aria-checked]="musicOn()"
             [class.on]="musicOn()"
             (click)="onToggleMusic()"
@@ -156,6 +157,26 @@
         </div>
       </section>
 
+      <!-- YZ ASİSTANI -->
+      <section class="settings-section">
+        <h3 class="settings-heading">{{ t('set.assistant') }}</h3>
+        <div class="settings-row">
+          <span>{{ t('set.assistantLabel') }}</span>
+          <button
+            class="switch"
+            type="button"
+            role="switch"
+            [attr.aria-label]="t('set.assistantLabel')"
+            [attr.aria-checked]="assistantOn()"
+            [class.on]="assistantOn()"
+            (click)="onToggleAssistant()"
+          >
+            <span class="switch-knob"></span>
+          </button>
+        </div>
+        <p class="settings-note assist-desc">{{ t('set.assistantDesc') }}</p>
+      </section>
+
       <!-- TEMA -->
       <section class="settings-section">
         <h3 class="settings-heading">{{ t('set.theme') }}</h3>
@@ -181,6 +202,19 @@
         </div>
         <p class="theme-hint">{{ t('set.moreThemes') }}</p>
       </section>
+
+      <!-- HESAP: çıkış YALNIZCA burada -->
+      @if (authUser(); as u) {
+        <section class="settings-section">
+          <h3 class="settings-heading">{{ t('set.account') }}</h3>
+          <div class="settings-row">
+            <span class="account-user">👤 {{ u.username }}</span>
+            <button class="btn-primary ghost logout-btn" type="button" (click)="onLogout()">
+              {{ t('auth.logout') }}
+            </button>
+          </div>
+        </section>
+      }
 
       <p class="settings-credit">{{ t('set.credit') }}</p>
 
@@ -300,13 +334,66 @@
       (click)="$event.stopPropagation()"
     >
       <div class="profile-head">
-        <span class="profile-head-avatar">👤</span>
+        <button
+          class="profile-head-avatar"
+          type="button"
+          [attr.aria-label]="t('prof.changeAvatar')"
+          [title]="t('prof.changeAvatar')"
+          (click)="onToggleAvatarPicker()"
+        >
+          {{ avatar() }}
+          <span class="avatar-edit" aria-hidden="true">✏️</span>
+        </button>
         <div class="profile-head-info">
           <span class="profile-head-name">{{ displayName() }}</span>
+          <!-- Ünvan: hesabın genel ilerlemesi (oyun içi "Seviye"den ayrı) -->
+          <span class="rank-badge">
+            {{ rankInfo().rank.icon }}
+            {{ L(rankInfo().rank.name, rankInfo().rank.nameEn) }}
+          </span>
           @if (!authUser()) {
             <span class="profile-head-hint">{{ t('prof.loginForName') }}</span>
           }
         </div>
+      </div>
+
+      <!-- Avatar seçici -->
+      @if (avatarPickerOpen()) {
+        <div class="avatar-picker">
+          @for (a of AVATARS; track a) {
+            <button
+              class="avatar-option"
+              type="button"
+              [class.selected]="avatar() === a"
+              [attr.aria-pressed]="avatar() === a"
+              [attr.aria-label]="a"
+              (click)="onSelectAvatar(a)"
+            >
+              {{ a }}
+            </button>
+          }
+        </div>
+      }
+
+      <!-- Ünvan ilerlemesi -->
+      <div class="rank-progress">
+        @if (rankInfo().next; as next) {
+          <div class="rank-row">
+            <span class="rank-now">{{ rankInfo().points }} {{ t('prof.points') }}</span>
+            <span class="rank-next">
+              {{ next.icon }} {{ L(next.name, next.nameEn) }}
+              — {{ rankInfo().remaining }} {{ t('prof.pointsLeft') }}
+            </span>
+          </div>
+          <div class="mission-bar">
+            <span class="mission-fill" [style.width.%]="rankInfo().percent"></span>
+          </div>
+        } @else {
+          <div class="rank-row">
+            <span class="rank-now">{{ rankInfo().points }} {{ t('prof.points') }}</span>
+            <span class="rank-next">{{ t('prof.maxRank') }}</span>
+          </div>
+        }
       </div>
 
       <!-- Günlük ödül -->
@@ -320,34 +407,20 @@
 
       <!-- İstatistikler -->
       <div class="profile-stats">
+        <div class="pstat highlight">
+          <strong>{{ bestScore() }}</strong><span>{{ t('hud.best') }}</span>
+        </div>
+        <div class="pstat"><strong>{{ bestTile() }}</strong><span>{{ t('prof.bestTile') }}</span></div>
+        <div class="pstat"><strong>{{ bestLevel() }}</strong><span>{{ t('prof.bestLevel') }}</span></div>
         <div class="pstat"><strong>{{ gamesPlayed() }}</strong><span>{{ t('prof.games') }}</span></div>
         <div class="pstat"><strong>%{{ winRate() }}</strong><span>{{ t('prof.winrate') }}</span></div>
-        <div class="pstat"><strong>{{ bestTile() }}</strong><span>{{ t('prof.bestTile') }}</span></div>
+        <div class="pstat"><strong>{{ totalMoves() }}</strong><span>{{ t('prof.totalMoves') }}</span></div>
         <div class="pstat"><strong>🔥 {{ currentStreak() }}</strong><span>{{ t('prof.streak') }}</span></div>
         <div class="pstat"><strong>{{ bestStreak() }}</strong><span>{{ t('prof.bestStreak') }}</span></div>
-        <div class="pstat"><strong>{{ totalMoves() }}</strong><span>{{ t('prof.totalMoves') }}</span></div>
+        <div class="pstat"><strong>💰 {{ totalGoldEarned() }}</strong><span>{{ t('prof.totalGold') }}</span></div>
       </div>
 
-      <!-- Başarımlar (profilde) -->
-      <h3 class="settings-heading prof-ach-heading">
-        {{ t('prof.achievements') }} ({{ unlockedAchievements().size }}/{{ ACHIEVEMENTS.length }})
-      </h3>
-      <div class="profile-ach-grid">
-        @for (a of ACHIEVEMENTS; track a.id) {
-          <div class="store-card ach-card" [class.locked]="!isAchievementUnlocked(a.id)">
-            <span class="card-icon">{{ a.icon }}</span>
-            <span class="card-name">{{ L(a.name, a.nameEn) }}</span>
-            <span class="card-desc">{{ L(a.desc, a.descEn) }}</span>
-            @if (isAchievementUnlocked(a.id)) {
-              <span class="card-badge used">{{ t('store.unlocked') }}</span>
-            } @else {
-              <span class="card-badge">💰 {{ a.gold }}</span>
-            }
-          </div>
-        }
-      </div>
-
-      <!-- Hesap: giriş / kayıt / çıkış -->
+      <!-- Hesap durumu (çıkış Ayarlar panelindedir) -->
       <div class="account-box">
         @if (authUser(); as u) {
           <div class="account-status">
@@ -355,9 +428,6 @@
             <strong class="account-user">👤 {{ u.username }}</strong>
           </div>
           <p class="account-sync">{{ t('auth.synced') }}</p>
-          <button class="btn-primary ghost" type="button" (click)="onLogout()">
-            {{ t('auth.logout') }}
-          </button>
         } @else {
           <button class="btn-primary account-cta" type="button" (click)="onOpenAuth()">
             {{ t('auth.signInCta') }}
@@ -366,6 +436,59 @@
       </div>
 
       <button class="btn-primary settings-close" type="button" (click)="onCloseProfile()">
+        {{ t('btn.close') }}
+      </button>
+    </div>
+  </div>
+}
+
+<!-- Başarımlar paneli (ana ekrandaki şeritten açılır) -->
+@if (achievementsOpen()) {
+  <div class="settings-backdrop" (click)="onCloseAchievements()">
+    <div
+      class="settings-panel"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-label]="t('prof.achievements')"
+      (click)="$event.stopPropagation()"
+    >
+      <h2 class="settings-title">
+        {{ t('prof.achievements') }} ({{ achUnlockedCount() }}/{{ achTotalCount }})
+      </h2>
+      <p class="settings-note">{{ t('ach.note') }}</p>
+
+      <div class="profile-ach-grid">
+        @for (a of ACHIEVEMENTS; track a.id) {
+          <div class="ach-row" [class.locked]="!isAchievementUnlocked(a.id)">
+            <span class="ach-icon">{{ a.icon }}</span>
+            <div class="ach-info">
+              <div class="ach-top">
+                <span class="ach-name">{{ L(a.name, a.nameEn) }}</span>
+                @if (isAchievementUnlocked(a.id)) {
+                  <span class="ach-badge done">{{ t('store.unlocked') }}</span>
+                } @else {
+                  <span class="ach-badge">💰 {{ a.gold }}</span>
+                }
+              </div>
+              <div class="ach-desc">{{ L(a.desc, a.descEn) }}</div>
+              <!-- Kilitliyse ne kadar yaklaştığını göster -->
+              @if (!isAchievementUnlocked(a.id)) {
+                <div class="mission-bar">
+                  <span
+                    class="mission-fill"
+                    [style.width.%]="achPercent(a.id)"
+                  ></span>
+                </div>
+                <div class="ach-prog">
+                  {{ achProgress(a.id).current }} / {{ achProgress(a.id).target }}
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      <button class="btn-primary settings-close" type="button" (click)="onCloseAchievements()">
         {{ t('btn.close') }}
       </button>
     </div>
@@ -485,6 +608,10 @@
             [attr.aria-label]="t('fr.searchPlaceholder')"
           />
         </div>
+
+        @if (friendError()) {
+          <p class="friend-error">{{ t(friendError()) }}</p>
+        }
 
         @if (friendSearchTerm().length >= 2) {
           <div class="friend-results">
@@ -664,19 +791,39 @@
                 <span class="mp-rank">{{ i + 1 }}</span>
               }
               <span class="mp-pname">
-                👤 {{ p.username }}
+                {{ p.isBot ? '' : '👤 ' }}{{ p.username }}
                 @if (isMe(p.id)) { <em>{{ t('mp.you') }}</em> }
                 @if (p.id === room.hostId) { <span class="mp-hosttag">{{ t('mp.host') }}</span> }
               </span>
               @if (room.status !== 'lobby') {
                 <span class="mp-score">{{ p.score }}</span>
                 @if (p.done) { <span class="mp-done">{{ t('mp.done') }}</span> }
+              } @else if (p.isBot && mpIsHost()) {
+                <button
+                  class="friend-btn ghost mp-botremove"
+                  type="button"
+                  (click)="onRemoveBot(p.id)"
+                >
+                  ✕
+                </button>
               }
             </div>
           }
         </div>
 
         @if (mpError()) { <p class="auth-error">{{ t(mpError()) }}</p> }
+
+        <!-- Host: bot ekle (lobide) -->
+        @if (room.status === 'lobby' && mpIsHost()) {
+          <div class="mp-addbots">
+            <span class="mp-addbots-label">{{ t('mp.addBot') }}</span>
+            <div class="lang-choice mp-botlevels">
+              <button type="button" (click)="onAddBot('easy')">{{ t('mp.botEasy') }}</button>
+              <button type="button" (click)="onAddBot('medium')">{{ t('mp.botMedium') }}</button>
+              <button type="button" (click)="onAddBot('expert')">{{ t('mp.botExpert') }}</button>
+            </div>
+          </div>
+        }
 
         <!-- Host: başlat (lobide) -->
         @if (room.status === 'lobby' && mpIsHost()) {
@@ -862,6 +1009,7 @@
           <span>{{ t('auth.password') }}</span>
           <input
             type="password"
+            [attr.minlength]="authTab() === 'register' ? 6 : null"
             [attr.autocomplete]="authTab() === 'register' ? 'new-password' : 'current-password'"
             [value]="authPass()"
             (input)="onAuthPassInput($event)"
@@ -900,7 +1048,7 @@
 }
 
 @if (status() === GameStatus.Idle) {
-  <app-start-screen />
+  <app-start-screen (openAchievements)="onOpenAchievements()" />
 } @else {
   <main class="game">
     <header class="topbar">
@@ -931,8 +1079,15 @@
       </div>
     </header>
 
-    <!-- Seviye modu: seviye + hedef bilgisi -->
-    @if (mode() === GameMode.Level) {
+    <!--
+      Oyun alanı: geniş ekranda iki sütun (solda büyük tahta, sağda bilgi
+      paneli), dar ekranda tek sütun. Yan panel `display: contents` ile
+      dağıldığından telefonda sıralama eskisi gibi kalır.
+    -->
+    <div class="play-area">
+      <aside class="side-panel">
+        <!-- Seviye modu: seviye + hedef bilgisi -->
+        @if (mode() === GameMode.Level) {
       <div class="level-bar">
         <span class="level-badge">{{ t('hud.level') }} {{ level() }}</span>
         <span class="level-target">
@@ -982,18 +1137,25 @@
 
     <!-- Sahip olunan güçler (kullanım çubuğu) -->
     @if (ownedPowers().length > 0) {
-      <div class="power-bar">
-        @for (p of ownedPowers(); track p.id) {
-          <button
-            class="power-btn"
-            type="button"
-            [title]="L(p.name, p.nameEn) + ' — ' + L(p.desc, p.descEn)"
-            (click)="onUsePower(p.id)"
-          >
-            <span class="power-icon">{{ p.icon }}</span>
-            <span class="power-count">{{ powers()[p.id] }}</span>
-          </button>
-        }
+      <div class="power-group">
+        <span class="side-title">{{ t('hud.powers') }}</span>
+        <div class="power-bar">
+          @for (p of ownedPowers(); track p.id) {
+            <button
+              class="power-btn"
+              type="button"
+              [title]="L(p.desc, p.descEn)"
+              [attr.aria-label]="
+                L(p.name, p.nameEn) + ' — ' + L(p.desc, p.descEn)
+              "
+              (click)="onUsePower(p.id)"
+            >
+              <span class="power-icon" aria-hidden="true">{{ p.icon }}</span>
+              <span class="power-name">{{ L(p.name, p.nameEn) }}</span>
+              <span class="power-count">×{{ powers()[p.id] }}</span>
+            </button>
+          }
+        </div>
       </div>
     }
 
@@ -1012,6 +1174,130 @@
       </div>
     }
 
+    <!-- YZ: canlı pozisyon göstergesi + son hamlenin kalitesi -->
+    @if (
+      assistantOn() &&
+      status() === GameStatus.Playing &&
+      !autoplaying()
+    ) {
+      <div class="ai-panel">
+        <span class="side-title">{{ t('ai.position') }}</span>
+        <div class="health-row">
+          <span class="health-label" [class]="'h-' + health().level">
+            {{ healthIcon() }} {{ t('ai.health.' + health().level) }}
+          </span>
+          <span class="health-pct">%{{ health().score }}</span>
+        </div>
+        <div class="mission-bar">
+          <span
+            class="mission-fill"
+            [class]="'h-' + health().level"
+            [style.width.%]="health().score"
+          ></span>
+        </div>
+
+        <!-- Son hamlenin YZ değerlendirmesi -->
+        @if (lastMoveReview(); as rev) {
+          <div class="move-review" [class]="'r-' + rev.rating">
+            <span class="review-text">{{ t('ai.rate.' + rev.rating) }}</span>
+            @if (rev.rating !== 'best') {
+              <span class="review-best">{{ arrowFor(rev.best) }}</span>
+            }
+          </div>
+        }
+
+        <!-- Oyun boyunca doğruluk -->
+        @if (ratedMoves() > 0) {
+          <div class="accuracy-row">
+            <span>{{ t('ai.accuracy') }}</span>
+            <strong>%{{ accuracy() }}</strong>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- YZ Asistanı: oyun içi öneri + uyarı -->
+    @if (
+      assistantOn() &&
+      mode() !== GameMode.Race &&
+      status() === GameStatus.Playing &&
+      !autoplaying()
+    ) {
+      <div class="assist-bar">
+        @if (assistantSuggestion(); as dir) {
+          <!-- İstenen öneri: yalnızca bu tahta için, hamle yapınca kaybolur -->
+          <span class="assist-hint">
+            💡 {{ t('assist.suggestion') }}: <strong>{{ arrowFor(dir) }}</strong>
+          </span>
+        } @else if (assistHintsLeft() > 0) {
+          <button class="assist-ask" type="button" (click)="onRequestHint()">
+            {{ t('assist.ask') }} ({{ assistHintsLeft() }}/{{ assistHintQuota }})
+          </button>
+        } @else {
+          <span class="assist-hint assist-empty">💡 {{ t('assist.none') }}</span>
+        }
+        @if (assistantWarning()) {
+          <span class="assist-warn">⚠️ {{ t('assist.warning') }}</span>
+        }
+      </div>
+    }
+
+    <!-- YZ oynarken: bunun bir gösterim olduğu bilgisi -->
+    @if (autoplaying()) {
+      <div class="assist-bar">
+        <span class="assist-hint ai-demo-note">{{ t('ai.demoNote') }}</span>
+      </div>
+    }
+
+    <!-- Gösterim bitti: kendi oyununa dönüldü + YZ'nin skoru -->
+    @if (!autoplaying() && aiDemoResult() !== null) {
+      <div class="assist-bar">
+        <span class="assist-hint ai-demo-back">
+          {{ t('ai.demoEnded') }}: <strong>{{ aiDemoResult() }}</strong>
+        </span>
+      </div>
+    }
+
+        <!-- Oyun kontrolleri (geniş ekranda panelin altında toplanır) -->
+        <div class="controls">
+          @if (mode() !== GameMode.Race) {
+            <button
+              class="btn-primary ghost pause-toggle"
+              type="button"
+              (click)="onTogglePause()"
+            >
+              {{ paused() ? t('pause.resume') : t('pause.pause') }}
+            </button>
+            <button
+              class="btn-primary ghost ai-toggle"
+              type="button"
+              [class.active]="autoplaying()"
+              (click)="onToggleAutoplay()"
+            >
+              {{ autoplaying() ? t('btn.aiStop') : t('btn.aiPlay') }}
+            </button>
+          }
+          <button
+            class="btn-primary ghost"
+            type="button"
+            [disabled]="!canUndo()"
+            (click)="onUndo()"
+          >
+            {{ t('btn.undo') }}
+          </button>
+          @if (mode() === GameMode.Level) {
+            <button class="btn-primary" type="button" (click)="onStartLevelMode()">
+              {{ t('btn.restart') }}
+            </button>
+          } @else if (mode() !== GameMode.Race) {
+            <!-- Yarışta "Yeni Oyun" yok: ortak tohumlu yarış bozulur. -->
+            <button class="btn-primary" type="button" (click)="onRestart()">
+              {{ t('btn.newGame') }}
+            </button>
+          }
+        </div>
+      </aside>
+
     <div class="board-area">
       <div class="board-wrap" [class.bomb-active]="bombMode()">
         <app-board />
@@ -1026,6 +1312,20 @@
               @case (Direction.Down) { ↓ }
             }
           </div>
+        }
+
+        <!-- Duraklat örtüsü (yalnızca tahtayı kaplar) -->
+        @if (paused()) {
+          <button
+            class="board-pause"
+            type="button"
+            [attr.aria-label]="t('pause.resume')"
+            (click)="onTogglePause()"
+          >
+            <span class="board-pause-icon">▶</span>
+            <span class="board-pause-title">{{ t('pause.paused') }}</span>
+            <span class="board-pause-tap">{{ t('pause.tap') }}</span>
+          </button>
         }
 
         @if (
@@ -1109,6 +1409,35 @@
                 }
               }
 
+              <!-- Oyun boyunca hamle doğruluğu -->
+              @if (assistantOn() && ratedMoves() > 0) {
+                <div class="overlay-accuracy">
+                  <span class="oa-main">
+                    🎯 {{ t('ai.accuracy') }}: <strong>%{{ accuracy() }}</strong>
+                  </span>
+                  <span class="oa-detail">
+                    ✨ {{ moveRatings().best }} ·
+                    👍 {{ moveRatings().good }} ·
+                    ⚠️ {{ moveRatings().inaccurate }}
+                  </span>
+                </div>
+              }
+
+              <!-- YZ oyun sonu analizi (algoritmik) -->
+              @if (mode() !== GameMode.Race) {
+                @if (analysisText()) {
+                  <div class="overlay-analysis">{{ analysisText() }}</div>
+                } @else {
+                  <button
+                    class="btn-primary ghost overlay-analyze"
+                    type="button"
+                    (click)="onAnalyze()"
+                  >
+                    {{ t('ov.analyze') }}
+                  </button>
+                }
+              }
+
               <div class="overlay-actions">
                 @if (mode() === GameMode.Race) {
                   <!-- Yarış bitti → çok oyunculu panele dön (sonuçlar orada) -->
@@ -1166,24 +1495,6 @@
       </div>
     </div>
 
-    <div class="controls">
-      <button
-        class="btn-primary ghost"
-        type="button"
-        [disabled]="!canUndo()"
-        (click)="onUndo()"
-      >
-        {{ t('btn.undo') }}
-      </button>
-      @if (mode() === GameMode.Level) {
-        <button class="btn-primary" type="button" (click)="onStartLevelMode()">
-          {{ t('btn.restart') }}
-        </button>
-      } @else {
-        <button class="btn-primary" type="button" (click)="onRestart()">
-          {{ t('btn.newGame') }}
-        </button>
-      }
     </div>
   </main>
 }

@@ -58,6 +58,7 @@ export class ChatService {
     this.activeFriend.set(null);
     this.messages.set([]);
     this.activePoll = false;
+    this.pollGen++; // kurulu kalan zamanlayıcıyı geçersiz kıl
   }
 
   /** Aktif sohbetin mesajlarını çek (fresh=true → baştan). */
@@ -73,11 +74,14 @@ export class ChatService {
       );
       if (!res.ok) return;
       const j = await res.json();
+      // Yanıt beklenirken başka bir arkadaşa geçilmiş olabilir: A'nın
+      // mesajlarını B'nin penceresine yazma.
+      if (this.activeFriend()?.id !== friend.id) return;
       const incoming: ChatMessage[] = j.messages ?? [];
       if (fresh) {
         this.messages.set(incoming);
       } else if (incoming.length) {
-        this.messages.update((cur) => [...cur, ...incoming]);
+        this.messages.update((cur) => mergeMessages(cur, incoming));
       }
       if (incoming.length) this.markSeen();
     } catch {
@@ -100,8 +104,12 @@ export class ChatService {
       });
       if (!res.ok) return false;
       const j = await res.json();
-      if (j.message) {
-        this.messages.update((cur) => [...cur, j.message as ChatMessage]);
+      // Aynı mesaj yoklama yanıtıyla da gelebilir → id'ye göre tekilleştir
+      // (yoksa @for track m.id çift anahtar hatası verir ve balon iki kez çizilir).
+      if (j.message && this.activeFriend()?.id === friend.id) {
+        this.messages.update((cur) =>
+          mergeMessages(cur, [j.message as ChatMessage]),
+        );
         this.markSeen();
       }
       return true;
@@ -110,6 +118,11 @@ export class ChatService {
     } finally {
       this.sending.set(false);
     }
+  }
+
+  /** Okunmamış rozetlerini anında temizler (çıkış yapılırken). */
+  clearUnread(): void {
+    this.unread.set(new Set());
   }
 
   /** Rozetler için: tüm sohbetlerin son mesajını yokla. */
@@ -156,13 +169,22 @@ export class ChatService {
     }
   }
 
+  /**
+   * Yoklama kuşağı: sohbet kapatılıp 3sn içinde yeniden açılırsa eski
+   * zamanlayıcı hâlâ kuruludur. Kuşak eşleşmezse kendini sonlandırır;
+   * aksi hâlde her açma/kapamada bir döngü daha birikir (çift mesaj kaynağı).
+   */
+  private pollGen = 0;
+
   private startActivePolling(): void {
     if (this.activePoll) return;
     this.activePoll = true;
+    const gen = ++this.pollGen;
+    const alive = () => this.activePoll && gen === this.pollGen;
     const tick = async () => {
-      if (!this.activePoll || !this.activeFriend()) return;
+      if (!alive() || !this.activeFriend()) return;
       await this.loadMessages(false);
-      if (this.activePoll) setTimeout(tick, 3000);
+      if (alive()) setTimeout(tick, 3000);
     };
     setTimeout(tick, 3000);
   }
@@ -172,7 +194,9 @@ export class ChatService {
     if (this.overviewPoll) return;
     this.overviewPoll = true;
     const tick = async () => {
-      if (this.auth.authHeaders()) await this.refreshOverview();
+      // Koşulsuz çağrılır: çıkış yapılmışsa refreshOverview okunmamışları
+      // temizler. Eskiden başlık koşulu yüzünden rozet takılı kalıyordu.
+      await this.refreshOverview();
       setTimeout(tick, intervalMs);
     };
     setTimeout(tick, intervalMs);
@@ -181,6 +205,21 @@ export class ChatService {
 
 function lastId(msgs: ChatMessage[]): number {
   return msgs.length ? msgs[msgs.length - 1].id : 0;
+}
+
+/**
+ * Gelen mesajları listeye id'ye göre TEKİL ve SIRALI ekler.
+ * Gönderme yanıtı ile yoklama yanıtı aynı mesajı taşıyabilir; düz ekleme
+ * yapılırsa şablondaki `track m.id` çift anahtar hatası verir.
+ */
+function mergeMessages(
+  current: ChatMessage[],
+  incoming: ChatMessage[],
+): ChatMessage[] {
+  const known = new Set(current.map((m) => m.id));
+  const fresh = incoming.filter((m) => !known.has(m.id));
+  if (!fresh.length) return current;
+  return [...current, ...fresh].sort((a, b) => a.id - b.id);
 }
 
 function loadSeen(): Record<number, number> {

@@ -171,6 +171,85 @@
   opacity: 0.72;
 }
 
+// --- Başarım şeridi (ana ekran özeti) -----------------------
+// Başarımlar profil panelinden buraya taşındı: ana ekranda görünür,
+// tıklayınca ilerleme çubuklu tam liste açılır.
+.ach-strip {
+  display: block;
+  width: 100%;
+  margin-top: 1rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: v.$radius-md;
+  background: var(--color-board);
+  color: var(--color-text-light);
+  text-align: left;
+  box-shadow: v.$shadow-soft;
+  transition: transform v.$transition-fast;
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.ach-strip-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+}
+
+.ach-strip-title {
+  font-weight: 800;
+  font-size: 0.92rem;
+}
+
+.ach-strip-count {
+  font-weight: 800;
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+
+.ach-strip-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.45rem;
+}
+
+// Kilitli başarımlar soluk ve gri; açılanlar tam renkli
+.ach-strip-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+
+  &.locked {
+    filter: grayscale(1);
+    opacity: 0.4;
+  }
+}
+
+// İlerleme çubuğu — app.scss'teki eşi bu bileşene ulaşmaz
+// (görünüm kapsüllemesi), bu yüzden burada da tanımlanır.
+.mission-bar {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+  overflow: hidden;
+}
+
+.mission-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-text-light);
+  transition: width 250ms ease;
+}
+
 .gold-total {
   margin: 0.9rem 0 0;
   font-size: clamp(0.9rem, 3.6vw, 1.05rem);

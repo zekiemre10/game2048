@@ -53,10 +53,14 @@ export function weekKey(d: Date): string {
   const dayNum = (date.getUTCDay() + 6) % 7;
   date.setUTCDate(date.getUTCDate() - dayNum + 3);
   const firstThursday = date.getTime();
+  // Yıl, takvim yılı DEĞİL, ISO "hafta yılı"dır: haftanın perşembesinin yılı.
+  // (31 Ara 2019 ISO'da 2020-W01'dir; takvim yılı kullanılırsa 2019-W01 ile
+  //  çakışır ve haftalık görevler ya hiç sıfırlanmaz ya da erken sıfırlanır.)
+  const isoYear = date.getUTCFullYear();
   date.setUTCMonth(0, 1);
   if (date.getUTCDay() !== 4) {
     date.setUTCMonth(0, 1 + ((4 - date.getUTCDay() + 7) % 7));
   }
   const week = 1 + Math.round((firstThursday - date.getTime()) / 604800000);
-  return `${d.getFullYear()}-W${String(week).padStart(2, '0')}`;
+  return `${isoYear}-W${String(week).padStart(2, '0')}`;
 }

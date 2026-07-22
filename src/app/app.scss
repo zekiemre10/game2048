@@ -16,6 +16,46 @@
   overflow: hidden;
 }
 
+// --- Oyun alanı: tahta + yan panel --------------------------
+//
+// Dar ekran (varsayılan): tek sütun. `.side-panel` display:contents ile
+// dağılır, çocukları doğrudan `.play-area`nın flex öğesi olur; `order`
+// ile bilgi bantları tahtanın üstünde, kontroller altında kalır.
+.play-area {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.side-panel {
+  display: contents;
+}
+
+.level-bar,
+.stats,
+.bomb-banner,
+.power-group,
+.race-standings,
+.assist-bar,
+.ai-panel {
+  order: -1; // tahtanın üstü
+}
+
+.board-area {
+  order: 0;
+}
+
+.controls {
+  order: 1; // tahtanın altı
+}
+
+// Panel başlığı (yalnızca geniş ekranda görünür)
+.side-title {
+  display: none;
+}
+
+
 .topbar {
   flex: 0 0 auto;
   display: flex;
@@ -517,6 +557,17 @@
   padding: 0.5rem 0.25rem;
   text-align: center;
 
+  // En iyi skor: profilin başlık sayısı, öne çıksın
+  &.highlight {
+    background: var(--color-button);
+
+    strong,
+    span {
+      color: var(--color-text-light);
+      opacity: 1;
+    }
+  }
+
   strong {
     display: block;
     font-size: 1.2rem;
@@ -832,63 +883,488 @@
   text-align: left;
 }
 
+// Başarımlar artık kart ızgarası değil, ilerleme çubuklu satır listesi.
+// Panelin kendi kaydırması var; iç içe kaydırma çubuğu kaldırıldı.
 .profile-ach-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
   margin-bottom: 0.9rem;
-  max-height: 46vh;
-  overflow-y: auto;
-  padding-right: 2px;
+}
+
+.ach-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: v.$radius-md;
+  background: var(--color-cell-empty);
+
+  &.locked {
+    opacity: 0.75;
+  }
+}
+
+.ach-icon {
+  font-size: 1.5rem;
+  line-height: 1.2;
+  flex: 0 0 auto;
+}
+
+.ach-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ach-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.ach-name {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--color-text);
+}
+
+.ach-badge {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--color-board);
+  color: var(--color-text-light);
+
+  &.done {
+    background: #3fa96b;
+    color: #fff;
+  }
+}
+
+.ach-desc {
+  font-size: 0.78rem;
+  opacity: 0.75;
+  margin-bottom: 0.3rem;
+}
+
+.ach-prog {
+  font-size: 0.7rem;
+  opacity: 0.7;
+  margin-top: 0.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
+// --- Ünvan (rütbe) ------------------------------------------
+
+.rank-badge {
+  align-self: flex-start;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  background: var(--color-button);
+  color: var(--color-text-light);
+}
+
+.rank-progress {
+  margin-bottom: 0.85rem;
+}
+
+.rank-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  margin-bottom: 0.25rem;
+  opacity: 0.85;
+}
+
+.rank-now {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.rank-next {
+  text-align: right;
+}
+
+// --- Avatar seçici ------------------------------------------
+
+.profile-head-avatar {
+  position: relative;
+  cursor: pointer;
+  transition: transform v.$transition-fast;
+
+  &:hover {
+    transform: scale(1.06);
+  }
+}
+
+.avatar-edit {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  font-size: 0.7rem;
+  background: var(--color-board);
+  border-radius: 50%;
+  padding: 2px;
+  line-height: 1;
+}
+
+.avatar-picker {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 0.3rem;
+  margin-bottom: 0.85rem;
+  padding: 0.5rem;
+  border-radius: v.$radius-md;
+  background: var(--color-cell-empty);
+}
+
+.avatar-option {
+  aspect-ratio: 1;
+  font-size: 1.25rem;
+  border-radius: v.$radius-sm;
+  background: transparent;
+  transition: transform v.$transition-fast;
+
+  &:hover {
+    transform: scale(1.15);
+  }
+
+  &.selected {
+    background: var(--color-button);
+    box-shadow: 0 0 0 2px var(--color-button);
+  }
+}
+
+@media (max-width: 430px) {
+  .avatar-picker {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+// --- YZ Asistanı (oyun içi öneri/uyarı çubuğu) --------------
+.assist-bar {
+  flex: 0 0 auto;
+  width: min(100%, 480px);
+  margin: 0 auto 0.4rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.8rem;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+// --- YZ paneli: pozisyon sağlığı + hamle kalitesi -----------
+
+.ai-panel {
+  flex: 0 0 auto;
+  margin-bottom: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: v.$radius-md;
+  background: var(--color-cell-empty);
+}
+
+.health-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.15rem;
+  font-size: 0.85rem;
+}
+
+.health-label {
+  font-weight: 800;
+
+  &.h-good {
+    color: #3fa96b;
+  }
+  &.h-risky {
+    color: #d99b2b;
+  }
+  &.h-danger {
+    color: #e8503a;
+  }
+}
+
+.health-pct {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+  font-size: 0.8rem;
+}
+
+// Sağlık çubuğunun rengi de duruma göre değişir
+.mission-fill.h-good {
+  background: #3fa96b;
+}
+.mission-fill.h-risky {
+  background: #d99b2b;
+}
+.mission-fill.h-danger {
+  background: #e8503a;
+}
+
+.move-review {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  animation: review-pop 0.25s ease-out;
+
+  &.r-best {
+    background: rgba(63, 169, 107, 0.18);
+    color: #3fa96b;
+  }
+  &.r-good {
+    background: rgba(217, 155, 43, 0.16);
+    color: #b7801f;
+  }
+  &.r-inaccurate {
+    background: rgba(232, 80, 58, 0.16);
+    color: #e8503a;
+  }
+}
+
+.review-best {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+@keyframes review-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.accuracy-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  opacity: 0.85;
+
+  strong {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// Oyun sonu ekranındaki doğruluk özeti
+.overlay-accuracy {
+  margin: 0.5rem 0 0.2rem;
+  text-align: center;
+}
+
+.oa-main {
+  display: block;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.oa-detail {
+  display: block;
+  font-size: 0.82rem;
+  opacity: 0.75;
+  margin-top: 0.15rem;
+}
+
+// Gösterim bitti bildirimi — kısa süre görünür, dikkat çeksin
+.ai-demo-back {
+  background: var(--color-button);
+  color: var(--color-text-light);
+  font-weight: 700;
+  animation: demo-back-in 0.25s ease-out;
+}
+
+@keyframes demo-back-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.assist-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: var(--color-cell-empty);
+  color: var(--color-text);
+
+  strong {
+    font-size: 1.15rem;
+    line-height: 1;
+  }
+}
+
+.assist-ask {
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-button);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-cell-empty);
+  }
+}
+
+.assist-empty {
+  opacity: 0.6;
+}
+
+.assist-warn {
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(232, 80, 58, 0.16);
+  color: #e8503a;
+  font-weight: 600;
+}
+
+.assist-desc {
+  margin-top: 0.35rem;
+}
+
+// --- Duraklat örtüsü (yalnızca tahtayı kaplar) --------------
+.board-pause {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: none;
+  border-radius: v.$radius-lg;
+  cursor: pointer;
+  color: var(--color-text-light);
+  background: rgba(40, 36, 32, 0.55); // color-mix desteklenmezse yedek
+  background: color-mix(in srgb, var(--color-board) 62%, transparent);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: overlay-fade 160ms ease;
+}
+
+.board-pause-icon {
+  font-size: clamp(2.6rem, 12vw, 4rem);
+  line-height: 1;
+  width: clamp(4rem, 18vw, 5.5rem);
+  height: clamp(4rem, 18vw, 5.5rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 0.35rem; // ▶ optik ortalama
+  border-radius: 50%;
+  background: var(--color-button);
+  color: var(--color-text-light);
+  box-shadow: v.$shadow-soft;
+}
+
+.board-pause-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.board-pause-tap {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+// YZ otomatik oynatma düğmesi (etkinken vurgulu)
+.ai-toggle.active {
+  background: var(--color-button);
+  color: var(--color-text-light);
+  border-color: var(--color-button);
 }
 
 // --- Oyun içi güç çubuğu ------------------------------------
 
-.power-bar {
+.power-group {
   flex: 0 0 auto;
-  display: flex;
-  gap: 0.5rem;
-  justify-content: center;
   margin-bottom: clamp(0.4rem, 1.5vw, 0.6rem);
+}
+
+.power-bar {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: center;
   flex-wrap: wrap;
 }
 
+// Güç butonu: simge + AD + adet.
+// Eskiden yalnızca simge ve köşede kırmızı bir rozet vardı; rozet "hata /
+// bildirim" gibi okunuyor, simgenin ne işe yaradığı ise tahmin gerektiriyordu.
 .power-btn {
-  position: relative;
-  width: 48px;
-  height: 48px;
-  border-radius: v.$radius-md;
-  background: var(--color-board);
-  font-size: 1.4rem;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background: var(--color-board);
+  color: var(--color-text);
   box-shadow: v.$shadow-soft;
   transition: transform v.$transition-fast;
+  white-space: nowrap;
 
   &:hover {
     transform: translateY(-2px);
   }
   &:active {
-    transform: scale(0.92);
+    transform: scale(0.95);
   }
 }
 
-.power-count {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: #e8503a;
-  color: #fff;
-  font-size: 0.72rem;
+.power-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.power-name {
+  font-size: 0.82rem;
   font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+}
+
+// Adet: sakin bir sayaç (uyarı kırmızısı değil)
+.power-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: var(--color-cell-empty);
+  opacity: 0.85;
+}
+
+// Çok dar ekranlarda ad gizlenir, simge + adet kalır
+@media (max-width: 400px) {
+  .power-name {
+    display: none;
+  }
 }
 
 // --- Bomba hedefleme bandı ----------------------------------
@@ -1523,6 +1999,17 @@
   text-align: center;
 }
 
+/* Arkadaş ekleme hatası (kullanıcı bulunamadı, zaten arkadaş vb.) */
+.friend-error {
+  margin: 0.2rem 0 0.6rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: v.$radius-sm;
+  background: rgba(220, 70, 70, 0.14);
+  color: #d64545;
+  font-size: 0.88rem;
+  text-align: center;
+}
+
 .friend-avatar {
   position: relative;
 }
@@ -1651,6 +2138,60 @@
 
 .chat-send {
   flex-shrink: 0;
+}
+
+// --- YZ Koç ------------------------------------------------
+.coach-quick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.8rem;
+}
+
+.coach-quick button {
+  padding: 0.5rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border, rgba(128, 128, 128, 0.3));
+  background: var(--panel-input-bg, rgba(128, 128, 128, 0.08));
+  color: inherit;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-align: left;
+
+  &:hover {
+    background: var(--panel-input-bg, rgba(128, 128, 128, 0.16));
+  }
+}
+
+.coach-typing {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+// --- Oyun sonu YZ analizi ----------------------------------
+.overlay-analyze {
+  margin: 0.4rem auto 0.2rem;
+}
+
+.overlay-analysis {
+  margin: 0.5rem 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  background: var(--color-cell-empty);
+  color: var(--color-text);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  text-align: left;
+  white-space: pre-wrap;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.overlay-analysis-err {
+  margin: 0.4rem 0;
+  font-size: 0.85rem;
+  color: #e8503a;
 }
 
 // --- Çok oyunculu paneli ------------------------------------
@@ -1804,6 +2345,27 @@
   font-weight: 700;
 }
 
+.mp-addbots {
+  margin-bottom: 0.6rem;
+}
+
+.mp-addbots-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 0.8;
+  margin-bottom: 0.3rem;
+}
+
+.mp-botlevels button {
+  font-size: 0.85rem;
+}
+
+.mp-botremove {
+  padding: 0.2rem 0.5rem;
+  flex-shrink: 0;
+}
+
 .mp-result {
   text-align: center;
   margin-bottom: 0.6rem;
@@ -1878,4 +2440,150 @@
 .race-pts {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
+}
+
+// --- Geniş ekran: solda büyük tahta, sağda bilgi paneli ------
+//
+// Eskiden her şey tek dar sütunda üst üste diziliyor, tahta ekranın ancak
+// %37'sini kaplıyor, sağ/sol taraf boş kalıyordu. Burada bilgiler sağa
+// alınır ve tahta boşalan yüksekliğin tamamını kullanır.
+@media (min-width: 1000px) {
+  .game {
+    width: min(100%, 1200px);
+  }
+
+  .play-area {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(240px, 23vw, 310px);
+    // minmax(0,1fr): satır içeriğe göre BÜYÜMEZ. Olmazsa uzun panel
+    // satırı şişirir, panel yükseklik sınırı olmadığı için kaydırma
+    // devreye girmez ve butonlar ekranın altında kalırdı.
+    grid-template-rows: minmax(0, 1fr);
+    gap: clamp(0.9rem, 2vw, 1.6rem);
+    align-items: stretch;
+    min-height: 0;
+  }
+
+  .board-area {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  // contents'ten gerçek bir kutuya dön: panel tek sütun olarak dizilir
+  .side-panel {
+    display: flex;
+    grid-column: 2;
+    grid-row: 1;
+    flex-direction: column;
+    gap: 0.55rem;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  // Panel içindeki her blok normal akışa döner (order/margin sıfırlanır)
+  .level-bar,
+  .stats,
+  .bomb-banner,
+  .power-group,
+  .race-standings,
+  .assist-bar,
+  .ai-panel,
+  .controls {
+    order: 0;
+    margin: 0;
+    width: auto;
+  }
+
+  // Seviye + hedef tek satır (dikey yer kazanmak için)
+  .level-bar {
+    justify-content: space-between;
+    gap: 0.4rem;
+  }
+
+  // Süre ve hamle yan yana iki kutu
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.35rem;
+  }
+
+  // Güçler dikey liste: her satırda ad + adet okunur
+  .power-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+  }
+
+  .power-btn {
+    justify-content: flex-start;
+    border-radius: v.$radius-md;
+    padding: 0.5rem 0.7rem;
+  }
+
+  .power-count {
+    margin-left: auto; // adet sağa yaslanır
+  }
+
+  // Kontroller alt alta, tam genişlik → hangi butonun ne yaptığı net.
+  // Panel kaydırılsa bile butonlar altta sabit kalır (kısa ekranlarda
+  // görünmez olmasınlar).
+  // İkişerli ızgara: dört buton dikey olarak yığılınca panelin yarısını
+  // yiyor ve güçler/öneri ekranın altında kalıyordu.
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.35rem;
+    margin-top: auto;
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding: 0.5rem 0 0.2rem;
+    // Kaydırılan içerik altından geçtiği için TAM OPAK olmalı
+    background: var(--color-bg);
+    border-top: 1px solid var(--color-cell-empty);
+
+    .btn-primary {
+      width: 100%;
+      padding-inline: 0.5rem;
+      font-size: 0.92rem;
+    }
+  }
+
+  .assist-bar {
+    justify-content: flex-start;
+    // Sabit buton çubuğunun altında kalmasın
+    margin-bottom: 0.35rem;
+  }
+
+  // Panel bölüm başlıkları
+  .side-title {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.55;
+    margin-bottom: 0.3rem;
+  }
+}
+
+// --- Dar ekran: üst köşe butonları çakışmasın ----------------
+//
+// Sol üstteki profil hapı ile sağ üstteki aksiyon butonları ikisi de
+// `fixed`. 430px altında toplam genişlikleri ekranı aştığı için üst üste
+// biniyorlardı; burada profil hapı yalnız avatara indirilir.
+@media (max-width: 430px) {
+  .profile-btn {
+    padding: 0.35rem;
+    gap: 0;
+  }
+
+  .profile-meta {
+    display: none;
+  }
+
+  // Mağaza yazısı yerine yalnız simge → sağdaki sıra kısalır
+  .store-btn-label {
+    display: none;
+  }
 }

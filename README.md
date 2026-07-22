@@ -19,6 +19,10 @@ Bilgisayarda **ok tuşlarıyla**, telefonda **parmakla kaydırarak** oynanır.
 |---------------|-------|
 | ![Başlık ekranı](docs/screenshot-start.png) | <img src="docs/screenshot-mobile.png" width="260"> |
 
+| Profil (ünvan + avatar) | Başarımlar (ilerleme çubuklu) |
+|-------------------------|-------------------------------|
+| ![Profil](docs/screenshot-profile.png) | ![Başarımlar](docs/screenshot-achievements.png) |
+
 ### Çevrimiçi özellikler
 
 | Arkadaşlar | Sohbet | Çok oyunculu yarış |
@@ -39,6 +43,27 @@ verilen süre içinde ulaşman gerekir. İlerledikçe süre kısalır (3:00 → 
 zorlaşır. Süre dolar veya hamle biterse seviye başarısız olur ("Tekrar Dene").
 Hedefe ulaşınca sonraki seviyeye geçersin. Ulaştığın en yüksek seviye kaydedilir.
 
+## 🤖 Yapay zekâ
+
+Oyunun içinde, **API anahtarı ve internet gerektirmeyen** bir yapay zekâ çalışır:
+`logic/ai.ts` içindeki **expectimax** arama motoru (yılan-gradyan sezgiseli, şans
+düğümü örneklemesi, sert düğüm bütçesi). Tüm YZ özellikleri bu tek motordan gelir:
+
+- 💡 **Hamle önerisi** — oyun başına 5 hak; en iyi yönü ok olarak gösterir
+- 🤖 **YZ gösterimi** — "YZ Oynasın" ile motoru izle. **Yalnızca örnektir:** durdurunca
+  tahtan, skorun, sürün ve hakların aynen geri gelir; ilerlemen etkilenmez
+- 🏁 **YZ rakibi** — çok oyunculu odaya 3 zorlukta bot ekle (Kolay / Orta / Uzman);
+  bot da insanla **aynı tohumlu** taş dizisini oynar
+- ✨ **Hamle kalitesi** — her hamlen YZ'nin seçimiyle kıyaslanır: *Mükemmel · İyi ·
+  Daha iyisi vardı (↑)* — oyun sonunda **doğruluk yüzdesi** özeti
+- 🟢 **Canlı pozisyon göstergesi** — tahtanın sağlığı (İyi / Riskli / Tehlikeli);
+  boş alan, köşe kullanımı ve kalan hamle yönlerinden hesaplanır
+- 🔍 **Oyun sonu değerlendirmesi** — köşe stratejisi, verimlilik ve kişisel ipucu
+
+Ayarlar'daki **🧠 YZ Asistanı** anahtarı öneri, hamle kalitesi ve pozisyon
+göstergesini birlikte açar/kapatır. Hamle başına ek maliyet ortanca **~2 ms**
+(en kötü ~40 ms) — arayüz hiç takılmaz.
+
 ## Özellikler
 
 - 🎯 **Doğru 2048 mantığı** — saf, framework'süz, tam test edilmiş
@@ -48,7 +73,11 @@ Hedefe ulaşınca sonraki seviyeye geçersin. Ulaştığın en yüksek seviye ka
 - 💰 **Altın + Mağaza** — seviye tamamlayınca altın kazan; mağazadan güç/tema al
 - ⚡ **Güçler** — ⏰ +30sn · 💣 bomba (kare sil) · 🔀 karıştır · ↩️ geri al · 💡 ipucu
 - 🎨 **Temalar** — Neon, Okyanus, Orman, Gün Batımı (altınla açılır)
-- 👤 **Profil** — isim, istatistik, gün serisi, başarımlar
+- 👤 **Profil** — avatar seçimi, **ünvan** (Çırak → Kalfa → Usta → Üstat → Efsane),
+  9 istatistik, gün serisi
+- 🏅 **Başarımlar** — ana ekranda özet şerit, panelde **ilerleme çubuklu** liste
+  ("512 Kulübü — 128/512")
+- ⏸️ **Duraklat** — yalnızca tahtayı örter, sayaç durur
 - 🎁 **Günlük ödül + seri** — her gün oyna, seriye göre altın kazan
 - 🎯 **Görevler** — günlük ve haftalık görevler; oynadıkça ilerler, altın verir
 - 🌍 **Dil (TR/EN)** — Ayarlar'dan geçiş; arayüzün tamamı iki dilde
@@ -57,8 +86,9 @@ Hedefe ulaşınca sonraki seviyeye geçersin. Ulaştığın en yüksek seviye ka
 - 👥 **Arkadaşlar** — kullanıcı ara, istek gönder/kabul et, arkadaş listesi (skor/seviye özeti)
 - 💬 **Sohbet** — arkadaşlar arası mesajlaşma, emoji seçici, okunmamış rozeti (yakın-gerçek zamanlı)
 - 🏁 **Çok oyunculu yarış** — oda kur, 4 haneli kodla davet, ortak tohumla adil yarış + canlı skor tablosu
-- 🏠 **Ana ekran** — hesap panelinden başlığa / mod seçimine dönüş
-- 🏅 **Başarımlar** — altın ödüllü hedefler
+- 🏠 **Ana ekran** — başlığa / mod seçimine dönüş (oyun ekranında ← tuşu)
+- 🖥️ **İki sütunlu düzen** — geniş ekranda solda büyük tahta, sağda bilgi paneli
+  (süre, güçler, YZ, kontroller); dar ekranda tek sütuna iner
 - ↶ **Geri al** — son hamleyi geri al (kaybettiren hamle dahil)
 - 🏆 **Kalıcı rekor** — en yüksek skor `localStorage`'da saklanır
 - ⚙️ **Ayarlar paneli** — müzik, ses seviyeleri, tema (tercihler kalıcı)
@@ -75,7 +105,8 @@ Hedefe ulaşınca sonraki seviyeye geçersin. Ulaştığın en yüksek seviye ka
 - TypeScript
 - SCSS (CSS değişkenleriyle temalama)
 - Web Audio API (prosedürel ses efektleri)
-- Vitest (173 birim/bileşen testi)
+- Expectimax oyun ağacı araması (yapay zekâ — bağımlılıksız, saf TypeScript)
+- Vitest (220 birim/bileşen testi)
 - **Backend:** Python standart kütüphanesi — `http.server` + `sqlite3` + `pbkdf2` (hesap,
   arkadaşlar, sohbet, çok oyunculu yarış). Ek bağımlılık yok; nginx arkasında ayrı serviste çalışır.
 
@@ -98,8 +129,13 @@ src/
       friends.service.ts     # Arkadaşlar: ara/istek/kabul/liste (yoklamalı)
       chat.service.ts        # Sohbet: mesaj gönder/al, okunmamış rozeti
       multiplayer.service.ts # Çok oyunculu: oda/kod/başlat + canlı ilerleme
+      ai.service.ts          # Oyun sonu değerlendirmesi (algoritmik, anahtarsız)
     logic/
       board-logic.ts   # SAF hamle mantığı (kaydırma + birleştirme)
+      ai.ts            # SAF yapay zekâ: expectimax + hamle kalitesi + pozisyon sağlığı
+      bot-runner.ts    # SAF bot koşucusu (çok oyunculu YZ rakibi, tohumlu)
+      rank.ts          # SAF ünvan hesabı (puan → rütbe + ilerleme)
+      missions.ts      # SAF görev üretimi + ISO gün/hafta anahtarları
       swipe.ts         # SAF dokunmatik yön tespiti
       format-time.ts   # SAF süre biçimlendirme (mm:ss)
     models/
@@ -119,6 +155,12 @@ Python servisidir (yalnızca standart kütüphane — `http.server`, `sqlite3`,
 JSON uçları: `/register` · `/login` · `/me` · `/sync` · `/friends*` · `/messages*` ·
 `/rooms*`. Çok oyunculu yarışta tüm oyunculara **ortak tohum** gönderilir; böylece
 herkes birebir aynı taş dizisini alır (adil yarış), skorlar ~1sn'de bir eşitlenir.
+
+Güvenlik önlemleri: PBKDF2-SHA256 (600k tur, kullanıcıya özel tuz), sabit zamanlı
+karşılaştırma, oturum jetonu **süre sınırı**, girişte hız sınırı, istek gövdesi üst
+sınırı, oda durumunda **üyelik kontrolü** (tohum sızıntısını önler), skor
+doğrulaması (yarış bittikten sonra veya aralık dışı skor kabul edilmez) ve tüm
+hataların JSON yanıta çevrilmesi.
 
 ```bash
 python3 server/app.py     # 127.0.0.1:8092 (GAME2048_PORT ile değiştirilebilir)
@@ -154,7 +196,12 @@ npx ng serve --host 0.0.0.0
 npm test
 ```
 
-**173 test**, hepsi geçiyor. Kapsam ve elle test kontrol listesi: [TEST-NOTES.md](TEST-NOTES.md)
+**220 test**, hepsi geçiyor. Kapsam ve elle test kontrol listesi: [TEST-NOTES.md](TEST-NOTES.md)
+
+Testlerin bir bölümü **regresyon testidir**: kod denetiminde bulunan hatalar
+(geri almanın sayacı yeniden başlatmaması, karıştırma gücünün tahtayı
+kilitlemesi, ISO hafta anahtarı çakışması, YZ'nin ilerlemeyi etkilemesi vb.)
+düzeltildikten sonra bir daha geri gelmesin diye kilitlendi.
 
 ## Derleme ve deploy
 
@@ -207,3 +254,9 @@ web sunucusuyla servis edilebilir. Canlı sürüm bu dosyaların
 - [x] Arkadaşlar (ara / istek / kabul / liste)
 - [x] Sohbet (emoji'li, yakın-gerçek zamanlı, okunmamış rozeti)
 - [x] Çok oyunculu yarış (oda kur, kodla davet, ortak tohumla canlı yarış)
+- [x] **Yapay zekâ** (expectimax motoru: öneri, gösterim, bot rakip, hamle
+      kalitesi, pozisyon göstergesi, oyun sonu değerlendirmesi)
+- [x] Duraklatma (yalnızca tahtayı örten efekt)
+- [x] Arayüz düzeni (geniş ekranda tahta + yan panel, isimli güçler)
+- [x] Profil yenileme (avatar seçimi, ünvan sistemi, başarım ilerlemesi)
+- [x] Kod denetimi ve hata düzeltmeleri (oyun mantığı, arayüz servisleri, backend)

@@ -22,6 +22,8 @@ import sqlite3
 import hashlib
 import secrets
 import time
+import threading
+import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 DB_PATH = os.environ.get("GAME2048_DB", os.path.join(os.path.dirname(__file__), "app.db"))
@@ -29,17 +31,62 @@ PORT = int(os.environ.get("GAME2048_PORT", "8092"))
 
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.\-çğışöüÇĞİŞÖÜ ]{2,20}$")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-PBKDF2_ITERS = 120_000
+PBKDF2_ITERS = 600_000  # OWASP 2024 önerisi (PBKDF2-SHA256)
+LEGACY_ITERS = 120_000  # eski hesapların hash'i (girişte yükseltilir)
 TOKEN_TTL = 60 * 60 * 24 * 90  # 90 gün
+MAX_BODY = 256 * 1024  # istek gövdesi üst sınırı (bellek koruması)
+MAX_DATA = 64 * 1024  # /sync ile saklanabilecek en büyük ilerleme kaydı
+MAX_SCORE = 10_000_000  # makul üst sınır (uydurma skorları ele)
+LOGIN_MAX_TRIES = 10  # aynı kullanıcı adı için pencere başına deneme
+# Kısa pencere bilinçli bir tercih: kaba kuvvetin hızını keser ama parolasını
+# birkaç kez yanlış giren gerçek kullanıcıyı uzun süre dışarıda bırakmaz.
+LOGIN_WINDOW = 120  # saniye
+
+
+class BadRequest(Exception):
+    """İstemci hatası → 400 (mesaj, çeviri anahtarı olarak döner)."""
+
+
+# Basit bellek içi giriş hız sınırı: {kullanıcı_adı: [zaman damgaları]}
+_login_tries = {}
+_login_lock = threading.Lock()
+
+
+def login_allowed(username_lower: str) -> bool:
+    """Kaba kuvvet denemelerini yavaşlatır (kalıcı depo gerektirmez)."""
+    now = time.time()
+    with _login_lock:
+        tries = [t for t in _login_tries.get(username_lower, []) if now - t < LOGIN_WINDOW]
+        if len(tries) >= LOGIN_MAX_TRIES:
+            _login_tries[username_lower] = tries
+            return False
+        tries.append(now)
+        _login_tries[username_lower] = tries
+        return True
+
+
+def login_succeeded(username_lower: str) -> None:
+    with _login_lock:
+        _login_tries.pop(username_lower, None)
 
 
 # --------------------------------------------------------------------------
 #  Veritabanı
 # --------------------------------------------------------------------------
+_wal_ready = False
+
+
 def db():
-    conn = sqlite3.connect(DB_PATH)
+    # timeout: eşzamanlı yazmalarda "database is locked" yerine bekle.
+    conn = sqlite3.connect(DB_PATH, timeout=10.0)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
+    # journal_mode kalıcı bir ayardır; her istekte çalıştırmak gereksiz
+    # kilit alır (oda yoklaması saniyede birkaç istek gönderiyor).
+    global _wal_ready
+    if not _wal_ready:
+        conn.execute("PRAGMA journal_mode=WAL")
+        _wal_ready = True
+    conn.execute("PRAGMA busy_timeout=10000")
     return conn
 
 
@@ -111,10 +158,29 @@ def init_db():
 # --------------------------------------------------------------------------
 #  Yardımcılar
 # --------------------------------------------------------------------------
-def hash_pw(password: str, salt: str) -> str:
+def hash_pw(password: str, salt: str, iters: int = PBKDF2_ITERS) -> str:
     return hashlib.pbkdf2_hmac(
-        "sha256", password.encode("utf-8"), salt.encode("utf-8"), PBKDF2_ITERS
+        "sha256", password.encode("utf-8"), salt.encode("utf-8"), iters
     ).hex()
+
+
+def check_pw(conn, row, password: str) -> bool:
+    """Parolayı sabit zamanlı doğrular; eski turlu hash'i sessizce yükseltir.
+
+    Tur sayısı 120k'dan 600k'ya çıkarıldı. Mevcut hesaplar kilitlenmesin
+    diye eski tur sayısı da denenir ve doğruysa kayıt yenilenir.
+    """
+    salt = row["salt"]
+    if secrets.compare_digest(row["pwhash"], hash_pw(password, salt)):
+        return True
+    if secrets.compare_digest(row["pwhash"], hash_pw(password, salt, LEGACY_ITERS)):
+        conn.execute(
+            "UPDATE users SET pwhash = ? WHERE id = ?",
+            (hash_pw(password, salt), row["id"]),
+        )
+        conn.commit()
+        return True
+    return False
 
 
 def user_public(row) -> dict:
@@ -149,10 +215,18 @@ def make_token(conn, user_id: int) -> str:
 def user_from_token(conn, token: str):
     if not token:
         return None
+    # TOKEN_TTL artık gerçekten uygulanıyor: eskiden sessions.created hiç
+    # okunmadığı için sızan bir jeton sonsuza dek geçerli kalıyordu.
+    cutoff = int(time.time()) - TOKEN_TTL
     row = conn.execute(
-        "SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?",
-        (token,),
+        "SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id "
+        "WHERE s.token = ? AND s.created > ?",
+        (token, cutoff),
     ).fetchone()
+    if row is None:
+        # Süresi dolmuş oturumları fırsat buldukça temizle.
+        conn.execute("DELETE FROM sessions WHERE created <= ?", (cutoff,))
+        conn.commit()
     return row
 
 
@@ -167,6 +241,23 @@ def are_friends(conn, a: int, b: int) -> bool:
 
 # Oda kodunda karışması kolay karakterler yok (0/O, 1/I)
 ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def reap_stale_rooms(conn) -> None:
+    """6 saatten eski odaları siler.
+
+    Host tarayıcısı `leave` göndermeden kapanırsa oda satırları sonsuza
+    dek kalıyordu; bu hem 4 karakterlik kod havuzunu hem de veritabanını
+    zamanla dolduruyor.
+    """
+    cutoff = int(time.time()) - 6 * 3600
+    conn.execute(
+        "DELETE FROM room_players WHERE code IN "
+        "(SELECT code FROM rooms WHERE created < ?)",
+        (cutoff,),
+    )
+    conn.execute("DELETE FROM rooms WHERE created < ?", (cutoff,))
+    conn.commit()
 
 
 def gen_room_code(conn) -> str:
@@ -208,6 +299,7 @@ def room_state(conn, code):
                 "score": p["score"],
                 "best": p["best"],
                 "done": bool(p["done"]),
+                "isBot": p["user_id"] < 0,  # botlar negatif kimlikli
             }
             for p in players
         ],
@@ -221,25 +313,36 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "game2048-api/1.0"
 
     def _send(self, code: int, obj):
-        body = json.dumps(obj).encode("utf-8")
+        # 204 gövde taşıyamaz (RFC 9110); nginx ve katı istemciler reddedebilir.
+        body = b"" if code == 204 else json.dumps(obj).encode("utf-8")
         self.send_response(code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
+        if body:
+            self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         # Yerel geliştirme için CORS (prodda aynı origin)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.end_headers()
-        self.wfile.write(body)
+        if body:
+            self.wfile.write(body)
 
     def _body(self) -> dict:
-        length = int(self.headers.get("Content-Length", 0) or 0)
+        raw = self.headers.get("Content-Length", 0) or 0
+        try:
+            length = int(raw)
+        except (TypeError, ValueError):
+            raise BadRequest("bad_content_length")
         if length <= 0:
             return {}
+        # Sınırsız okuma bellek tüketimiyle sunucuyu düşürebiliyordu.
+        if length > MAX_BODY:
+            raise BadRequest("payload_too_large")
         try:
-            return json.loads(self.rfile.read(length).decode("utf-8"))
+            data = json.loads(self.rfile.read(length).decode("utf-8"))
         except Exception:
             return {}
+        return data if isinstance(data, dict) else {}
 
     def _token(self):
         auth = self.headers.get("Authorization", "")
@@ -251,12 +354,40 @@ class Handler(BaseHTTPRequestHandler):
         for prefix in ("/emre/2048/api", "/api"):
             if p.startswith(prefix):
                 p = p[len(prefix):]
+                break  # tek önek soyulur (/api/apix → /x olmasın)
         return p.rstrip("/") or "/"
 
     def do_OPTIONS(self):
         self._send(204, {})
 
     def do_GET(self):
+        self._dispatch(self._route_get)
+
+    def do_POST(self):
+        self._dispatch(self._route_post)
+
+    def _dispatch(self, route):
+        """Tüm hataları JSON yanıta çevirir.
+
+        Önceden hiçbir işleyicide try/except yoktu: gövdedeki bozuk bir
+        sayı (`{"id": "abc"}`) işleyiciyi çökertiyor, istemciye yanıt hiç
+        yazılmadığı için bağlantı resetleniyordu.
+        """
+        try:
+            route()
+        except BadRequest as exc:
+            self._send(400, {"error": str(exc)})
+        except (ValueError, TypeError, KeyError, IndexError):
+            self._send(400, {"error": "bad_request"})
+        except sqlite3.IntegrityError:
+            self._send(409, {"error": "conflict"})
+        except sqlite3.OperationalError:
+            self._send(503, {"error": "busy"})
+        except Exception:
+            traceback.print_exc()  # ayrıntı yalnızca sunucu günlüğüne
+            self._send(500, {"error": "server_error"})
+
+    def _route_get(self):
         p = self._path()
         if p == "/health":
             return self._send(200, {"ok": True})
@@ -274,7 +405,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._room_state()
         return self._send(404, {"error": "not_found"})
 
-    def do_POST(self):
+    def _route_post(self):
         p = self._path()
         if p == "/register":
             return self._register()
@@ -302,6 +433,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._room_start()
         if p == "/rooms/progress":
             return self._room_progress()
+        if p == "/rooms/addbot":
+            return self._room_addbot()
+        if p == "/rooms/removebot":
+            return self._room_removebot()
+        if p == "/rooms/botprogress":
+            return self._room_botprogress()
         return self._send(404, {"error": "not_found"})
 
     def _auth_row(self, conn):
@@ -318,7 +455,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, {"error": "invalid_username"})
         if not EMAIL_RE.match(email):
             return self._send(400, {"error": "invalid_email"})
-        if len(password) < 4:
+        if len(password) < 6:
             return self._send(400, {"error": "weak_password"})
 
         conn = db()
@@ -331,11 +468,17 @@ class Handler(BaseHTTPRequestHandler):
 
             salt = secrets.token_hex(16)
             data = json.dumps(b.get("data") or {})
-            conn.execute(
-                "INSERT INTO users (username, username_lower, email, pwhash, salt, data, created)"
-                " VALUES (?,?,?,?,?,?,?)",
-                (username, username.lower(), email, hash_pw(password, salt), salt, data, int(time.time())),
-            )
+            if len(data) > MAX_DATA:
+                return self._send(400, {"error": "invalid_data"})
+            try:
+                conn.execute(
+                    "INSERT INTO users (username, username_lower, email, pwhash, salt, data, created)"
+                    " VALUES (?,?,?,?,?,?,?)",
+                    (username, username.lower(), email, hash_pw(password, salt), salt, data, int(time.time())),
+                )
+            except sqlite3.IntegrityError:
+                # İki eşzamanlı kayıt: kontrol ile INSERT arası yarış.
+                return self._send(409, {"error": "username_taken"})
             conn.commit()
             row = conn.execute(
                 "SELECT * FROM users WHERE username_lower = ?", (username.lower(),)
@@ -349,13 +492,18 @@ class Handler(BaseHTTPRequestHandler):
         b = self._body()
         username = (b.get("username") or "").strip()
         password = b.get("password") or ""
+        uname = username.lower()
+        # Kaba kuvvete karşı: aynı kullanıcı adına 5 dakikada 8 deneme.
+        if not login_allowed(uname):
+            return self._send(429, {"error": "too_many_attempts"})
         conn = db()
         try:
             row = conn.execute(
-                "SELECT * FROM users WHERE username_lower = ?", (username.lower(),)
+                "SELECT * FROM users WHERE username_lower = ?", (uname,)
             ).fetchone()
-            if not row or hash_pw(password, row["salt"]) != row["pwhash"]:
+            if not row or not check_pw(conn, row, password):
                 return self._send(401, {"error": "bad_credentials"})
+            login_succeeded(uname)
             token = make_token(conn, row["id"])
             return self._send(200, {"token": token, "user": user_public(row)})
         finally:
@@ -363,6 +511,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def _logout(self):
         token = self._token()
+        if not token:
+            # Eskiden jeton yokken de 200 dönüyordu (hiçbir şey yapmadan).
+            return self._send(401, {"error": "unauthorized"})
         conn = db()
         try:
             conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
@@ -394,9 +545,13 @@ class Handler(BaseHTTPRequestHandler):
             data = self._body().get("data")
             if not isinstance(data, dict):
                 return self._send(400, {"error": "invalid_data"})
+            blob = json.dumps(data)
+            # Sınırsız blob ile veritabanını şişirmeyi engelle.
+            if len(blob) > MAX_DATA:
+                return self._send(400, {"error": "invalid_data"})
             conn.execute(
                 "UPDATE users SET data = ? WHERE id = ?",
-                (json.dumps(data), row["id"]),
+                (blob, row["id"]),
             )
             conn.commit()
             return self._send(200, {"ok": True})
@@ -415,12 +570,17 @@ class Handler(BaseHTTPRequestHandler):
             if "?" in self.path:
                 from urllib.parse import parse_qs
                 q = (parse_qs(self.path.split("?", 1)[1]).get("q", [""])[0]).strip()
-            if len(q) < 2:
+            if len(q) < 2 or len(q) > 20:
                 return self._send(200, {"users": []})
+            # LIKE joker karakterleri kaçırılır: "q=__" ile tüm kullanıcı
+            # tablosunu dökmek mümkündü (numaralandırma).
+            pattern = (
+                q.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            )
             rows = conn.execute(
-                "SELECT * FROM users WHERE username_lower LIKE ? AND id != ? "
-                "ORDER BY username LIMIT 15",
-                (f"%{q.lower()}%", me["id"]),
+                "SELECT * FROM users WHERE username_lower LIKE ? ESCAPE '\\' "
+                "AND id != ? ORDER BY username LIMIT 15",
+                (f"%{pattern}%", me["id"]),
             ).fetchall()
             return self._send(200, {"users": [user_public(r) for r in rows]})
         finally:
@@ -685,6 +845,7 @@ class Handler(BaseHTTPRequestHandler):
             b = self._body()
             duration = int(b.get("duration") or 180)
             duration = max(30, min(600, duration))
+            reap_stale_rooms(conn)  # terk edilmiş odaları temizle
             code = gen_room_code(conn)
             seed = secrets.randbelow(2_000_000_000) + 1
             now = int(time.time())
@@ -737,9 +898,26 @@ class Handler(BaseHTTPRequestHandler):
             if not room:
                 return self._send(200, {"ok": True})
             if room["host_id"] == me["id"]:
-                # Host ayrıldı → odayı tamamen kaldır
-                conn.execute("DELETE FROM room_players WHERE code=?", (code,))
-                conn.execute("DELETE FROM rooms WHERE code=?", (code,))
+                # Host ayrıldı. Eskiden oda koşulsuz siliniyordu; yarışın
+                # ortasında host sekmeyi kapatınca diğer herkesin yarışı
+                # buharlaşıyordu. Başka insan oyuncu varsa kurucu devredilir.
+                conn.execute(
+                    "DELETE FROM room_players WHERE code=? AND user_id=?",
+                    (code, me["id"]),
+                )
+                heir = conn.execute(
+                    "SELECT user_id FROM room_players WHERE code=? AND user_id>0 "
+                    "ORDER BY joined LIMIT 1",
+                    (code,),
+                ).fetchone()
+                if heir:
+                    conn.execute(
+                        "UPDATE rooms SET host_id=? WHERE code=?", (heir["user_id"], code)
+                    )
+                else:
+                    # İnsan kalmadı → odayı (ve botlarını) kaldır
+                    conn.execute("DELETE FROM room_players WHERE code=?", (code,))
+                    conn.execute("DELETE FROM rooms WHERE code=?", (code,))
             else:
                 conn.execute(
                     "DELETE FROM room_players WHERE code=? AND user_id=?",
@@ -791,12 +969,126 @@ class Handler(BaseHTTPRequestHandler):
             score = int(b.get("score") or 0)
             best = int(b.get("best") or 0)
             done = 1 if b.get("done") else 0
+            # Skorlar tamamen istemciden geliyordu: negatif/uçuk değerler ve
+            # yarış bittikten SONRA gönderilen güncellemeler kabul ediliyordu.
+            if not 0 <= score <= MAX_SCORE or not 0 <= best <= MAX_SCORE:
+                return self._send(400, {"error": "invalid_score"})
+            room = conn.execute("SELECT * FROM rooms WHERE code=?", (code,)).fetchone()
+            if not room:
+                return self._send(404, {"error": "room_not_found"})
+            member = conn.execute(
+                "SELECT 1 FROM room_players WHERE code=? AND user_id=?",
+                (code, me["id"]),
+            ).fetchone()
+            if not member:
+                return self._send(403, {"error": "not_in_room"})
+            if room["status"] != "racing":
+                # Lobide veya yarış bittikten sonra skor YAZILMAZ; ancak
+                # istemci son durumu görebilsin diye oda yine döndürülür
+                # (aksi hâlde yarışın bittiğini hiç öğrenemezdi).
+                return self._send(200, {"room": room_state(conn, code)})
             conn.execute(
                 "UPDATE room_players SET score=?, best=?, done=? WHERE code=? AND user_id=?",
                 (score, best, done, code, me["id"]),
             )
             conn.commit()
             return self._send(200, {"room": room_state(conn, code)})
+        finally:
+            conn.close()
+
+    # --- YZ botları (host tarafından yönetilir) ----------------
+    def _room_addbot(self):
+        """POST /rooms/addbot {code, difficulty} -> odaya YZ botu ekle (host, lobi)."""
+        conn = db()
+        try:
+            me = self._auth_row(conn)
+            if not me:
+                return self._send(401, {"error": "unauthorized"})
+            b = self._body()
+            code = (b.get("code") or "").strip().upper()
+            diff = (b.get("difficulty") or "medium").lower()
+            names = {"easy": "🤖 Bot (Kolay)", "medium": "🤖 Bot (Orta)", "expert": "🤖 Bot (Uzman)"}
+            room = conn.execute("SELECT * FROM rooms WHERE code=?", (code,)).fetchone()
+            if not room:
+                return self._send(404, {"error": "room_not_found"})
+            if room["host_id"] != me["id"]:
+                return self._send(403, {"error": "not_host"})
+            if room["status"] != "lobby":
+                return self._send(409, {"error": "already_started"})
+            # En küçük mevcut kimliğin altında yeni negatif bot kimliği
+            row = conn.execute(
+                "SELECT MIN(user_id) AS m FROM room_players WHERE code=?", (code,)
+            ).fetchone()
+            bot_id = min(0, row["m"] or 0) - 1
+            try:
+                conn.execute(
+                    "INSERT INTO room_players (code, user_id, username, joined) VALUES (?,?,?,?)",
+                    (code, bot_id, names.get(diff, names["medium"]), int(time.time())),
+                )
+            except sqlite3.IntegrityError:
+                # Host butona iki kez bastıysa iki istek de aynı kimliği
+                # hesaplayabilir; çakışmayı hata değil, "tekrar dene" say.
+                return self._send(409, {"error": "try_again"})
+            conn.commit()
+            return self._send(200, {"room": room_state(conn, code), "botId": bot_id})
+        finally:
+            conn.close()
+
+    def _room_removebot(self):
+        """POST /rooms/removebot {code, botId} -> botu çıkar (host, lobi)."""
+        conn = db()
+        try:
+            me = self._auth_row(conn)
+            if not me:
+                return self._send(401, {"error": "unauthorized"})
+            b = self._body()
+            code = (b.get("code") or "").strip().upper()
+            bot_id = b.get("botId")
+            room = conn.execute("SELECT * FROM rooms WHERE code=?", (code,)).fetchone()
+            if not room:
+                return self._send(404, {"error": "room_not_found"})
+            if room["host_id"] != me["id"]:
+                return self._send(403, {"error": "not_host"})
+            conn.execute(
+                "DELETE FROM room_players WHERE code=? AND user_id=? AND user_id<0",
+                (code, int(bot_id) if bot_id is not None else 0),
+            )
+            conn.commit()
+            return self._send(200, {"room": room_state(conn, code)})
+        finally:
+            conn.close()
+
+    def _room_botprogress(self):
+        """POST /rooms/botprogress {code, botId, score, best, done} -> bot ilerlemesi (host)."""
+        conn = db()
+        try:
+            me = self._auth_row(conn)
+            if not me:
+                return self._send(401, {"error": "unauthorized"})
+            b = self._body()
+            code = (b.get("code") or "").strip().upper()
+            bot_id = b.get("botId")
+            room = conn.execute("SELECT * FROM rooms WHERE code=?", (code,)).fetchone()
+            if not room:
+                return self._send(404, {"error": "room_not_found"})
+            if room["host_id"] != me["id"]:
+                return self._send(403, {"error": "not_host"})
+            score = int(b.get("score") or 0)
+            best = int(b.get("best") or 0)
+            if not 0 <= score <= MAX_SCORE or not 0 <= best <= MAX_SCORE:
+                return self._send(400, {"error": "invalid_score"})
+            conn.execute(
+                "UPDATE room_players SET score=?, best=?, done=? WHERE code=? AND user_id=? AND user_id<0",
+                (
+                    score,
+                    best,
+                    1 if b.get("done") else 0,
+                    code,
+                    int(bot_id) if bot_id is not None else 0,
+                ),
+            )
+            conn.commit()
+            return self._send(200, {"ok": True})
         finally:
             conn.close()
 
@@ -811,6 +1103,15 @@ class Handler(BaseHTTPRequestHandler):
             st = room_state(conn, code)
             if not st:
                 return self._send(404, {"error": "room_not_found"})
+            # Üyelik şartı: oda kodu 4 karakter (~1M olasılık), taranabilir.
+            # Kontrol olmadan herkes her odanın TOHUMUNU ve skorlarını
+            # okuyabiliyordu; tohum bilinince taş dizisi önceden hesaplanır.
+            member = conn.execute(
+                "SELECT 1 FROM room_players WHERE code=? AND user_id=?",
+                (code, me["id"]),
+            ).fetchone()
+            if not member:
+                return self._send(403, {"error": "not_in_room"})
             return self._send(200, {"room": st})
         finally:
             conn.close()

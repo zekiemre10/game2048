@@ -62,12 +62,21 @@ export class FriendsService {
     }
   }
 
+  /**
+   * Arama sıra numarası: her tuş vuruşunda istek atıldığından yanıtlar
+   * sırasız dönebilir. Yalnızca EN SON isteğin yanıtı uygulanır; aksi
+   * hâlde "an" yanıtı geç gelip "anna" sonuçlarını eziyordu.
+   */
+  private searchSeq = 0;
+
   /** Kullanıcı ara (en az 2 karakter). */
   async search(q: string): Promise<void> {
     const headers = this.auth.authHeaders();
     const term = q.trim();
+    const seq = ++this.searchSeq;
     if (!headers || term.length < 2) {
       this.searchResults.set([]);
+      this.searching.set(false);
       return;
     }
     this.searching.set(true);
@@ -77,11 +86,12 @@ export class FriendsService {
         { headers },
       );
       const j = await res.json().catch(() => ({}));
+      if (seq !== this.searchSeq) return; // daha yeni bir arama var
       this.searchResults.set(res.ok ? (j.users ?? []) : []);
     } catch {
-      this.searchResults.set([]);
+      if (seq === this.searchSeq) this.searchResults.set([]);
     } finally {
-      this.searching.set(false);
+      if (seq === this.searchSeq) this.searching.set(false);
     }
   }
 

@@ -118,6 +118,11 @@ export class App {
 
   // --- Profil: ünvan ve avatar -------------------------------
   protected readonly rankInfo = this.game.rankInfo;
+
+  // --- 7 günlük ödül takvimi ---------------------------------
+  protected readonly rewardCalendar = this.game.rewardCalendar;
+  protected readonly rewardCycleDay = this.game.rewardCycleDay;
+  protected readonly claimedReward = this.game.claimedReward;
   protected readonly avatar = this.game.avatar;
   protected readonly AVATARS = AVATARS;
   protected readonly avatarPickerOpen = signal(false);

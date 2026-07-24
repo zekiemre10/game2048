@@ -421,13 +421,44 @@
         }
       </div>
 
-      <!-- Günlük ödül -->
+      <!-- 7 günlük ödül takvimi -->
+      <h3 class="settings-heading">{{ t('rew.title') }}</h3>
+      <div class="reward-week">
+        @for (r of rewardCalendar; track r.day) {
+          <div
+            class="rw-day"
+            [class.claimed]="r.day < rewardCycleDay() || (r.day === rewardCycleDay() && !canClaimDaily())"
+            [class.today]="r.day === rewardCycleDay()"
+            [class.big]="r.day === 7"
+          >
+            <span class="rw-num">{{ t('rew.day') }} {{ r.day }}</span>
+            <span class="rw-icon">{{ r.icon }}</span>
+            <span class="rw-amount">
+              @if (r.gold > 0) { {{ r.gold }} }
+              @if (r.power) { <span class="rw-power">×{{ r.powerCount }}</span> }
+            </span>
+            @if (r.day < rewardCycleDay() || (r.day === rewardCycleDay() && !canClaimDaily())) {
+              <span class="rw-tick" aria-hidden="true">✓</span>
+            }
+          </div>
+        }
+      </div>
+
       @if (canClaimDaily()) {
         <button class="btn-primary daily-btn" type="button" (click)="onClaimDaily()">
-          {{ t('prof.claimDaily') }}
+          {{ t('prof.claimDaily') }} — {{ t('rew.day') }} {{ rewardCycleDay() }}
         </button>
       } @else {
-        <div class="daily-done">{{ t('prof.dailyDone') }}</div>
+        <div class="daily-done">
+          {{ t('prof.dailyDone') }}
+          @if (claimedReward(); as cr) {
+            <span class="daily-got">
+              {{ cr.icon }}
+              @if (cr.gold > 0) { +{{ cr.gold }} }
+              @if (cr.power) { ×{{ cr.powerCount }} }
+            </span>
+          }
+        </div>
       }
 
       <!-- İstatistikler -->

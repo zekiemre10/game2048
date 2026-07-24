@@ -9,7 +9,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(1rem, 5vw, 1.5rem);
+  padding: clamp(0.6rem, 4vw, 1.5rem);
   box-sizing: border-box;
 }
 
@@ -17,6 +17,12 @@
   text-align: center;
   max-width: 420px;
   width: 100%;
+}
+
+// Sarmalayıcılar dar ekranda "yok" sayılır → tek sütun akışı korunur
+.hero-brand,
+.hero-actions {
+  display: contents;
 }
 
 .logo {
@@ -382,5 +388,107 @@
 
   .hint {
     margin-top: 0.2rem;
+  }
+
+  // Yeni kartlar da küçülür
+  .daily-card {
+    margin-top: 0.4rem;
+    padding: 0.45rem 0.6rem;
+  }
+
+  .daily-desc {
+    display: none;
+  }
+
+  .ach-strip {
+    margin-top: 0.4rem;
+    padding: 0.4rem 0.6rem;
+  }
+
+  .ach-strip-icons {
+    display: none; // yer kazan; sayı ve çubuk kalır
+  }
+}
+
+// --- Geniş ekran: iki sütun (solda marka, sağda seçimler) ----
+//
+// Günlük kart + başarım şeridi eklenince tek sütun 792px'e çıktı ve
+// 720px yüksekliğindeki ekranlarda kaydırma gerekiyordu. İki sütun
+// yüksekliği yarıya indirir, boş yatay alanı da değerlendirir.
+@media (min-width: 860px) {
+  .hero {
+    max-width: 900px;
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(1.2rem, 4vw, 2.5rem);
+  }
+
+  .hero-brand,
+  .hero-actions {
+    display: block; // artık gerçek sütun
+    min-width: 0;
+  }
+
+  .hero-actions > *:first-child {
+    margin-top: 0;
+  }
+
+  // Marka sütununda başlık daha büyük durabilir
+  .logo {
+    margin-bottom: 0.8rem;
+  }
+
+  .hint {
+    margin-top: 0.8rem;
+  }
+}
+
+// --- Orta yükseklik: tek sütun kalsa da sıkışsın --------------
+// (860px'den dar ama 760px'den kısa ekranlar — küçük telefonlar)
+@media (max-height: 760px) and (max-width: 859px) {
+  .logo {
+    width: 44px;
+    margin-bottom: 0.4rem;
+    font-size: 0.85rem;
+  }
+
+  .title {
+    font-size: clamp(1.9rem, 8vw, 2.4rem);
+  }
+
+  .subtitle {
+    font-size: 0.9rem;
+    margin: 0.25rem 0 0.6rem;
+  }
+
+  .size-row {
+    margin-bottom: 0.5rem;
+  }
+
+  .mode-card {
+    padding: 0.5rem 0.4rem;
+  }
+
+  .mode-icon {
+    font-size: 1.4rem;
+  }
+
+  .daily-card {
+    margin-top: 0.5rem;
+    padding: 0.55rem 0.7rem;
+  }
+
+  .ach-strip {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.7rem;
+  }
+
+  .gold-total {
+    margin-top: 0.5rem;
+  }
+
+  .hint {
+    margin-top: 0.5rem;
   }
 }

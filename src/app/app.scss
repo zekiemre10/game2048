@@ -1060,6 +1060,92 @@
   font-size: 0.9rem;
 }
 
+// --- 7 günlük ödül takvimi ----------------------------------
+
+.reward-week {
+  display: grid;
+  // 7 gün: 4 + 3 dizilir (7. gün geniş vurgu alır)
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.35rem;
+  margin-bottom: 0.7rem;
+}
+
+.rw-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.4rem 0.2rem;
+  border-radius: v.$radius-md;
+  background: var(--color-cell-empty);
+  text-align: center;
+
+  // Alınmış günler soluk + tikli
+  &.claimed {
+    opacity: 0.55;
+  }
+
+  // Bugünün ödülü vurgulu
+  &.today {
+    background: var(--color-button);
+    color: var(--color-text-light);
+    box-shadow: 0 0 0 2px var(--color-button);
+  }
+
+  // 7. gün büyük ödül — son sırada tüm genişliği alır
+  &.big {
+    grid-column: span 4;
+    flex-direction: row;
+    justify-content: center;
+    gap: 0.5rem;
+    background: linear-gradient(135deg, #f6c945, #f0a020);
+    color: #5a3d00;
+
+    &.today {
+      box-shadow: 0 0 0 2px #f0a020;
+    }
+  }
+}
+
+.rw-num {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  opacity: 0.8;
+}
+
+.rw-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.rw-amount {
+  font-size: 0.72rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.rw-power {
+  font-size: 0.72rem;
+}
+
+.rw-tick {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #3fa96b;
+}
+
+// Bugün ne kazanıldığı ("alındı" satırında)
+.daily-got {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-weight: 800;
+}
+
 // --- Günlük meydan okuma paneli -----------------------------
 
 .daily-day {

@@ -127,6 +127,10 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'set.account': { tr: '👤 HESAP', en: '👤 ACCOUNT' },
   'set.tutorial': { tr: '🎓 REHBER', en: '🎓 GUIDE' },
 
+  // 7 günlük ödül takvimi
+  'rew.title': { tr: '🎁 7 GÜNLÜK ÖDÜL', en: '🎁 7-DAY REWARDS' },
+  'rew.day': { tr: 'Gün', en: 'Day' },
+
   // Günlük meydan okuma
   'daily.title': { tr: '📅 Günlük Meydan Okuma', en: '📅 Daily Challenge' },
   'daily.cardDesc': {

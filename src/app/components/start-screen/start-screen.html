@@ -1,9 +1,24 @@
 <section class="start-screen">
+  <!--
+    Geniş ekranda iki sütun: solda marka, sağda seçimler. Dar ekranda
+    sarmalayıcılar `display: contents` ile dağılır ve tek sütun kalır.
+  -->
   <div class="hero">
-    <div class="logo">2048</div>
-    <h1 class="title">2048</h1>
-    <p class="subtitle" [innerHTML]="t('start.subtitle')"></p>
+    <div class="hero-brand">
+      <div class="logo">2048</div>
+      <h1 class="title">2048</h1>
+      <p class="subtitle" [innerHTML]="t('start.subtitle')"></p>
 
+      <p class="gold-total">{{ t('start.totalGold') }} {{ gold() }}</p>
+
+      @if (bestLevel() > 0) {
+        <p class="best-level">{{ t('start.bestLevel') }} {{ bestLevel() }}</p>
+      }
+
+      <p class="hint">{{ t('start.hint') }}</p>
+    </div>
+
+    <div class="hero-actions">
     <!-- Tahta boyutu (Seviye modu hariç) -->
     <div class="size-row">
       <span class="size-label">{{ t('start.sizeLabel') }}</span>
@@ -75,13 +90,6 @@
         <span class="mission-fill" [style.width.%]="percent()"></span>
       </span>
     </button>
-
-    <p class="gold-total">{{ t('start.totalGold') }} {{ gold() }}</p>
-
-    @if (bestLevel() > 0) {
-      <p class="best-level">{{ t('start.bestLevel') }} {{ bestLevel() }}</p>
-    }
-
-    <p class="hint">{{ t('start.hint') }}</p>
+    </div>
   </div>
 </section>

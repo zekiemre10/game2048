@@ -78,7 +78,9 @@ göstergesini birlikte açar/kapatır. Hamle başına ek maliyet ortanca **~2 ms
 - 🏅 **Başarımlar** — ana ekranda özet şerit, panelde **ilerleme çubuklu** liste
   ("512 Kulübü — 128/512")
 - ⏸️ **Duraklat** — yalnızca tahtayı örter, sayaç durur
-- 🎁 **Günlük ödül + seri** — her gün oyna, seriye göre altın kazan
+- 🎁 **7 günlük ödül takvimi** — üst üste her gün gel, ödül büyüsün:
+  30 → 50 altın → 💣 bomba → 90 altın → ↩️ 2 geri al → 140 altın →
+  **7. gün: 250 altın + 3 ipucu**. Seri kırılmazsa tur baştan başlar
 - 🎯 **Görevler** — günlük ve haftalık görevler; oynadıkça ilerler, altın verir
 - 🌍 **Dil (TR/EN)** — Ayarlar'dan geçiş; arayüzün tamamı iki dilde
 - 🎮 **Modlar** — Klasik · Zen (süresiz) · Zaman Yarışı (3dk) · Seviye · Günlük + tahta boyutu (3×3/4×4/5×5)

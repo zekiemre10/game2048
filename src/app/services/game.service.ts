@@ -34,11 +34,16 @@ import {
 } from '../models/power.model';
 import { ACHIEVEMENTS } from '../models/achievement.model';
 import {
-  dailyRewardAmount,
   dayKey,
   streakAfterActivity,
   yesterdayKey,
 } from '../logic/daily';
+import {
+  DAILY_REWARDS,
+  DailyReward,
+  cycleDay,
+  rewardForStreak,
+} from '../logic/daily-rewards';
 import {
   DAILY_COUNT,
   DAILY_POOL,
@@ -1148,13 +1153,48 @@ export class GameService {
     if (this.lastRewardDay() === today) return false; // bugün alınmış
 
     this.registerActivity(); // seriyi güncelle
-    const reward = dailyRewardAmount(this.currentStreak());
-    this.addGold(reward);
+    // 7 günlük döngü: seri sürdükçe ödül büyür, aralarda güç gelir.
+    const reward = rewardForStreak(this.currentStreak());
+    if (reward.gold > 0) this.addGold(reward.gold);
+    if (reward.power) {
+      this.powers.update((inv) => ({
+        ...inv,
+        [reward.power!]: inv[reward.power!] + reward.powerCount,
+      }));
+      savePowers(this.powers());
+    }
     this.lastRewardDay.set(today);
-    this.lastDailyReward.set(reward);
+    this.lastDailyReward.set(reward.gold);
+    this.claimedReward.set(reward);
     saveDailyDay(today);
+    this.celebrate('achievement'); // ödül alındı 🎉
     return true;
   }
+
+  /** Bugün alınan ödülün ayrıntısı (arayüzde "ne kazandın" için). */
+  readonly claimedReward = signal<DailyReward | null>(null);
+
+  /**
+   * Bugün alınacak/alınan ödülün döngüdeki günü (1-7).
+   * Ödül henüz alınmadıysa, alınınca serinin NE OLACAĞI hesaplanır —
+   * böylece takvim doğru günü vurgular (seri kırıldıysa 1'e döner).
+   */
+  readonly rewardCycleDay = computed(() => {
+    const now = new Date();
+    const today = dayKey(now);
+    const streak = this.canClaimDaily()
+      ? streakAfterActivity(
+          this.currentStreak(),
+          this.lastActiveDay(),
+          today,
+          yesterdayKey(now),
+        )
+      : this.currentStreak();
+    return cycleDay(Math.max(1, streak));
+  });
+
+  /** 7 günlük ödül takvimi (arayüzde gösterilir). */
+  readonly rewardCalendar = DAILY_REWARDS;
 
   /** Oyun sonunda istatistikleri günceller. */
   private recordGameEnd(won: boolean): void {

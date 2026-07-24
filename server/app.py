@@ -56,6 +56,12 @@ def login_allowed(username_lower: str) -> bool:
     """Kaba kuvvet denemelerini yavaşlatır (kalıcı depo gerektirmez)."""
     now = time.time()
     with _login_lock:
+        # Farklı kullanıcı adlarıyla sözlüğü sonsuza dek şişirmeyi önle:
+        # penceresi dolmuş kayıtları fırsat buldukça temizle.
+        if len(_login_tries) > 4096:
+            for u in [u for u, ts in _login_tries.items()
+                      if not any(now - t < LOGIN_WINDOW for t in ts)]:
+                del _login_tries[u]
         tries = [t for t in _login_tries.get(username_lower, []) if now - t < LOGIN_WINDOW]
         if len(tries) >= LOGIN_MAX_TRIES:
             _login_tries[username_lower] = tries
@@ -493,7 +499,7 @@ class Handler(BaseHTTPRequestHandler):
         username = (b.get("username") or "").strip()
         password = b.get("password") or ""
         uname = username.lower()
-        # Kaba kuvvete karşı: aynı kullanıcı adına 5 dakikada 8 deneme.
+        # Kaba kuvvete karşı: aynı kullanıcı adına 2 dakikada 10 deneme.
         if not login_allowed(uname):
             return self._send(429, {"error": "too_many_attempts"})
         conn = db()

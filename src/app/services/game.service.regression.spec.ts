@@ -89,12 +89,22 @@ describe('Regresyon — denetimde bulunan hatalar', () => {
   // --- YZ yalnızca gösterim ------------------------------------
 
   it('YZ durdurulunca oyuncunun kendi tahtası ve skoru geri gelir', () => {
+    // Yalnızca anlamlı tahta durumu: konum/değer (animasyon bayrakları
+    // geri yüklemede kasıtlı olarak temizlenir, kıyasa dahil edilmez).
+    const boardState = () =>
+      JSON.stringify(
+        service
+          .tiles()
+          .map((t) => ({ id: t.id, value: t.value, row: t.row, col: t.col }))
+          .sort((a, b) => a.id - b.id),
+      );
+
     service.startMode(GameMode.Classic);
     // Oyuncu birkaç hamle yapsın
     for (let i = 0; i < 6; i++) {
       service.move([Direction.Up, Direction.Left, Direction.Down, Direction.Right][i % 4]);
     }
-    const myTiles = JSON.stringify(service.tiles());
+    const myTiles = boardState();
     const myScore = service.score();
     const myMoves = service.moves();
 
@@ -109,7 +119,7 @@ describe('Regresyon — denetimde bulunan hatalar', () => {
 
     service.stopAutoplay();
 
-    expect(JSON.stringify(service.tiles())).toBe(myTiles);
+    expect(boardState()).toBe(myTiles);
     expect(service.score()).toBe(myScore);
     expect(service.moves()).toBe(myMoves);
     expect(service.status()).toBe(GameStatus.Playing);
@@ -155,6 +165,38 @@ describe('Regresyon — denetimde bulunan hatalar', () => {
     const aiScore = service.score();
     service.stopAutoplay();
     expect(service.aiDemoResult()).toBe(aiScore);
+  });
+
+  it('gösterim durdurulunca taşlarda animasyon bayrağı kalmaz', () => {
+    service.startMode(GameMode.Classic);
+    // Bir hamle yap → yeni/birleşmiş taş bayrakları oluşabilir
+    for (const d of [Direction.Up, Direction.Left, Direction.Down, Direction.Right]) {
+      if (service.move(d)) break;
+    }
+    service.startAutoplay('expert');
+    const dir = bestMove(service.toValueGrid(), 'expert');
+    if (dir) service.move(dir);
+    service.stopAutoplay();
+    // Geri yüklenen taşların hiçbiri isNew/merged taşımamalı (tekrar animasyon yok)
+    for (const t of service.tiles()) {
+      expect(t.isNew).toBeFalsy();
+      expect(t.merged).toBeFalsy();
+    }
+  });
+
+  it('gösterim geri sayım sayacını dondurur (oyun-sonu ekranı yanıp sönmez)', () => {
+    service.startMode(GameMode.TimeAttack);
+    service.startAutoplay('expert');
+    // Gösterim sırasında YZ oynasa da geri sayım aktif sayaç KURMAMALI:
+    // status Playing kalır, süre bitip Lost'a düşmez.
+    for (let i = 0; i < 8; i++) {
+      const dir = bestMove(service.toValueGrid(), 'expert');
+      if (!dir) break;
+      service.move(dir);
+    }
+    expect(service.status()).toBe(GameStatus.Playing);
+    service.stopAutoplay();
+    expect(service.status()).toBe(GameStatus.Playing);
   });
 
   it('gösterim sırasında yeni oyun başlarsa eski tahta GERİ GELMEZ', () => {

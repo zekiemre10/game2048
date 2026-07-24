@@ -519,6 +519,12 @@ export class GameService {
       assistHintsLeft: this.assistHintsLeft(),
     };
 
+    // Sayacı DONDUR: gösterim oyuncunun saatiyle oynanmaz. Aksi hâlde
+    // süre gösterim sırasında bitip oyun-sonu ekranını bir an gösterebilir
+    // (o an bir butona basmak istenmeyen işlem tetikler). Süre restorePreAi'de
+    // anlık görüntüden geri yüklenir.
+    this.stopTimer();
+
     this.aiDemoResult.set(null);
     this.autoplayLevel = level;
     this.autoplaying.set(true);
@@ -558,7 +564,11 @@ export class GameService {
 
     const aiScore = this.score(); // gösterimde YZ'nin ulaştığı skor
 
-    this.tiles.set(snap.tiles);
+    // Animasyon bayraklarını temizleyerek geri yükle (geri-al ile aynı):
+    // yoksa gösterim öncesi taşlar tekrar pop/bump oynatırdı.
+    this.tiles.set(
+      snap.tiles.map((t) => ({ id: t.id, value: t.value, row: t.row, col: t.col })),
+    );
     this.score.set(snap.score);
     this.moves.set(snap.moves);
     this.keepPlayingAfterWin = snap.keepPlayingAfterWin;

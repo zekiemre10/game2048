@@ -81,11 +81,18 @@ göstergesini birlikte açar/kapatır. Hamle başına ek maliyet ortanca **~2 ms
 - 🎁 **Günlük ödül + seri** — her gün oyna, seriye göre altın kazan
 - 🎯 **Görevler** — günlük ve haftalık görevler; oynadıkça ilerler, altın verir
 - 🌍 **Dil (TR/EN)** — Ayarlar'dan geçiş; arayüzün tamamı iki dilde
-- 🎮 **Modlar** — Klasik · Zen (süresiz) · Zaman Yarışı (3dk) · Seviye + tahta boyutu (3×3/4×4/5×5)
+- 🎮 **Modlar** — Klasik · Zen (süresiz) · Zaman Yarışı (3dk) · Seviye · Günlük + tahta boyutu (3×3/4×4/5×5)
 - 👤 **Hesap** — kayıt/giriş (kullanıcı adı + e-posta), ilerleme buluta kaydı, cihazlar arası senkron
 - 👥 **Arkadaşlar** — kullanıcı ara, istek gönder/kabul et, arkadaş listesi (skor/seviye özeti)
 - 💬 **Sohbet** — arkadaşlar arası mesajlaşma, emoji seçici, okunmamış rozeti (yakın-gerçek zamanlı)
 - 🏁 **Çok oyunculu yarış** — oda kur, 4 haneli kodla davet, ortak tohumla adil yarış + canlı skor tablosu
+- 📅 **Günlük meydan okuma** — herkes o gün **aynı tahtayı** oynar (tohum tarihten
+  türetilir; istemci ve sunucu aynı formülü kullanır). 3 dakika, güçler kapalı,
+  en iyi skorun günlük sıralamaya girer
+- 🏆 **Skor tablosu** — genel ve arkadaşlar arası en yüksek skor sıralaması;
+  ilk üçte madalya, kendi sıran listede olmasan da gösterilir
+- 🎉 **Kutlama efektleri** — başarım / seviye / 2048 anında konfeti + ses
+- 🎓 **İlk oyun rehberi** — yeni oyuncuya 6 adımlık tanıtım (Ayarlar'dan tekrar açılır)
 - 🏠 **Ana ekran** — başlığa / mod seçimine dönüş (oyun ekranında ← tuşu)
 - 🖥️ **İki sütunlu düzen** — geniş ekranda solda büyük tahta, sağda bilgi paneli
   (süre, güçler, YZ, kontroller); dar ekranda tek sütuna iner
@@ -106,7 +113,7 @@ göstergesini birlikte açar/kapatır. Hamle başına ek maliyet ortanca **~2 ms
 - SCSS (CSS değişkenleriyle temalama)
 - Web Audio API (prosedürel ses efektleri)
 - Expectimax oyun ağacı araması (yapay zekâ — bağımlılıksız, saf TypeScript)
-- Vitest (220 birim/bileşen testi)
+- Vitest (239 birim/bileşen testi)
 - **Backend:** Python standart kütüphanesi — `http.server` + `sqlite3` + `pbkdf2` (hesap,
   arkadaşlar, sohbet, çok oyunculu yarış). Ek bağımlılık yok; nginx arkasında ayrı serviste çalışır.
 
@@ -130,11 +137,14 @@ src/
       chat.service.ts        # Sohbet: mesaj gönder/al, okunmamış rozeti
       multiplayer.service.ts # Çok oyunculu: oda/kod/başlat + canlı ilerleme
       ai.service.ts          # Oyun sonu değerlendirmesi (algoritmik, anahtarsız)
+      leaderboard.service.ts # Skor tablosu (genel / arkadaşlar)
+      daily.service.ts       # Günlük meydan okuma: sonuç gönderimi + sıralama
     logic/
       board-logic.ts   # SAF hamle mantığı (kaydırma + birleştirme)
       ai.ts            # SAF yapay zekâ: expectimax + hamle kalitesi + pozisyon sağlığı
       bot-runner.ts    # SAF bot koşucusu (çok oyunculu YZ rakibi, tohumlu)
       rank.ts          # SAF ünvan hesabı (puan → rütbe + ilerleme)
+      daily-challenge.ts # SAF günlük tohum (sunucudaki formülle birebir aynı)
       missions.ts      # SAF görev üretimi + ISO gün/hafta anahtarları
       swipe.ts         # SAF dokunmatik yön tespiti
       format-time.ts   # SAF süre biçimlendirme (mm:ss)
@@ -196,7 +206,7 @@ npx ng serve --host 0.0.0.0
 npm test
 ```
 
-**220 test**, hepsi geçiyor. Kapsam ve elle test kontrol listesi: [TEST-NOTES.md](TEST-NOTES.md)
+**239 test**, hepsi geçiyor. Kapsam ve elle test kontrol listesi: [TEST-NOTES.md](TEST-NOTES.md)
 
 Testlerin bir bölümü **regresyon testidir**: kod denetiminde bulunan hatalar
 (geri almanın sayacı yeniden başlatmaması, karıştırma gücünün tahtayı
@@ -260,3 +270,7 @@ web sunucusuyla servis edilebilir. Canlı sürüm bu dosyaların
 - [x] Arayüz düzeni (geniş ekranda tahta + yan panel, isimli güçler)
 - [x] Profil yenileme (avatar seçimi, ünvan sistemi, başarım ilerlemesi)
 - [x] Kod denetimi ve hata düzeltmeleri (oyun mantığı, arayüz servisleri, backend)
+- [x] Skor tablosu (genel + arkadaşlar, kendi sıran dahil)
+- [x] Günlük meydan okuma (tarihten türetilen ortak tohum, günlük sıralama)
+- [x] Kutlama efektleri (konfeti + prosedürel fanfar sesi)
+- [x] İlk oyun rehberi (6 adımlık tanıtım, Ayarlar'dan tekrar açılır)

@@ -29,6 +29,9 @@ export class StartScreen {
   /** Şerite tıklandı → App başarımlar panelini açar. */
   readonly openAchievements = output<void>();
 
+  /** Günlük meydan okuma kartı → App günlük panelini açar. */
+  readonly openDaily = output<void>();
+
   protected readonly ACHIEVEMENTS = ACHIEVEMENTS;
   protected readonly totalCount = ACHIEVEMENTS.length;
   protected readonly unlockedCount = computed(

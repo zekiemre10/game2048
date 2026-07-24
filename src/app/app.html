@@ -1,3 +1,11 @@
+<!-- Kutlama konfetisi (başarım / seviye / 2048) -->
+<app-confetti [burst]="confettiBurst()" />
+
+<!-- İlk oyun rehberi (ilk ziyarette otomatik, Ayarlar'dan tekrar açılır) -->
+@if (tutorialOpen()) {
+  <app-tutorial (closed)="onCloseTutorial()" />
+}
+
 <!-- Sol üst: profil -->
 <button
   class="profile-btn"
@@ -40,6 +48,15 @@
     @if (friendsBadge() > 0) {
       <span class="notif-badge">{{ friendsBadge() }}</span>
     }
+  </button>
+  <button
+    class="round-btn lb-btn"
+    type="button"
+    [attr.aria-label]="t('nav.leaderboard')"
+    [attr.title]="t('nav.leaderboard')"
+    (click)="onOpenLeaderboard()"
+  >
+    🏆
   </button>
   <button
     class="round-btn mp-btn"
@@ -201,6 +218,14 @@
           }
         </div>
         <p class="theme-hint">{{ t('set.moreThemes') }}</p>
+      </section>
+
+      <!-- REHBER -->
+      <section class="settings-section">
+        <h3 class="settings-heading">{{ t('set.tutorial') }}</h3>
+        <button class="btn-primary ghost tut-again" type="button" (click)="onShowTutorial()">
+          {{ t('set.showTutorial') }}
+        </button>
       </section>
 
       <!-- HESAP: çıkış YALNIZCA burada -->
@@ -436,6 +461,140 @@
       </div>
 
       <button class="btn-primary settings-close" type="button" (click)="onCloseProfile()">
+        {{ t('btn.close') }}
+      </button>
+    </div>
+  </div>
+}
+
+<!-- Günlük meydan okuma paneli -->
+@if (dailyOpen()) {
+  <div class="settings-backdrop" (click)="onCloseDaily()">
+    <div
+      class="settings-panel"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-label]="t('daily.title')"
+      (click)="$event.stopPropagation()"
+    >
+      <h2 class="settings-title">{{ t('daily.title') }}</h2>
+      <p class="settings-note">{{ t('daily.note') }}</p>
+      <p class="daily-day">📅 {{ dailyToday() }}</p>
+
+      <button class="btn-primary daily-play" type="button" (click)="onPlayDaily()">
+        {{ dailyMyRow() ? t('daily.playAgain') : t('daily.play') }}
+      </button>
+
+      @if (dailyMyRow(); as mine) {
+        <div class="daily-mine">
+          {{ t('daily.yourBest') }}:
+          <strong>{{ mine.score }}</strong>
+          · {{ t('daily.rank') }} <strong>{{ mine.rank }}</strong>
+        </div>
+      }
+
+      @if (dailyError()) {
+        <p class="friend-error">{{ t(dailyError()) }}</p>
+        @if (!authUser()) {
+          <button class="btn-primary account-cta" type="button" (click)="onOpenAuth()">
+            {{ t('auth.signInCta') }}
+          </button>
+        }
+      } @else if (dailyLoading()) {
+        <p class="friend-muted">{{ t('lb.loading') }}</p>
+      } @else if (dailyRows().length === 0) {
+        <p class="friend-muted">{{ t('daily.beFirst') }}</p>
+      } @else {
+        <h3 class="settings-heading">
+          {{ t('daily.board') }} ({{ dailyPlayers() }})
+        </h3>
+        <div class="lb-list">
+          @for (r of dailyRows(); track r.id) {
+            <div class="lb-row" [class.me]="r.id === authUser()?.id">
+              <span class="lb-rank">{{ medalFor(r.rank) }}</span>
+              <span class="lb-name">{{ r.username }}</span>
+              <span class="lb-tile">{{ r.best }}</span>
+              <span class="lb-score">{{ r.score }}</span>
+            </div>
+          }
+        </div>
+      }
+
+      <button class="btn-primary settings-close" type="button" (click)="onCloseDaily()">
+        {{ t('btn.close') }}
+      </button>
+    </div>
+  </div>
+}
+
+<!-- Skor tablosu paneli -->
+@if (leaderboardOpen()) {
+  <div class="settings-backdrop" (click)="onCloseLeaderboard()">
+    <div
+      class="settings-panel"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-label]="t('nav.leaderboard')"
+      (click)="$event.stopPropagation()"
+    >
+      <h2 class="settings-title">{{ t('lb.title') }}</h2>
+
+      <!-- Kapsam seçimi: genel / arkadaşlar -->
+      <div class="lb-tabs">
+        <button
+          type="button"
+          [class.active]="lbScope() === 'global'"
+          (click)="onLeaderboardScope('global')"
+        >
+          {{ t('lb.global') }}
+        </button>
+        <button
+          type="button"
+          [class.active]="lbScope() === 'friends'"
+          (click)="onLeaderboardScope('friends')"
+        >
+          {{ t('lb.friends') }}
+        </button>
+      </div>
+
+      @if (lbError()) {
+        <p class="friend-error">{{ t(lbError()) }}</p>
+        @if (!authUser()) {
+          <button class="btn-primary account-cta" type="button" (click)="onOpenAuth()">
+            {{ t('auth.signInCta') }}
+          </button>
+        }
+      } @else if (lbLoading()) {
+        <p class="friend-muted">{{ t('lb.loading') }}</p>
+      } @else if (lbRows().length === 0) {
+        <p class="friend-muted">{{ t('lb.empty') }}</p>
+      } @else {
+        <div class="lb-list">
+          @for (r of lbRows(); track r.id) {
+            <div class="lb-row" [class.me]="r.id === authUser()?.id">
+              <span class="lb-rank" [class]="'m' + r.rank">{{ medalFor(r.rank) }}</span>
+              <span class="lb-name">{{ r.username }}</span>
+              <span class="lb-tile">{{ r.bestTile }}</span>
+              <span class="lb-score">{{ r.bestScore }}</span>
+            </div>
+          }
+        </div>
+
+        <!-- Kendi sıram (ilk 50'de değilsem de görünür) -->
+        @if (lbMyRow(); as mine) {
+          @if (!lbInTop()) {
+            <div class="lb-row me lb-mine">
+              <span class="lb-rank">{{ mine.rank }}.</span>
+              <span class="lb-name">{{ mine.username }}</span>
+              <span class="lb-tile">{{ mine.bestTile }}</span>
+              <span class="lb-score">{{ mine.bestScore }}</span>
+            </div>
+          }
+        }
+        <p class="settings-note lb-note">{{ t('lb.note') }}</p>
+      }
+
+      <button class="btn-primary settings-close" type="button" (click)="onCloseLeaderboard()">
         {{ t('btn.close') }}
       </button>
     </div>
@@ -1048,7 +1207,10 @@
 }
 
 @if (status() === GameStatus.Idle) {
-  <app-start-screen (openAchievements)="onOpenAchievements()" />
+  <app-start-screen
+    (openAchievements)="onOpenAchievements()"
+    (openDaily)="onOpenDaily()"
+  />
 } @else {
   <main class="game">
     <header class="topbar">
@@ -1136,7 +1298,8 @@
     }
 
     <!-- Sahip olunan güçler (kullanım çubuğu) -->
-    @if (ownedPowers().length > 0) {
+    <!-- Güçler: günlükte KAPALI (herkes aynı koşullarda yarışsın) -->
+    @if (ownedPowers().length > 0 && mode() !== GameMode.Daily) {
       <div class="power-group">
         <span class="side-title">{{ t('hud.powers') }}</span>
         <div class="power-bar">

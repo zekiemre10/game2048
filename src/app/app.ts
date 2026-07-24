@@ -1,6 +1,8 @@
 import { Component, HostListener, computed, effect, inject, signal, untracked } from '@angular/core';
 import { StartScreen } from './components/start-screen/start-screen';
 import { BoardComponent } from './components/board/board';
+import { Confetti } from './components/confetti/confetti';
+import { Tutorial } from './components/tutorial/tutorial';
 import { AVATARS, GameService } from './services/game.service';
 import { ThemeService } from './services/theme.service';
 import { THEMES } from './models/theme.model';
@@ -10,6 +12,8 @@ import { FriendsService, Friend } from './services/friends.service';
 import { ChatService } from './services/chat.service';
 import { MultiplayerService } from './services/multiplayer.service';
 import { AiService } from './services/ai.service';
+import { LeaderScope, LeaderboardService } from './services/leaderboard.service';
+import { DailyService } from './services/daily.service';
 import { AudioService } from './services/audio.service';
 import { SfxService } from './services/sfx.service';
 import { Direction, GameMode, GameStatus } from './models/tile.model';
@@ -30,7 +34,7 @@ const KEY_TO_DIRECTION: Record<string, Direction> = {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [StartScreen, BoardComponent],
+  imports: [StartScreen, BoardComponent, Confetti, Tutorial],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
@@ -45,6 +49,8 @@ export class App {
   private readonly chat = inject(ChatService);
   private readonly mp = inject(MultiplayerService);
   private readonly ai = inject(AiService);
+  private readonly leaderboard = inject(LeaderboardService);
+  private readonly daily = inject(DailyService);
 
   /** Statik metin çevirisi (şablonda {{ t('key') }}). */
   protected readonly t = (key: string, params?: Record<string, string | number>) =>
@@ -171,6 +177,67 @@ export class App {
 
   /** Başarımlar paneli açık mı? (ana ekrandaki şeritten açılır) */
   protected readonly achievementsOpen = signal(false);
+
+  // --- Skor tablosu ------------------------------------------
+  protected readonly leaderboardOpen = signal(false);
+  protected readonly lbRows = this.leaderboard.rows;
+  protected readonly lbMyRow = this.leaderboard.myRow;
+  protected readonly lbLoading = this.leaderboard.loading;
+  protected readonly lbScope = this.leaderboard.scope;
+  protected readonly lbError = this.leaderboard.error;
+
+  /** Kendi satırım listede görünüyor mu? (yoksa ayrıca gösterilir) */
+  protected readonly lbInTop = computed(() => {
+    const id = this.authUser()?.id;
+    return id !== undefined && this.lbRows().some((r) => r.id === id);
+  });
+
+  onOpenLeaderboard(): void {
+    this.closeAllPanels();
+    this.leaderboardOpen.set(true);
+    void this.leaderboard.load();
+  }
+
+  // --- Günlük meydan okuma -----------------------------------
+  protected readonly dailyOpen = signal(false);
+  protected readonly dailyRows = this.daily.rows;
+  protected readonly dailyMyRow = this.daily.myRow;
+  protected readonly dailyLoading = this.daily.loading;
+  protected readonly dailyError = this.daily.error;
+  protected readonly dailyPlayers = this.daily.players;
+  protected readonly dailyToday = this.daily.today;
+
+  onOpenDaily(): void {
+    this.closeAllPanels();
+    this.dailyOpen.set(true);
+    void this.daily.load();
+  }
+
+  onCloseDaily(): void {
+    this.dailyOpen.set(false);
+  }
+
+  /** Aynı sonucun iki kez gönderilmesini önleyen işaret. */
+  private dailySubmitted = '';
+
+  /** Günün tahtasını oyna (panel kapanır, oyun başlar). */
+  onPlayDaily(): void {
+    this.dailyOpen.set(false);
+    this.game.startDaily();
+  }
+
+  onCloseLeaderboard(): void {
+    this.leaderboardOpen.set(false);
+  }
+
+  onLeaderboardScope(scope: LeaderScope): void {
+    void this.leaderboard.load(scope);
+  }
+
+  /** İlk üç sıraya madalya, sonrasına sıra numarası. */
+  protected medalFor(rank: number): string {
+    return rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
+  }
 
   /** Açılan başarım sayısı / toplam — ana ekran şeridi için. */
   protected readonly achUnlockedCount = computed(
@@ -350,6 +417,55 @@ export class App {
         }
       });
     });
+
+    // Günlük meydan okuma bitince sonucu sunucuya gönder (en iyi skor sayılır).
+    effect(() => {
+      const s = this.status();
+      const isDaily = this.mode() === GameMode.Daily;
+      const over =
+        s === GameStatus.Lost || s === GameStatus.Won || s === GameStatus.Failed;
+      untracked(() => {
+        if (!isDaily || !over) return;
+        if (this.game.aiPlayed()) return; // YZ oynadıysa sıralamaya girmez
+        if (this.dailySubmitted === s + this.game.dailyDay()) return; // tek gönderim
+        this.dailySubmitted = s + this.game.dailyDay();
+        void this.daily
+          .submit(this.score(), this.game.currentBestTile(), this.moves())
+          .then(() => this.daily.load());
+      });
+    });
+
+    // Kutlama: başarım/seviye/2048 anında konfeti + ses.
+    effect(() => {
+      const c = this.game.celebration();
+      if (!c) return;
+      untracked(() => {
+        this.confettiBurst.update((n) => n + 1);
+        // Başarım küçük bir "ding", seviye/kazanç tam fanfar.
+        if (c.kind === 'achievement') this.sfx.playReward();
+        else this.sfx.playFanfare();
+      });
+    });
+  }
+
+  /** Konfeti patlama sayacı (her artışta yeni yağmur). */
+  protected readonly confettiBurst = signal(0);
+
+  // --- İlk oyun rehberi --------------------------------------
+
+  /** Rehber açık mı? İlk ziyarette otomatik açılır. */
+  protected readonly tutorialOpen = signal(!tutorialSeen());
+
+  /** Rehber kapatıldı → bir daha otomatik açılmasın. */
+  onCloseTutorial(): void {
+    this.tutorialOpen.set(false);
+    saveTutorialSeen();
+  }
+
+  /** Ayarlar'dan rehberi yeniden aç. */
+  onShowTutorial(): void {
+    this.settingsOpen.set(false);
+    this.tutorialOpen.set(true);
   }
 
   /** Asistanı aç/kapat (kalıcı). */
@@ -842,6 +958,8 @@ export class App {
     this.friendsOpen.set(false);
     this.mpOpen.set(false);
     this.achievementsOpen.set(false);
+    this.leaderboardOpen.set(false);
+    this.dailyOpen.set(false);
   }
 
   /** Ayarlar panelini kapat. */
@@ -885,5 +1003,25 @@ export class App {
     const value = Number((event.target as HTMLInputElement).value);
     this.sfx.setVolume(value / 100);
     this.sfx.playMove(); // anlık önizleme: kaydırınca duyulsun
+  }
+}
+
+// --- İlk oyun rehberi tercihi (localStorage) -----------------
+
+const TUTORIAL_KEY = 'game2048.tutorialSeen';
+
+function tutorialSeen(): boolean {
+  try {
+    return localStorage.getItem(TUTORIAL_KEY) === '1';
+  } catch {
+    return true; // depolama yoksa rehberi zorlamayalım
+  }
+}
+
+function saveTutorialSeen(): void {
+  try {
+    localStorage.setItem(TUTORIAL_KEY, '1');
+  } catch {
+    /* yoksay */
   }
 }

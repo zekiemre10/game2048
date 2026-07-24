@@ -171,6 +171,57 @@
   opacity: 0.72;
 }
 
+// --- Günlük meydan okuma kartı ------------------------------
+.daily-card {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  margin-top: 1rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: v.$radius-md;
+  background: linear-gradient(135deg, #6c4bd6, #a05ce0);
+  color: #fff;
+  text-align: left;
+  box-shadow: v.$shadow-soft;
+  transition: transform v.$transition-fast;
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.daily-icon {
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.daily-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.daily-name {
+  display: block;
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.daily-desc {
+  display: block;
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+.daily-go {
+  font-size: 1.2rem;
+  font-weight: 800;
+  opacity: 0.9;
+}
+
 // --- Başarım şeridi (ana ekran özeti) -----------------------
 // Başarımlar profil panelinden buraya taşındı: ana ekranda görünür,
 // tıklayınca ilerleme çubuklu tam liste açılır.

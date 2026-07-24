@@ -54,6 +54,8 @@ export enum GameMode {
   TimeAttack = 'timeAttack',
   /** Çok oyunculu yarış: ortak tohum, sabit süre, canlı skor tablosu. */
   Race = 'race',
+  /** Günlük meydan okuma: günün tohumu, sabit süre, günlük sıralama. */
+  Daily = 'daily',
 }
 
 /** Zaman Yarışı modunun süresi (saniye). */

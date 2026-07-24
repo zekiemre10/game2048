@@ -1,0 +1,104 @@
+@use '../../../styles/variables' as v;
+
+.tut-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70; // konfetinin (60) üstünde
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+  animation: tut-fade 0.2s ease-out;
+}
+
+.tut-card {
+  width: min(100%, 400px);
+  padding: 1.6rem 1.4rem 1.2rem;
+  border-radius: v.$radius-lg;
+  background: var(--color-panel, var(--color-bg));
+  color: var(--color-text);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  text-align: center;
+  animation: tut-pop 0.22s ease-out;
+}
+
+.tut-icon {
+  display: block;
+  font-size: 3rem;
+  line-height: 1;
+  margin-bottom: 0.6rem;
+}
+
+.tut-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.tut-body {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+
+.tut-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.tut-dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--color-cell-empty);
+  transition: all v.$transition-fast;
+
+  &.active {
+    background: var(--color-button);
+    width: 22px;
+    border-radius: 999px;
+  }
+}
+
+.tut-actions {
+  display: flex;
+  gap: 0.6rem;
+
+  .btn-primary {
+    flex: 1;
+  }
+}
+
+@keyframes tut-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tut-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+// Hareket azaltma tercihi: animasyonları kapat
+@media (prefers-reduced-motion: reduce) {
+  .tut-backdrop,
+  .tut-card {
+    animation: none;
+  }
+}

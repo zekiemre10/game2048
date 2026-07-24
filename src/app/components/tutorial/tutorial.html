@@ -1,0 +1,42 @@
+<div class="tut-backdrop" (click)="skip()">
+  <div
+    class="tut-card"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="t('tut.title')"
+    (click)="$event.stopPropagation()"
+  >
+    <span class="tut-icon" aria-hidden="true">{{ step().icon }}</span>
+    <h2 class="tut-title">{{ t(step().titleKey) }}</h2>
+    <p class="tut-body">{{ t(step().bodyKey) }}</p>
+
+    <!-- Adım göstergesi -->
+    <div class="tut-dots">
+      @for (s of STEPS; track s.titleKey; let i = $index) {
+        <button
+          class="tut-dot"
+          type="button"
+          [class.active]="i === index()"
+          [attr.aria-label]="i + 1 + '/' + total"
+          [attr.aria-current]="i === index()"
+          (click)="goTo(i)"
+        ></button>
+      }
+    </div>
+
+    <div class="tut-actions">
+      @if (index() > 0) {
+        <button class="btn-primary ghost" type="button" (click)="back()">
+          {{ t('tut.back') }}
+        </button>
+      } @else {
+        <button class="btn-primary ghost" type="button" (click)="skip()">
+          {{ t('tut.skip') }}
+        </button>
+      }
+      <button class="btn-primary" type="button" (click)="next()">
+        {{ isLast() ? t('tut.start') : t('tut.next') }}
+      </button>
+    </div>
+  </div>
+</div>

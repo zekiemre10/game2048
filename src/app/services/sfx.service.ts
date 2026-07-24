@@ -45,6 +45,27 @@ export class SfxService {
     this.blip({ freq: 660, type: 'sine', dur: 0.11, gain: 0.4, delay: 0.05 });
   }
 
+  /** Kutlama sesi: yükselen dört notalık neşeli arpej (kazanç anları). */
+  playFanfare(): void {
+    // Do–Mi–Sol–Do (majör arpej) — başarı/kutlama hissi
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((freq, i) => {
+      this.blip({
+        freq,
+        type: 'triangle',
+        dur: 0.18,
+        gain: 0.4,
+        delay: i * 0.08,
+      });
+    });
+  }
+
+  /** Küçük ödül sesi (başarım açılışı) — iki notalık kısa "ding". */
+  playReward(): void {
+    this.blip({ freq: 880, type: 'sine', dur: 0.12, gain: 0.4 });
+    this.blip({ freq: 1318.5, type: 'sine', dur: 0.16, gain: 0.4, delay: 0.09 });
+  }
+
   // --- Web Audio ----------------------------------------------
 
   /** AudioContext'i tembel oluşturur ve gerekirse devam ettirir. */

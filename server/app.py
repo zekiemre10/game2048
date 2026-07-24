@@ -150,6 +150,18 @@ def init_db():
             joined INTEGER NOT NULL,
             UNIQUE(code, user_id)
         );
+        -- Günlük meydan okuma: her gün herkes AYNI tahtayı oynar (tohum
+        -- tarihten türetilir). Kullanıcı başına o günün EN İYİ skoru tutulur.
+        CREATE TABLE IF NOT EXISTS daily_scores (
+            day TEXT NOT NULL,              -- YYYY-MM-DD (UTC)
+            user_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            score INTEGER NOT NULL DEFAULT 0,
+            best INTEGER NOT NULL DEFAULT 0,
+            moves INTEGER NOT NULL DEFAULT 0,
+            updated INTEGER NOT NULL,
+            PRIMARY KEY (day, user_id)
+        );
         """
     )
     # Şema göçü: users.email kolonu (eski DB'de yoksa ekle)
@@ -206,6 +218,52 @@ def friend_public(row) -> dict:
         "bestLevel": int(data.get("bestLevel") or 1),
         "bestTile": int(data.get("bestTile") or 0),
     }
+
+
+def leaderboard_rows(conn, user_ids=None, limit: int = 50):
+    """En yüksek skora göre sıralı oyuncu listesi.
+
+    Skor `users.data` JSON'unun içinde tutulduğundan SQL ile sıralanamaz;
+    satırlar okunup Python'da sıralanır. Kullanıcı sayısı bu ölçekte küçük
+    olduğu için yeterli (gerekirse ileride ayrı bir sütuna taşınabilir).
+    """
+    if user_ids is not None:
+        if not user_ids:
+            return []
+        marks = ",".join("?" for _ in user_ids)
+        rows = conn.execute(
+            f"SELECT id, username, data FROM users WHERE id IN ({marks})",
+            tuple(user_ids),
+        ).fetchall()
+    else:
+        rows = conn.execute("SELECT id, username, data FROM users").fetchall()
+
+    people = [friend_public(r) for r in rows]
+    people.sort(
+        key=lambda p: (-p["bestScore"], -p["bestTile"], p["username"].lower())
+    )
+    top = people[:limit]
+    for i, p in enumerate(top):
+        p["rank"] = i + 1
+    return top
+
+
+def utc_day() -> str:
+    """Bugünün gün anahtarı (UTC) — herkes aynı günde aynı tahtayı oynar."""
+    return time.strftime("%Y-%m-%d", time.gmtime())
+
+
+def daily_seed(day: str) -> int:
+    """Gün anahtarından kararlı bir tohum üretir (istemciyle aynı formül).
+
+    Basit FNV-benzeri karma: aynı gün → aynı tohum, ardışık günler
+    birbirine benzemeyen tahtalar verir.
+    """
+    h = 2166136261
+    for ch in day:
+        h ^= ord(ch)
+        h = (h * 16777619) & 0xFFFFFFFF
+    return h or 1
 
 
 def make_token(conn, user_id: int) -> str:
@@ -409,6 +467,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._messages_overview()
         if p == "/rooms/state":
             return self._room_state()
+        if p == "/leaderboard":
+            return self._leaderboard()
+        if p == "/daily":
+            return self._daily_info()
         return self._send(404, {"error": "not_found"})
 
     def _route_post(self):
@@ -445,6 +507,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._room_removebot()
         if p == "/rooms/botprogress":
             return self._room_botprogress()
+        if p == "/daily/submit":
+            return self._daily_submit()
         return self._send(404, {"error": "not_found"})
 
     def _auth_row(self, conn):
@@ -1095,6 +1159,139 @@ class Handler(BaseHTTPRequestHandler):
             )
             conn.commit()
             return self._send(200, {"ok": True})
+        finally:
+            conn.close()
+
+    def _leaderboard(self):
+        """GET /leaderboard?scope=global|friends -> en yüksek skor sıralaması.
+
+        Yanıt ayrıca çağıranın kendi sırasını (`me`) taşır; oyuncu ilk 50'de
+        olmasa bile nerede olduğunu görebilsin.
+        """
+        conn = db()
+        try:
+            me = self._auth_row(conn)
+            if not me:
+                return self._send(401, {"error": "unauthorized"})
+            scope = (self._query("scope") or "global").lower()
+
+            if scope == "friends":
+                # Arkadaşlar + kendim
+                rows = conn.execute(
+                    "SELECT CASE WHEN requester_id=? THEN addressee_id ELSE requester_id END AS other "
+                    "FROM friendships WHERE status='accepted' AND (requester_id=? OR addressee_id=?)",
+                    (me["id"], me["id"], me["id"]),
+                ).fetchall()
+                ids = [r["other"] for r in rows] + [me["id"]]
+                top = leaderboard_rows(conn, user_ids=ids)
+                mine = next((p for p in top if p["id"] == me["id"]), None)
+            else:
+                top = leaderboard_rows(conn)
+                mine = next((p for p in top if p["id"] == me["id"]), None)
+                if mine is None:
+                    # İlk 50'de değilim → gerçek sıramı ayrıca hesapla
+                    everyone = leaderboard_rows(conn, limit=10_000_000)
+                    mine = next(
+                        (p for p in everyone if p["id"] == me["id"]), None
+                    )
+
+            return self._send(200, {"scope": scope, "top": top, "me": mine})
+        finally:
+            conn.close()
+
+    # --- Günlük meydan okuma -----------------------------------
+    def _daily_info(self):
+        """GET /daily -> bugünün tohumu + sıralama + kendi sonucum."""
+        conn = db()
+        try:
+            me = self._auth_row(conn)
+            if not me:
+                return self._send(401, {"error": "unauthorized"})
+            day = utc_day()
+            rows = conn.execute(
+                "SELECT user_id, username, score, best, moves FROM daily_scores "
+                "WHERE day=? ORDER BY score DESC, best DESC, updated ASC LIMIT 50",
+                (day,),
+            ).fetchall()
+            top = []
+            for i, r in enumerate(rows):
+                top.append({
+                    "id": r["user_id"],
+                    "username": r["username"],
+                    "score": r["score"],
+                    "best": r["best"],
+                    "moves": r["moves"],
+                    "rank": i + 1,
+                })
+            mine = next((x for x in top if x["id"] == me["id"]), None)
+            if mine is None:
+                own = conn.execute(
+                    "SELECT score, best, moves FROM daily_scores WHERE day=? AND user_id=?",
+                    (day, me["id"]),
+                ).fetchone()
+                if own:
+                    rank = conn.execute(
+                        "SELECT COUNT(*) AS n FROM daily_scores WHERE day=? AND score > ?",
+                        (day, own["score"]),
+                    ).fetchone()["n"] + 1
+                    mine = {
+                        "id": me["id"],
+                        "username": me["username"],
+                        "score": own["score"],
+                        "best": own["best"],
+                        "moves": own["moves"],
+                        "rank": rank,
+                    }
+            return self._send(200, {
+                "day": day,
+                "seed": daily_seed(day),
+                "top": top,
+                "me": mine,
+                "players": conn.execute(
+                    "SELECT COUNT(*) AS n FROM daily_scores WHERE day=?", (day,)
+                ).fetchone()["n"],
+            })
+        finally:
+            conn.close()
+
+    def _daily_submit(self):
+        """POST /daily/submit {score,best,moves} -> günün sonucunu kaydet.
+
+        Yalnızca ÖNCEKİNDEN İYİYSE güncellenir; gün anahtarı sunucudan
+        alınır (istemci geçmiş bir güne skor yazamasın).
+        """
+        conn = db()
+        try:
+            me = self._auth_row(conn)
+            if not me:
+                return self._send(401, {"error": "unauthorized"})
+            b = self._body()
+            score = int(b.get("score") or 0)
+            best = int(b.get("best") or 0)
+            moves = int(b.get("moves") or 0)
+            if not 0 <= score <= MAX_SCORE or not 0 <= best <= MAX_SCORE:
+                return self._send(400, {"error": "invalid_score"})
+            if not 0 <= moves <= 1_000_000:
+                return self._send(400, {"error": "invalid_score"})
+
+            day = utc_day()
+            now = int(time.time())
+            prev = conn.execute(
+                "SELECT score FROM daily_scores WHERE day=? AND user_id=?",
+                (day, me["id"]),
+            ).fetchone()
+            improved = prev is None or score > prev["score"]
+            if improved:
+                conn.execute(
+                    "INSERT INTO daily_scores (day, user_id, username, score, best, moves, updated) "
+                    "VALUES (?,?,?,?,?,?,?) "
+                    "ON CONFLICT(day, user_id) DO UPDATE SET "
+                    "score=excluded.score, best=excluded.best, "
+                    "moves=excluded.moves, username=excluded.username, updated=excluded.updated",
+                    (day, me["id"], me["username"], score, best, moves, now),
+                )
+                conn.commit()
+            return self._send(200, {"ok": True, "improved": improved, "day": day})
         finally:
             conn.close()
 

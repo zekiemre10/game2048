@@ -125,6 +125,98 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'assist.warning': { tr: 'Tahta doluyor, dikkatli oyna!', en: 'Board is filling up, play carefully!' },
   'set.theme': { tr: '🎨 TEMA', en: '🎨 THEME' },
   'set.account': { tr: '👤 HESAP', en: '👤 ACCOUNT' },
+  'set.tutorial': { tr: '🎓 REHBER', en: '🎓 GUIDE' },
+
+  // Günlük meydan okuma
+  'daily.title': { tr: '📅 Günlük Meydan Okuma', en: '📅 Daily Challenge' },
+  'daily.cardDesc': {
+    tr: 'Herkes bugün aynı tahtayı oynuyor',
+    en: 'Everyone plays the same board today',
+  },
+  'daily.note': {
+    tr: 'Herkes bugün aynı taş dizisiyle 3 dakika oynar. Güçler kapalıdır — en iyi skorun sıralamaya girer.',
+    en: 'Everyone plays the same tile sequence for 3 minutes today. Powers are off — your best score enters the ranking.',
+  },
+  'daily.play': { tr: '▶ Bugünü Oyna', en: '▶ Play Today' },
+  'daily.playAgain': { tr: '🔄 Tekrar Dene', en: '🔄 Try Again' },
+  'daily.board': { tr: 'Bugünün sıralaması', en: "Today's ranking" },
+  'daily.yourBest': { tr: 'En iyin', en: 'Your best' },
+  'daily.rank': { tr: 'sıra', en: 'rank' },
+  'daily.beFirst': {
+    tr: 'Bugün henüz kimse oynamadı — ilk sen ol!',
+    en: 'Nobody has played today — be the first!',
+  },
+  'daily.err.login': {
+    tr: 'Günlük meydan okuma için giriş yap.',
+    en: 'Sign in for the daily challenge.',
+  },
+  'daily.err.unauthorized': {
+    tr: 'Oturumun sona ermiş, tekrar giriş yap.',
+    en: 'Your session expired, please sign in again.',
+  },
+  'daily.err.network': { tr: 'Bağlantı hatası.', en: 'Connection error.' },
+  'daily.err.error': { tr: 'Bir hata oluştu.', en: 'Something went wrong.' },
+  'mode.daily': { tr: 'Günlük', en: 'Daily' },
+
+  // Skor tablosu
+  'nav.leaderboard': { tr: 'Skor Tablosu', en: 'Leaderboard' },
+  'lb.title': { tr: '🏆 Skor Tablosu', en: '🏆 Leaderboard' },
+  'lb.global': { tr: '🌍 Genel', en: '🌍 Global' },
+  'lb.friends': { tr: '👥 Arkadaşlar', en: '👥 Friends' },
+  'lb.loading': { tr: 'Yükleniyor…', en: 'Loading…' },
+  'lb.empty': { tr: 'Henüz kimse yok.', en: 'Nobody here yet.' },
+  'lb.note': {
+    tr: 'En yüksek skora göre sıralanır. Skorun buluta kaydedildikçe güncellenir.',
+    en: 'Ranked by best score. Updates as your score syncs to the cloud.',
+  },
+  'lb.err.login': {
+    tr: 'Skor tablosunu görmek için giriş yap.',
+    en: 'Sign in to see the leaderboard.',
+  },
+  'lb.err.unauthorized': {
+    tr: 'Oturumun sona ermiş, tekrar giriş yap.',
+    en: 'Your session expired, please sign in again.',
+  },
+  'lb.err.network': { tr: 'Bağlantı hatası.', en: 'Connection error.' },
+  'lb.err.error': { tr: 'Bir hata oluştu.', en: 'Something went wrong.' },
+  'set.showTutorial': { tr: 'Rehberi Tekrar Göster', en: 'Show Guide Again' },
+
+  // İlk oyun rehberi
+  'tut.title': { tr: 'Nasıl oynanır?', en: 'How to play' },
+  'tut.next': { tr: 'İleri', en: 'Next' },
+  'tut.back': { tr: 'Geri', en: 'Back' },
+  'tut.skip': { tr: 'Atla', en: 'Skip' },
+  'tut.start': { tr: 'Hadi Başlayalım!', en: "Let's Play!" },
+  'tut.s1.title': { tr: '2048’e Ulaş', en: 'Reach 2048' },
+  'tut.s1.body': {
+    tr: 'Aynı sayıya sahip iki kare çarpışınca birleşir: 2+2=4, 4+4=8… Amacın 2048 karesini yapmak.',
+    en: 'Two tiles with the same number merge when they collide: 2+2=4, 4+4=8… Your goal is the 2048 tile.',
+  },
+  'tut.s2.title': { tr: 'Kontroller', en: 'Controls' },
+  'tut.s2.body': {
+    tr: 'Bilgisayarda ok tuşlarıyla (↑ ↓ ← →), telefonda parmağınla kaydırarak oyna. Her hamlede yeni bir kare gelir.',
+    en: 'Use the arrow keys (↑ ↓ ← →) on a computer, or swipe on a phone. A new tile appears after every move.',
+  },
+  'tut.s3.title': { tr: 'Modlar', en: 'Game modes' },
+  'tut.s3.body': {
+    tr: 'Klasik, Zen (süresiz), Zaman Yarışı (3 dakika) ve Seviye (hedef + geri sayım). Tahta boyutunu da seçebilirsin.',
+    en: 'Classic, Zen (untimed), Time Attack (3 minutes) and Level (target + countdown). You can pick the board size too.',
+  },
+  'tut.s4.title': { tr: 'Altın ve Güçler', en: 'Gold & powers' },
+  'tut.s4.body': {
+    tr: 'Seviye tamamlayıp görev bitirerek altın kazan. Mağazadan +30 saniye, bomba, karıştır, geri al ve ipucu satın al.',
+    en: 'Earn gold by finishing levels and missions. Buy +30 seconds, bomb, shuffle, undo and hint from the store.',
+  },
+  'tut.s5.title': { tr: 'Yapay Zekâ Asistanı', en: 'AI assistant' },
+  'tut.s5.body': {
+    tr: 'Ayarlar’dan aç: hamlelerini puanlar, pozisyonunu gösterir ve hamle önerir. “YZ Oynasın” ile izleyebilirsin — durdurunca kendi oyununa dönersin.',
+    en: 'Turn it on in Settings: it rates your moves, shows your position and suggests moves. Watch it with “AI Play” — stopping returns you to your own game.',
+  },
+  'tut.s6.title': { tr: 'Arkadaşlar ve Yarış', en: 'Friends & racing' },
+  'tut.s6.body': {
+    tr: 'Hesap açıp arkadaş ekle, sohbet et ve oda kurup aynı taşlarla canlı yarış. İlerlemen buluta kaydedilir.',
+    en: 'Create an account to add friends, chat, and race live with identical tiles. Your progress is saved to the cloud.',
+  },
   'set.moreThemes': { tr: "Daha fazla tema 🛒 Mağaza'da", en: 'More themes in the 🛒 Store' },
   'set.lang': { tr: '🌐 DİL / LANGUAGE', en: '🌐 LANGUAGE / DİL' },
   'set.credit': {

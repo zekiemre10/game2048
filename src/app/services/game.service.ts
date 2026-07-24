@@ -21,6 +21,10 @@ import {
   reviewMove,
 } from '../logic/ai';
 import { rankFor, rankPoints } from '../logic/rank';
+import { DAILY_DURATION, dailySeed, utcDayKey } from '../logic/daily-challenge';
+
+/** Kutlama türü — arayüz hangi sesi/mesajı göstereceğini seçer. */
+export type CelebrationKind = 'win' | 'level' | 'achievement';
 import { MAX_LEVEL, levelConfig } from '../models/level.model';
 import {
   PowerId,
@@ -261,8 +265,17 @@ export class GameService {
   /** Son hamleden ÖNCEKİ durum (tek adımlık geçmiş). */
   private readonly history = signal<GameSnapshot | null>(null);
 
-  /** Geri alınabilecek bir hamle var mı? */
-  readonly canUndo = computed<boolean>(() => this.history() !== null);
+  /**
+   * Geri alınabilecek bir hamle var mı?
+   * Tohumlu modlarda (yarış + günlük) geri alma yasak olduğundan buton da
+   * pasif olmalı; yoksa aktif görünüp tıklayınca hiçbir şey yapmıyordu.
+   */
+  readonly canUndo = computed<boolean>(
+    () =>
+      this.history() !== null &&
+      this.mode() !== GameMode.Race &&
+      this.mode() !== GameMode.Daily,
+  );
 
   // --- Türetilmiş sinyaller -----------------------------------
 
@@ -360,6 +373,38 @@ export class GameService {
    * oyuncular birebir aynı taş dizisini alır (adil yarış). `duration`
    * saniyelik geri sayım; süre bitince skor kalır (Zaman Yarışı gibi).
    */
+  /**
+   * Günlük meydan okumayı başlatır: tohum günden türetilir, herkes AYNI
+   * tahtayı oynar. Yarıştan farkı tek kişilik olması ve sonucun günlük
+   * sıralamaya gönderilmesidir.
+   */
+  startDaily(): void {
+    const day = utcDayKey();
+    this.cancelAutoplay();
+    this.paused.set(false);
+    this.aiAssisted.set(false);
+    this.resetAssistHints();
+    this.resetMoveReview();
+    this.raceRng = mulberry32(dailySeed(day) >>> 0);
+    this.dailyDay.set(day);
+    this.mode.set(GameMode.Daily);
+    this.boardSize.set(BOARD_SIZE); // günlük her zaman 4×4 (adil)
+    this.tiles.set([]);
+    this.score.set(0);
+    this.moves.set(0);
+    this.keepPlayingAfterWin = true; // 2048'de durma, süre bitene dek oyna
+    this.history.set(null);
+    this.clearPowerFx();
+    this.status.set(GameStatus.Playing);
+    this.spawnRandomTile();
+    this.spawnRandomTile();
+    this.startCountdown(DAILY_DURATION);
+    this.registerActivity();
+  }
+
+  /** Oynanan günlük meydan okumanın gün anahtarı (sonuç gönderimi için). */
+  readonly dailyDay = signal<string>('');
+
   startRace(seed: number, duration: number): void {
     this.cancelAutoplay();
     this.paused.set(false);
@@ -470,6 +515,22 @@ export class GameService {
   /** İlerleme (rekor, görev, istatistik, altın) sayılmamalı mı? */
   aiPlayed(): boolean {
     return this.autoplaying() || this.aiAssisted();
+  }
+
+  // --- Kutlama (ses + konfeti tetikleyici) --------------------
+
+  /**
+   * Kutlama olayı: her yeni başarı anında `id` artar; arayüz bunu izleyip
+   * konfeti + ses oynatır. YZ oynadıysa kutlama YOK (gerçek başarı değil).
+   */
+  readonly celebration = signal<{ id: number; kind: CelebrationKind } | null>(
+    null,
+  );
+  private celebrationId = 0;
+
+  private celebrate(kind: CelebrationKind): void {
+    if (this.aiPlayed()) return;
+    this.celebration.set({ id: ++this.celebrationId, kind });
   }
 
   private autoplayTimer: ReturnType<typeof setTimeout> | null = null;
@@ -693,6 +754,11 @@ export class GameService {
     // Yarış sırasında "Yeni Oyun" YOK: tohumlu yarışı tohumsuz/süresiz bir
     // tek kişilik oyuna çevirip skoru sunucuya bildirmeye devam ederdi.
     if (this.mode() === GameMode.Race) return;
+    // Günlük: aynı günün tahtasıyla tekrar dene (en iyi skorun sayılır).
+    if (this.mode() === GameMode.Daily) {
+      this.startDaily();
+      return;
+    }
     if (this.mode() === GameMode.Level) {
       this.startLevelMode();
     } else {
@@ -738,9 +804,12 @@ export class GameService {
    * @returns geri alma yapıldıysa true.
    */
   undo(): boolean {
-    // Yarışta geri alma YOK: tohumlu taş dizisi geri sarılamaz; geri alınca
-    // oyuncunun taş akışı diğer yarışçılardan sapar (haksız yeniden çekiliş).
-    if (this.mode() === GameMode.Race) return false;
+    // Tohumlu modlarda (yarış + günlük) geri alma YOK: taş dizisi geri
+    // sarılamaz, geri alınca oyuncunun akışı diğerlerinden sapar
+    // (haksız yeniden çekiliş).
+    if (this.mode() === GameMode.Race || this.mode() === GameMode.Daily) {
+      return false;
+    }
 
     const snapshot = this.history();
     if (!snapshot) return false;
@@ -780,7 +849,7 @@ export class GameService {
       this.startTimer(this.elapsedSeconds()); // yukarı sayan
       return;
     }
-    // Level / TimeAttack / Race → kalan süreden geri sayım
+    // Level / TimeAttack / Race / Daily → kalan süreden geri sayım
     this.startCountdown(this.remainingSeconds(), this.elapsedSeconds());
   }
 
@@ -1168,7 +1237,10 @@ export class GameService {
         changed = true;
       }
     }
-    if (changed) saveAchievements(this.unlockedAchievements());
+    if (changed) {
+      saveAchievements(this.unlockedAchievements());
+      this.celebrate('achievement'); // yeni başarım açıldı 🎉
+    }
   }
 
   private achievementMet(id: string): boolean {
@@ -1388,6 +1460,7 @@ export class GameService {
       this.stopTimer(); // süre "tamamlama" anında donar
       this.status.set(GameStatus.Won);
       this.recordGameEnd(true);
+      this.celebrate('win'); // 2048'e ulaşıldı 🎉
       return;
     }
     if (!hasAnyMove(this.tiles(), this.boardSize())) {
@@ -1421,8 +1494,10 @@ export class GameService {
       if (this.level() >= MAX_LEVEL) {
         this.status.set(GameStatus.Won);
         this.recordGameEnd(true); // tüm seviyeler bitti = kazanılmış oyun
+        this.celebrate('win'); // tüm seviyeler tamamlandı 🎉
       } else {
         this.status.set(GameStatus.LevelComplete);
+        this.celebrate('level'); // seviye geçildi 🎉
       }
       return;
     }

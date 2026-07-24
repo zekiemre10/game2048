@@ -44,6 +44,16 @@
       </button>
     </div>
 
+    <!-- Günlük meydan okuma: herkes aynı tahtayı oynar -->
+    <button class="daily-card" type="button" (click)="openDaily.emit()">
+      <span class="daily-icon" aria-hidden="true">📅</span>
+      <span class="daily-info">
+        <span class="daily-name">{{ t('daily.title') }}</span>
+        <span class="daily-desc">{{ t('daily.cardDesc') }}</span>
+      </span>
+      <span class="daily-go" aria-hidden="true">→</span>
+    </button>
+
     <!-- Başarımlar: ana ekranda özet şerit, tıklayınca tam liste -->
     <button class="ach-strip" type="button" (click)="openAchievements.emit()">
       <span class="ach-strip-top">

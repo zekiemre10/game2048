@@ -305,10 +305,8 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'auth.logout': { tr: 'Çıkış Yap', en: 'Log Out' },
   'auth.haveAccount': { tr: 'Zaten hesabın var mı? Giriş yap', en: 'Already have an account? Log in' },
   'auth.noAccount': { tr: 'Hesabın yok mu? Kayıt ol', en: "Don't have an account? Sign up" },
-  'auth.loggedInAs': { tr: 'Giriş yapıldı:', en: 'Signed in as:' },
   'auth.signInCta': { tr: '☁️ Giriş yap / Kayıt ol', en: '☁️ Log in / Sign up' },
   'auth.working': { tr: 'Lütfen bekle…', en: 'Please wait…' },
-  'auth.synced': { tr: '☁️ İlerleme buluta kaydediliyor', en: '☁️ Progress syncing to cloud' },
   // Hata mesajları (backend error kodları)
   'auth.err.invalid_username': {
     tr: 'Kullanıcı adı 2-20 karakter olmalı (harf, rakam, . _ -).',

@@ -1982,29 +1982,9 @@
   gap: 0.5rem;
 }
 
-.account-status {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.15rem;
-}
-
-.account-label {
-  font-size: 0.75rem;
-  opacity: 0.7;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
+// Ayarlar > Hesap bölümündeki kullanıcı adı
 .account-user {
   font-size: 1.1rem;
-}
-
-.account-sync {
-  margin: 0;
-  text-align: center;
-  font-size: 0.78rem;
-  opacity: 0.7;
 }
 
 .account-cta {

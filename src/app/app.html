@@ -476,20 +476,18 @@
         <div class="pstat"><strong>💰 {{ totalGoldEarned() }}</strong><span>{{ t('prof.totalGold') }}</span></div>
       </div>
 
-      <!-- Hesap durumu (çıkış Ayarlar panelindedir) -->
-      <div class="account-box">
-        @if (authUser(); as u) {
-          <div class="account-status">
-            <span class="account-label">{{ t('auth.loggedInAs') }}</span>
-            <strong class="account-user">👤 {{ u.username }}</strong>
-          </div>
-          <p class="account-sync">{{ t('auth.synced') }}</p>
-        } @else {
+      <!--
+        Giriş yapılmışsa burada bir şey gösterilmez: kullanıcı adı zaten
+        panelin başlığında yazıyor, çıkış da Ayarlar'da. Yalnızca misafire
+        giriş çağrısı gösterilir.
+      -->
+      @if (!authUser()) {
+        <div class="account-box">
           <button class="btn-primary account-cta" type="button" (click)="onOpenAuth()">
             {{ t('auth.signInCta') }}
           </button>
-        }
-      </div>
+        </div>
+      }
 
       <button class="btn-primary settings-close" type="button" (click)="onCloseProfile()">
         {{ t('btn.close') }}

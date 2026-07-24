@@ -376,6 +376,12 @@
             {{ rankInfo().rank.icon }}
             {{ L(rankInfo().rank.name, rankInfo().rank.nameEn) }}
           </span>
+          <!-- Ay sonu şampiyonlukları -->
+          @if (championships() > 0) {
+            <span class="champ-badge" [title]="t('lb.champTitle')">
+              🏆 ×{{ championships() }}
+            </span>
+          }
           @if (!authUser()) {
             <span class="profile-head-hint">{{ t('prof.loginForName') }}</span>
           }
@@ -568,8 +574,35 @@
     >
       <h2 class="settings-title">{{ t('lb.title') }}</h2>
 
-      <!-- Kapsam seçimi: genel / arkadaşlar -->
-      <div class="lb-tabs">
+      <!-- Şampiyonluk ödülü bekliyorsa en üstte göster -->
+      @if (lbPrize(); as prize) {
+        <div class="lb-prize">
+          <span class="lb-prize-title">
+            🏆 {{ t('lb.wonTitle') }} — {{ monthLabel(prize.month) }}
+          </span>
+          <span class="lb-prize-detail">
+            💰 {{ prize.gold }} · {{ t('lb.prizePowers') }}
+          </span>
+          <button
+            class="btn-primary lb-prize-btn"
+            type="button"
+            [disabled]="claimingPrize()"
+            (click)="onClaimPrize()"
+          >
+            {{ t('lb.claimPrize') }}
+          </button>
+        </div>
+      }
+
+      <!-- Kapsam: bu ay / tüm zamanlar / arkadaşlar -->
+      <div class="lb-tabs three">
+        <button
+          type="button"
+          [class.active]="lbScope() === 'monthly'"
+          (click)="onLeaderboardScope('monthly')"
+        >
+          {{ t('lb.monthly') }}
+        </button>
         <button
           type="button"
           [class.active]="lbScope() === 'global'"
@@ -585,6 +618,10 @@
           {{ t('lb.friends') }}
         </button>
       </div>
+
+      @if (lbScope() === 'monthly') {
+        <p class="lb-month">📅 {{ monthLabel(lbMonth()) }}</p>
+      }
 
       @if (lbError()) {
         <p class="friend-error">{{ t(lbError()) }}</p>
@@ -620,7 +657,9 @@
             </div>
           }
         }
-        <p class="settings-note lb-note">{{ t('lb.note') }}</p>
+        <p class="settings-note lb-note">
+          {{ lbScope() === 'monthly' ? t('lb.monthlyNote') : t('lb.note') }}
+        </p>
       }
 
       <button class="btn-primary settings-close" type="button" (click)="onCloseLeaderboard()">

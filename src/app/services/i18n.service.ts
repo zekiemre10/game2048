@@ -165,8 +165,17 @@ const DICT: Record<string, { tr: string; en: string }> = {
   // Skor tablosu
   'nav.leaderboard': { tr: 'Skor Tablosu', en: 'Leaderboard' },
   'lb.title': { tr: '🏆 Skor Tablosu', en: '🏆 Leaderboard' },
-  'lb.global': { tr: '🌍 Genel', en: '🌍 Global' },
+  'lb.global': { tr: '🌍 Tüm Zamanlar', en: '🌍 All Time' },
   'lb.friends': { tr: '👥 Arkadaşlar', en: '👥 Friends' },
+  'lb.monthly': { tr: '📅 Bu Ay', en: '📅 This Month' },
+  'lb.monthlyNote': {
+    tr: 'Sıralama her ay yeniden başlar. Ay sonunda 1. olan büyük ödülü kazanır — kendi rekorun ve ilerlemen SIFIRLANMAZ.',
+    en: 'The ranking restarts every month. The #1 at month end wins the grand prize — your own record and progress are NEVER reset.',
+  },
+  'lb.wonTitle': { tr: 'Ayın Şampiyonusun!', en: "You're the champion of the month!" },
+  'lb.prizePowers': { tr: 'her güçten 3 adet', en: '3 of each power' },
+  'lb.claimPrize': { tr: '🎁 Ödülü Al', en: '🎁 Claim Prize' },
+  'lb.champTitle': { tr: 'Ay sonu şampiyonlukları', en: 'Monthly championships' },
   'lb.loading': { tr: 'Yükleniyor…', en: 'Loading…' },
   'lb.empty': { tr: 'Henüz kimse yok.', en: 'Nobody here yet.' },
   'lb.note': {

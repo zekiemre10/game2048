@@ -37,6 +37,14 @@ TOKEN_TTL = 60 * 60 * 24 * 90  # 90 gün
 MAX_BODY = 256 * 1024  # istek gövdesi üst sınırı (bellek koruması)
 MAX_DATA = 64 * 1024  # /sync ile saklanabilecek en büyük ilerleme kaydı
 MAX_SCORE = 10_000_000  # makul üst sınır (uydurma skorları ele)
+
+# Ay sonu şampiyonluk ödülü — bilinçli olarak BÜYÜK: bir aylık rekabetin
+# karşılığı, normal günlük ödüllerin çok üzerinde olmalı.
+CHAMPION_PRIZE = {
+    "gold": 2000,
+    "powers": {"time": 3, "bomb": 3, "shuffle": 3, "undo": 3, "hint": 3},
+}
+
 LOGIN_MAX_TRIES = 10  # aynı kullanıcı adı için pencere başına deneme
 # Kısa pencere bilinçli bir tercih: kaba kuvvetin hızını keser ama parolasını
 # birkaç kez yanlış giren gerçek kullanıcıyı uzun süre dışarıda bırakmaz.
@@ -152,6 +160,26 @@ def init_db():
         );
         -- Günlük meydan okuma: her gün herkes AYNI tahtayı oynar (tohum
         -- tarihten türetilir). Kullanıcı başına o günün EN İYİ skoru tutulur.
+        -- Aylık skor tablosu: her ay YENİDEN başlar (yarış sıfırlanır),
+        -- ama oyuncunun kendi ilerlemesi/rekoru ASLA sıfırlanmaz.
+        CREATE TABLE IF NOT EXISTS monthly_scores (
+            month TEXT NOT NULL,            -- YYYY-MM (UTC)
+            user_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            score INTEGER NOT NULL DEFAULT 0,   -- o ay yapılan EN İYİ skor
+            best INTEGER NOT NULL DEFAULT 0,    -- o ay yapılan en büyük kare
+            updated INTEGER NOT NULL,
+            PRIMARY KEY (month, user_id)
+        );
+        -- Ay sonunda 1. olan oyuncunun ödülü (ay başına tek kazanan).
+        CREATE TABLE IF NOT EXISTS monthly_prizes (
+            month TEXT PRIMARY KEY,         -- ödülün ait olduğu ay
+            user_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            score INTEGER NOT NULL,
+            claimed INTEGER NOT NULL DEFAULT 0,
+            created INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS daily_scores (
             day TEXT NOT NULL,              -- YYYY-MM-DD (UTC)
             user_id INTEGER NOT NULL,
@@ -251,6 +279,52 @@ def leaderboard_rows(conn, user_ids=None, limit: int = 50):
 def utc_day() -> str:
     """Bugünün gün anahtarı (UTC) — herkes aynı günde aynı tahtayı oynar."""
     return time.strftime("%Y-%m-%d", time.gmtime())
+
+
+def utc_month() -> str:
+    """İçinde bulunulan ay (UTC) — `YYYY-MM`."""
+    return time.strftime("%Y-%m", time.gmtime())
+
+
+def prev_month(month: str) -> str:
+    """Verilen aydan bir önceki ay (`YYYY-MM`)."""
+    y, m = (int(x) for x in month.split("-"))
+    if m == 1:
+        return f"{y - 1}-12"
+    return f"{y}-{m - 1:02d}"
+
+
+def settle_finished_months(conn) -> None:
+    """Biten ayların şampiyonunu belirler (tembel değerlendirme).
+
+    Ay değiştiğinde, henüz kazananı yazılmamış geçmiş aylar için
+    o ayın 1.'si `monthly_prizes` tablosuna kaydedilir. Zamanlanmış
+    görev gerektirmez: tabloyu ilk isteyen tetikler.
+    """
+    now_month = utc_month()
+    rows = conn.execute(
+        "SELECT DISTINCT month FROM monthly_scores WHERE month < ?", (now_month,)
+    ).fetchall()
+    for r in rows:
+        month = r["month"]
+        exists = conn.execute(
+            "SELECT 1 FROM monthly_prizes WHERE month = ?", (month,)
+        ).fetchone()
+        if exists:
+            continue
+        top = conn.execute(
+            "SELECT user_id, username, score FROM monthly_scores "
+            "WHERE month = ? AND score > 0 ORDER BY score DESC, updated ASC LIMIT 1",
+            (month,),
+        ).fetchone()
+        if not top:
+            continue
+        conn.execute(
+            "INSERT OR IGNORE INTO monthly_prizes "
+            "(month, user_id, username, score, claimed, created) VALUES (?,?,?,?,0,?)",
+            (month, top["user_id"], top["username"], top["score"], int(time.time())),
+        )
+    conn.commit()
 
 
 def daily_seed(day: str) -> int:
@@ -509,6 +583,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._room_botprogress()
         if p == "/daily/submit":
             return self._daily_submit()
+        if p == "/monthly/submit":
+            return self._monthly_submit()
+        if p == "/monthly/claim":
+            return self._monthly_claim()
         return self._send(404, {"error": "not_found"})
 
     def _auth_row(self, conn):
@@ -1163,17 +1241,71 @@ class Handler(BaseHTTPRequestHandler):
             conn.close()
 
     def _leaderboard(self):
-        """GET /leaderboard?scope=global|friends -> en yüksek skor sıralaması.
+        """GET /leaderboard?scope=monthly|global|friends -> skor sıralaması.
 
-        Yanıt ayrıca çağıranın kendi sırasını (`me`) taşır; oyuncu ilk 50'de
-        olmasa bile nerede olduğunu görebilsin.
+        - `monthly`: yalnızca içinde bulunulan ayın skorları (her ay yeniden
+          başlar; oyuncunun kendi rekoru/ilerlemesi sıfırlanmaz)
+        - `global` : tüm zamanların en yüksek skoru
+        - `friends`: yalnızca arkadaşlar (tüm zamanlar)
+
+        Yanıt ayrıca çağıranın kendi sırasını (`me`) ve varsa bekleyen
+        şampiyonluk ödülünü (`prize`) taşır.
         """
         conn = db()
         try:
             me = self._auth_row(conn)
             if not me:
                 return self._send(401, {"error": "unauthorized"})
-            scope = (self._query("scope") or "global").lower()
+            scope = (self._query("scope") or "monthly").lower()
+
+            # Biten ayların şampiyonu belirlensin (tembel)
+            settle_finished_months(conn)
+
+            if scope == "monthly":
+                month = utc_month()
+                rows = conn.execute(
+                    "SELECT user_id, username, score, best FROM monthly_scores "
+                    "WHERE month = ? ORDER BY score DESC, best DESC, updated ASC LIMIT 50",
+                    (month,),
+                ).fetchall()
+                top = [
+                    {
+                        "id": r["user_id"],
+                        "username": r["username"],
+                        "bestScore": r["score"],
+                        "bestTile": r["best"],
+                        "bestLevel": 0,
+                        "rank": i + 1,
+                    }
+                    for i, r in enumerate(rows)
+                ]
+                mine = next((p for p in top if p["id"] == me["id"]), None)
+                if mine is None:
+                    own = conn.execute(
+                        "SELECT score, best FROM monthly_scores WHERE month=? AND user_id=?",
+                        (month, me["id"]),
+                    ).fetchone()
+                    if own:
+                        rank = conn.execute(
+                            "SELECT COUNT(*) AS n FROM monthly_scores "
+                            "WHERE month=? AND score > ?",
+                            (month, own["score"]),
+                        ).fetchone()["n"] + 1
+                        mine = {
+                            "id": me["id"],
+                            "username": me["username"],
+                            "bestScore": own["score"],
+                            "bestTile": own["best"],
+                            "bestLevel": 0,
+                            "rank": rank,
+                        }
+                return self._send(200, {
+                    "scope": scope,
+                    "month": month,
+                    "top": top,
+                    "me": mine,
+                    "prize": self._pending_prize(conn, me),
+                })
 
             if scope == "friends":
                 # Arkadaşlar + kendim
@@ -1195,7 +1327,95 @@ class Handler(BaseHTTPRequestHandler):
                         (p for p in everyone if p["id"] == me["id"]), None
                     )
 
-            return self._send(200, {"scope": scope, "top": top, "me": mine})
+            return self._send(200, {
+                "scope": scope,
+                "top": top,
+                "me": mine,
+                "prize": self._pending_prize(conn, me),
+            })
+        finally:
+            conn.close()
+
+    # --- Aylık şampiyonluk -------------------------------------
+
+    def _pending_prize(self, conn, me):
+        """Çağıranın alınmamış şampiyonluk ödülü varsa döndürür."""
+        row = conn.execute(
+            "SELECT month, score FROM monthly_prizes "
+            "WHERE user_id = ? AND claimed = 0 ORDER BY month LIMIT 1",
+            (me["id"],),
+        ).fetchone()
+        if not row:
+            return None
+        return {"month": row["month"], "score": row["score"], **CHAMPION_PRIZE}
+
+    def _monthly_submit(self):
+        """POST /monthly/submit {score,best} -> bu ayın skorunu bildir.
+
+        Yalnızca ayın mevcut en iyisinden YÜKSEKSE güncellenir. Ay
+        anahtarı sunucudan alınır (geçmiş aya skor yazılamaz).
+        """
+        conn = db()
+        try:
+            me = self._auth_row(conn)
+            if not me:
+                return self._send(401, {"error": "unauthorized"})
+            b = self._body()
+            score = int(b.get("score") or 0)
+            best = int(b.get("best") or 0)
+            if not 0 <= score <= MAX_SCORE or not 0 <= best <= MAX_SCORE:
+                return self._send(400, {"error": "invalid_score"})
+
+            month = utc_month()
+            now = int(time.time())
+            prev = conn.execute(
+                "SELECT score FROM monthly_scores WHERE month=? AND user_id=?",
+                (month, me["id"]),
+            ).fetchone()
+            improved = prev is None or score > prev["score"]
+            if improved:
+                conn.execute(
+                    "INSERT INTO monthly_scores "
+                    "(month, user_id, username, score, best, updated) VALUES (?,?,?,?,?,?) "
+                    "ON CONFLICT(month, user_id) DO UPDATE SET "
+                    "score=excluded.score, best=excluded.best, "
+                    "username=excluded.username, updated=excluded.updated",
+                    (month, me["id"], me["username"], score, best, now),
+                )
+                conn.commit()
+            return self._send(200, {"ok": True, "improved": improved, "month": month})
+        finally:
+            conn.close()
+
+    def _monthly_claim(self):
+        """POST /monthly/claim -> bekleyen şampiyonluk ödülünü al.
+
+        Ödül sunucuda 'alındı' işaretlenir; istemci altını/güçleri kendi
+        tarafında ekler ve buluta senkronlar.
+        """
+        conn = db()
+        try:
+            me = self._auth_row(conn)
+            if not me:
+                return self._send(401, {"error": "unauthorized"})
+            settle_finished_months(conn)
+            row = conn.execute(
+                "SELECT month FROM monthly_prizes "
+                "WHERE user_id = ? AND claimed = 0 ORDER BY month LIMIT 1",
+                (me["id"],),
+            ).fetchone()
+            if not row:
+                return self._send(404, {"error": "no_prize"})
+            conn.execute(
+                "UPDATE monthly_prizes SET claimed = 1 WHERE month = ? AND user_id = ?",
+                (row["month"], me["id"]),
+            )
+            conn.commit()
+            return self._send(200, {
+                "ok": True,
+                "month": row["month"],
+                **CHAMPION_PRIZE,
+            })
         finally:
             conn.close()
 

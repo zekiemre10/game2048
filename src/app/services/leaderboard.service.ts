@@ -16,7 +16,15 @@ export interface LeaderRow {
   rank: number;
 }
 
-export type LeaderScope = 'global' | 'friends';
+export type LeaderScope = 'monthly' | 'global' | 'friends';
+
+/** Ay sonu şampiyonluk ödülü (sunucudan gelir). */
+export interface ChampionPrize {
+  month: string;
+  score: number;
+  gold: number;
+  powers: Record<string, number>;
+}
 
 @Injectable({ providedIn: 'root' })
 export class LeaderboardService {
@@ -25,8 +33,14 @@ export class LeaderboardService {
   readonly rows = signal<LeaderRow[]>([]);
   readonly myRow = signal<LeaderRow | null>(null);
   readonly loading = signal(false);
-  readonly scope = signal<LeaderScope>('global');
+  readonly scope = signal<LeaderScope>('monthly');
   readonly error = signal('');
+
+  /** Gösterilen ay (`YYYY-MM`) — aylık sekmede doldurulur. */
+  readonly month = signal('');
+
+  /** Alınmamış şampiyonluk ödülü (varsa). */
+  readonly prize = signal<ChampionPrize | null>(null);
 
   /** Sıra numarası: geç gelen yanıt yeniyi ezmesin. */
   private seq = 0;
@@ -57,10 +71,51 @@ export class LeaderboardService {
       }
       this.rows.set(j.top ?? []);
       this.myRow.set(j.me ?? null);
+      this.month.set(j.month ?? '');
+      this.prize.set(j.prize ?? null);
     } catch {
       if (seq === this.seq) this.error.set('lb.err.network');
     } finally {
       if (seq === this.seq) this.loading.set(false);
+    }
+  }
+
+  /**
+   * Bu ayki skoru bildirir (oyun bitince çağrılır).
+   * Sunucu yalnızca ayın mevcut en iyisinden yüksekse kaydeder.
+   */
+  async submitMonthly(score: number, best: number): Promise<void> {
+    const headers = this.auth.authHeaders();
+    if (!headers || score <= 0) return;
+    try {
+      await fetch(`${API_BASE}/monthly/submit`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ score, best }),
+      });
+    } catch {
+      /* çevrimdışı — sessiz */
+    }
+  }
+
+  /**
+   * Bekleyen şampiyonluk ödülünü alır.
+   * @returns ödül içeriği (altın + güçler) ya da null
+   */
+  async claimPrize(): Promise<ChampionPrize | null> {
+    const headers = this.auth.authHeaders();
+    if (!headers) return null;
+    try {
+      const res = await fetch(`${API_BASE}/monthly/claim`, {
+        method: 'POST',
+        headers,
+      });
+      if (!res.ok) return null;
+      const j = await res.json();
+      this.prize.set(null);
+      return j as ChampionPrize;
+    } catch {
+      return null;
     }
   }
 }

@@ -4,6 +4,7 @@ import {
   ElementRef,
   OnDestroy,
   ViewChild,
+  effect,
   input,
 } from '@angular/core';
 
@@ -57,19 +58,36 @@ export class Confetti implements AfterViewInit, OnDestroy {
   private raf: number | null = null;
   private lastBurst = 0;
   private reduced = false;
+  private ready = false;
+
+  constructor() {
+    // Patlamayı EFEKT ile izle. (Eskiden her karede yoklanıyordu; bu,
+    // ekranda hiçbir şey olmasa bile sonsuz bir rAF döngüsü demekti —
+    // pil tüketiyor ve testleri kararsızlaştırıyordu.)
+    effect(() => {
+      const b = this.burst();
+      if (!this.ready || b <= this.lastBurst) return;
+      this.lastBurst = b;
+      this.spawn();
+      this.start();
+    });
+  }
 
   ngAfterViewInit(): void {
     if (typeof window === 'undefined') return;
     this.reduced =
       window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     const cv = this.canvasRef.nativeElement;
-    this.ctx = cv.getContext('2d');
+    // jsdom gibi ortamlarda 2D bağlam olmayabilir → sessizce devre dışı kal
+    try {
+      this.ctx = cv.getContext('2d');
+    } catch {
+      this.ctx = null;
+    }
     this.resize();
     window.addEventListener('resize', this.resize);
-
-    // burst sinyalini gözlemek için basit bir kontrol döngüsü:
-    // input signal'i effect ile izlemek yerine animasyon karesinde bakıyoruz.
-    this.loop();
+    this.ready = true;
+    this.lastBurst = this.burst(); // açılışta eski patlamayı oynatma
   }
 
   ngOnDestroy(): void {
@@ -108,13 +126,15 @@ export class Confetti implements AfterViewInit, OnDestroy {
     }
   }
 
+  /** Animasyonu başlat (zaten çalışıyorsa yeniden başlatmaz). */
+  private start(): void {
+    if (this.raf !== null || typeof requestAnimationFrame === 'undefined') return;
+    if (!this.particles.length) return;
+    this.raf = requestAnimationFrame(this.loop);
+  }
+
   private loop = (): void => {
-    // input burst değişimini yakala
-    const b = this.burst();
-    if (b > this.lastBurst) {
-      this.lastBurst = b;
-      this.spawn();
-    }
+    this.raf = null;
 
     const ctx = this.ctx;
     if (ctx) {
@@ -139,8 +159,14 @@ export class Confetti implements AfterViewInit, OnDestroy {
       this.particles = this.particles.filter(
         (p) => p.life > 0 && p.y < h + 40,
       );
+    } else {
+      // Çizim bağlamı yoksa simülasyonu boşa çalıştırma
+      this.particles = [];
     }
 
-    this.raf = requestAnimationFrame(this.loop);
+    // Yalnızca gösterilecek parçacık varken devam et → boşta CPU yakma
+    if (this.particles.length) {
+      this.raf = requestAnimationFrame(this.loop);
+    }
   };
 }

@@ -93,6 +93,7 @@ const TIME_POWER_SECONDS = 30;
 const NAME_KEY = 'game2048.name';
 const AVATAR_KEY = 'game2048.avatar';
 const ASSISTANT_KEY = 'game2048.assistant';
+const CHAMPION_KEY = 'game2048.championships';
 
 /** Seçilebilir profil avatarları (ilk sıradaki varsayılan). */
 export const AVATARS = [
@@ -1079,6 +1080,7 @@ export class GameService {
       bestLevel: this.bestLevel(),
       name: this.playerName(),
       avatar: this.avatar(),
+      championships: this.championships(),
       gamesPlayed: this.gamesPlayed(),
       gamesWon: this.gamesWon(),
       bestTile: this.bestTile(),
@@ -1102,6 +1104,11 @@ export class GameService {
     if (typeof d['avatar'] === 'string' && AVATARS.includes(d['avatar'] as string)) {
       this.avatar.set(d['avatar'] as string);
       saveAvatar(d['avatar'] as string);
+    }
+    const champ = num(d['championships']);
+    if (champ !== null) {
+      this.championships.set(champ);
+      saveChampionships(champ);
     }
     const gp = num(d['gamesPlayed']);
     if (gp !== null) this.gamesPlayed.set(gp);
@@ -1173,6 +1180,32 @@ export class GameService {
 
   /** Bugün alınan ödülün ayrıntısı (arayüzde "ne kazandın" için). */
   readonly claimedReward = signal<DailyReward | null>(null);
+
+  /**
+   * Ay sonu şampiyonluk ödülünü envantere ekler.
+   * Sunucu ödülün alındığını kendi tarafında işaretler; burada yalnızca
+   * altın ve güçler eklenir (ardından bulut senkronu devreye girer).
+   */
+  grantChampionPrize(gold: number, powers: Record<string, number>): void {
+    if (gold > 0) this.addGold(gold);
+    const inv = { ...this.powers() };
+    let changed = false;
+    for (const [id, count] of Object.entries(powers ?? {})) {
+      if (id in inv && typeof count === 'number' && count > 0) {
+        inv[id as PowerId] += count;
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.powers.set(inv);
+      savePowers(inv);
+    }
+    this.championships.update((n) => n + 1);
+    saveChampionships(this.championships());
+  }
+
+  /** Kazanılan ay sonu şampiyonluğu sayısı (profilde rozet). */
+  readonly championships = signal<number>(loadChampionships());
 
   /**
    * Bugün alınacak/alınan ödülün döngüdeki günü (1-7).
@@ -1876,6 +1909,23 @@ function loadAssistant(): boolean {
 function saveAssistant(on: boolean): void {
   try {
     localStorage?.setItem(ASSISTANT_KEY, on ? '1' : '0');
+  } catch {
+    /* yoksay */
+  }
+}
+
+function loadChampionships(): number {
+  try {
+    const n = Number(localStorage?.getItem(CHAMPION_KEY) || 0);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveChampionships(n: number): void {
+  try {
+    localStorage?.setItem(CHAMPION_KEY, String(n));
   } catch {
     /* yoksay */
   }

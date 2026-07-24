@@ -115,6 +115,7 @@ export class App {
   protected readonly claimableMissions = this.game.claimableMissions;
   protected readonly bestLevel = this.game.bestLevel;
   protected readonly totalGoldEarned = this.game.totalGoldEarned;
+  protected readonly championships = this.game.championships;
 
   // --- Profil: ünvan ve avatar -------------------------------
   protected readonly rankInfo = this.game.rankInfo;
@@ -222,8 +223,8 @@ export class App {
     this.dailyOpen.set(false);
   }
 
-  /** Aynı sonucun iki kez gönderilmesini önleyen işaret. */
-  private dailySubmitted = '';
+  /** Aynı oyun sonucunun iki kez gönderilmesini önleyen işaret. */
+  private lastSubmitStamp = '';
 
   /** Günün tahtasını oyna (panel kapanır, oyun başlar). */
   onPlayDaily(): void {
@@ -237,6 +238,41 @@ export class App {
 
   onLeaderboardScope(scope: LeaderScope): void {
     void this.leaderboard.load(scope);
+  }
+
+  /** Bekleyen şampiyonluk ödülü (varsa) + gösterilen ay. */
+  protected readonly lbPrize = this.leaderboard.prize;
+  protected readonly lbMonth = this.leaderboard.month;
+
+  /** Ödül alınıyor mu (çift tıklamayı engeller). */
+  protected readonly claimingPrize = signal(false);
+
+  /**
+   * Ay sonu şampiyonluk ödülünü al: sunucu "alındı" işaretler, altın ve
+   * güçler burada envantere eklenir (sonra buluta senkronlanır).
+   */
+  async onClaimPrize(): Promise<void> {
+    if (this.claimingPrize()) return;
+    this.claimingPrize.set(true);
+    try {
+      const prize = await this.leaderboard.claimPrize();
+      if (!prize) return;
+      this.game.grantChampionPrize(prize.gold, prize.powers);
+      this.confettiBurst.update((n) => n + 1);
+      this.sfx.playFanfare();
+    } finally {
+      this.claimingPrize.set(false);
+    }
+  }
+
+  /** `YYYY-MM` → "Temmuz 2026" gibi okunur ay adı. */
+  protected monthLabel(key: string): string {
+    if (!key) return '';
+    const [y, m] = key.split('-').map(Number);
+    const names = this.i18n.lang() === 'en'
+      ? ['January','February','March','April','May','June','July','August','September','October','November','December']
+      : ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+    return `${names[(m || 1) - 1]} ${y}`;
   }
 
   /** İlk üç sıraya madalya, sonrasına sıra numarası. */
@@ -423,20 +459,36 @@ export class App {
       });
     });
 
-    // Günlük meydan okuma bitince sonucu sunucuya gönder (en iyi skor sayılır).
+    // Oyun bitince sonucu sunucuya gönder:
+    // - Günlük modda günün sıralamasına
+    // - Her modda AYLIK skor tablosuna (ay sonunda 1. büyük ödül alır)
     effect(() => {
       const s = this.status();
-      const isDaily = this.mode() === GameMode.Daily;
+      const mode = this.mode();
       const over =
-        s === GameStatus.Lost || s === GameStatus.Won || s === GameStatus.Failed;
+        s === GameStatus.Lost ||
+        s === GameStatus.Won ||
+        s === GameStatus.Failed ||
+        s === GameStatus.LevelComplete;
       untracked(() => {
-        if (!isDaily || !over) return;
+        if (!over) return;
         if (this.game.aiPlayed()) return; // YZ oynadıysa sıralamaya girmez
-        if (this.dailySubmitted === s + this.game.dailyDay()) return; // tek gönderim
-        this.dailySubmitted = s + this.game.dailyDay();
-        void this.daily
-          .submit(this.score(), this.game.currentBestTile(), this.moves())
-          .then(() => this.daily.load());
+        const score = this.score();
+        if (score <= 0) return;
+
+        // Aynı oyun sonunu iki kez göndermeyi engelle
+        const stamp = `${mode}|${s}|${score}|${this.moves()}`;
+        if (this.lastSubmitStamp === stamp) return;
+        this.lastSubmitStamp = stamp;
+
+        const bestTile = this.game.currentBestTile();
+        void this.leaderboard.submitMonthly(score, bestTile);
+
+        if (mode === GameMode.Daily) {
+          void this.daily
+            .submit(score, bestTile, this.moves())
+            .then(() => this.daily.load());
+        }
       });
     });
 

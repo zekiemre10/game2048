@@ -91,8 +91,12 @@ göstergesini birlikte açar/kapatır. Hamle başına ek maliyet ortanca **~2 ms
 - 📅 **Günlük meydan okuma** — herkes o gün **aynı tahtayı** oynar (tohum tarihten
   türetilir; istemci ve sunucu aynı formülü kullanır). 3 dakika, güçler kapalı,
   en iyi skorun günlük sıralamaya girer
-- 🏆 **Skor tablosu** — genel ve arkadaşlar arası en yüksek skor sıralaması;
-  ilk üçte madalya, kendi sıran listede olmasan da gösterilir
+- 🏆 **Skor tablosu** — üç sekme: **Bu Ay** · Tüm Zamanlar · Arkadaşlar.
+  İlk üçte madalya, kendi sıran listede olmasan da gösterilir
+- 👑 **Aylık şampiyonluk** — sıralama **her ay yeniden başlar**; ay sonunda
+  1. olan **2000 altın + her güçten 3 adet** kazanır ve profilinde 🏆 rozeti
+  birikir. Oyuncunun kendi rekoru ve ilerlemesi **asla sıfırlanmaz** —
+  aylık yarış ayrı bir tablodur
 - 🎉 **Kutlama efektleri** — başarım / seviye / 2048 anında konfeti + ses
 - 🎓 **İlk oyun rehberi** — yeni oyuncuya 6 adımlık tanıtım (Ayarlar'dan tekrar açılır)
 - 🏠 **Ana ekran** — başlığa / mod seçimine dönüş (oyun ekranında ← tuşu)
@@ -115,7 +119,7 @@ göstergesini birlikte açar/kapatır. Hamle başına ek maliyet ortanca **~2 ms
 - SCSS (CSS değişkenleriyle temalama)
 - Web Audio API (prosedürel ses efektleri)
 - Expectimax oyun ağacı araması (yapay zekâ — bağımlılıksız, saf TypeScript)
-- Vitest (239 birim/bileşen testi)
+- Vitest (259 birim/bileşen testi)
 - **Backend:** Python standart kütüphanesi — `http.server` + `sqlite3` + `pbkdf2` (hesap,
   arkadaşlar, sohbet, çok oyunculu yarış). Ek bağımlılık yok; nginx arkasında ayrı serviste çalışır.
 
@@ -208,7 +212,7 @@ npx ng serve --host 0.0.0.0
 npm test
 ```
 
-**239 test**, hepsi geçiyor. Kapsam ve elle test kontrol listesi: [TEST-NOTES.md](TEST-NOTES.md)
+**259 test**, hepsi geçiyor. Kapsam ve elle test kontrol listesi: [TEST-NOTES.md](TEST-NOTES.md)
 
 Testlerin bir bölümü **regresyon testidir**: kod denetiminde bulunan hatalar
 (geri almanın sayacı yeniden başlatmaması, karıştırma gücünün tahtayı
@@ -276,3 +280,5 @@ web sunucusuyla servis edilebilir. Canlı sürüm bu dosyaların
 - [x] Günlük meydan okuma (tarihten türetilen ortak tohum, günlük sıralama)
 - [x] Kutlama efektleri (konfeti + prosedürel fanfar sesi)
 - [x] İlk oyun rehberi (6 adımlık tanıtım, Ayarlar'dan tekrar açılır)
+- [x] 7 günlük ödül takvimi (artan ödül, aralarda güçler, 7. gün büyük ödül)
+- [x] Aylık şampiyonluk (her ay sıfırlanan sıralama + ay sonu büyük ödül)

@@ -1173,11 +1173,72 @@
 
 // --- Skor tablosu -------------------------------------------
 
+// Şampiyonluk ödülü bildirimi (ay sonu 1.'si için)
+.lb-prize {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.8rem;
+  padding: 0.7rem;
+  border-radius: v.$radius-md;
+  background: linear-gradient(135deg, #f6c945, #f0a020);
+  color: #5a3d00;
+  text-align: center;
+}
+
+.lb-prize-title {
+  font-weight: 800;
+  font-size: 0.98rem;
+}
+
+.lb-prize-detail {
+  font-size: 0.85rem;
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+.lb-prize-btn {
+  width: 100%;
+  background: #5a3d00;
+  color: #ffe9a8;
+}
+
+// Aylık sekmede gösterilen ay adı
+.lb-month {
+  margin: -0.4rem 0 0.7rem;
+  text-align: center;
+  font-weight: 700;
+  opacity: 0.8;
+}
+
+// Profil: ay sonu şampiyonluk rozeti
+.champ-badge {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f6c945, #f0a020);
+  color: #5a3d00;
+}
+
 .lb-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.4rem;
   margin-bottom: 0.8rem;
+
+  // Üç sekmeli hâli (Bu Ay / Tüm Zamanlar / Arkadaşlar)
+  &.three {
+    grid-template-columns: repeat(3, 1fr);
+
+    button {
+      font-size: 0.78rem;
+      padding: 0.45rem 0.25rem;
+    }
+  }
 
   button {
     padding: 0.45rem 0.5rem;

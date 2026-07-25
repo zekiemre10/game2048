@@ -620,7 +620,19 @@
       </div>
 
       @if (lbScope() === 'monthly') {
-        <p class="lb-month">📅 {{ monthLabel(lbMonth()) }}</p>
+        <div class="lb-month-bar">
+          <span class="lb-month">📅 {{ monthLabel(lbMonth()) }}</span>
+          <span class="lb-countdown">⏳ {{ daysLeftInMonth() }} {{ t('lb.daysLeft') }}</span>
+        </div>
+        <!-- Ödülün NE ZAMAN geleceği açıkça yazsın -->
+        <p class="lb-prize-info">
+          🏆 {{ t('lb.prizeInfo') }}
+          @if (lbMyRow(); as mine) {
+            <strong class="lb-standing">
+              {{ mine.rank === 1 ? t('lb.youAreFirst') : t('lb.yourRank') + ' ' + mine.rank }}
+            </strong>
+          }
+        </p>
       }
 
       @if (lbError()) {

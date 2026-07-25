@@ -226,6 +226,39 @@ export class App {
   /** Aynı oyun sonucunun iki kez gönderilmesini önleyen işaret. */
   private lastSubmitStamp = '';
 
+  // --- Aylık skor bildirimi ----------------------------------
+  //
+  // Skor SADECE oyun bitince gönderilirse, oyunu yarıda bırakan (ana ekrana
+  // dönen / yeni oyun açan) oyuncunun skoru hiç kaydedilmiyordu. Bu yüzden
+  // skor yükseldikçe de bildiriyoruz (geciktirmeli, ağı yormadan).
+
+  /** Bu oturumda sunucuya bildirilen en yüksek aylık skor. */
+  private monthlySent = 0;
+  private monthlyTimer: ReturnType<typeof setTimeout> | null = null;
+  private monthlyPending: { score: number; best: number } | null = null;
+
+  /** Skoru geciktirmeli olarak sıraya alır (art arda hamlelerde tek istek). */
+  private queueMonthly(score: number, best: number): void {
+    if (score <= this.monthlySent) return;
+    this.monthlyPending = { score, best };
+    if (typeof setTimeout === 'undefined') return;
+    if (this.monthlyTimer !== null) clearTimeout(this.monthlyTimer);
+    this.monthlyTimer = setTimeout(() => this.flushMonthly(), 4000);
+  }
+
+  /** Bekleyen aylık skoru hemen gönderir. */
+  private flushMonthly(): void {
+    if (this.monthlyTimer !== null) {
+      clearTimeout(this.monthlyTimer);
+      this.monthlyTimer = null;
+    }
+    const p = this.monthlyPending;
+    this.monthlyPending = null;
+    if (!p || p.score <= this.monthlySent) return;
+    this.monthlySent = p.score;
+    void this.leaderboard.submitMonthly(p.score, p.best);
+  }
+
   /** Günün tahtasını oyna (panel kapanır, oyun başlar). */
   onPlayDaily(): void {
     this.dailyOpen.set(false);
@@ -263,6 +296,19 @@ export class App {
     } finally {
       this.claimingPrize.set(false);
     }
+  }
+
+  /** Ay bitene kaç gün kaldı (ödülün ne zaman geleceğini göstermek için). */
+  protected daysLeftInMonth(): number {
+    const now = new Date();
+    // Ayın son gününü UTC'de bul (sunucu ay anahtarı UTC)
+    const end = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1);
+    const today = Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+    );
+    return Math.max(0, Math.round((end - today) / 86400000));
   }
 
   /** `YYYY-MM` → "Temmuz 2026" gibi okunur ay adı. */
@@ -482,7 +528,8 @@ export class App {
         this.lastSubmitStamp = stamp;
 
         const bestTile = this.game.currentBestTile();
-        void this.leaderboard.submitMonthly(score, bestTile);
+        this.queueMonthly(score, bestTile);
+        this.flushMonthly(); // oyun bitti → beklemeden gönder
 
         if (mode === GameMode.Daily) {
           void this.daily
@@ -491,6 +538,25 @@ export class App {
         }
       });
     });
+
+    // Oyun DEVAM EDERKEN de skoru aylık tabloya bildir: oyuncu oyunu yarıda
+    // bırakıp ana ekrana dönse bile o skor sıralamaya girsin.
+    effect(() => {
+      const score = this.score();
+      untracked(() => {
+        if (score <= 0) return;
+        if (this.game.aiPlayed()) return; // YZ oynadıysa sayılmaz
+        this.queueMonthly(score, this.game.currentBestTile());
+      });
+    });
+
+    // Sekme kapanırken/gizlenirken bekleyen skoru kaçırma
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') this.flushMonthly();
+      });
+      window.addEventListener('pagehide', () => this.flushMonthly());
+    }
 
     // Kutlama: başarım/seviye/2048 anında konfeti + ses.
     effect(() => {
@@ -752,6 +818,7 @@ export class App {
     // Odadan da çık: yoksa yoklama döngüsü ana ekranda sonsuza dek
     // çalışıp "bitirdi" bilgisi göndermeye devam ediyordu.
     void this.mp.leaveRoom();
+    this.flushMonthly(); // yarıda bırakılan oyunun skoru da sıralamaya girsin
     this.game.goHome();
   }
 

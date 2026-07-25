@@ -176,6 +176,13 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'lb.prizePowers': { tr: 'her güçten 3 adet', en: '3 of each power' },
   'lb.claimPrize': { tr: '🎁 Ödülü Al', en: '🎁 Claim Prize' },
   'lb.champTitle': { tr: 'Ay sonu şampiyonlukları', en: 'Monthly championships' },
+  'lb.daysLeft': { tr: 'gün kaldı', en: 'days left' },
+  'lb.prizeInfo': {
+    tr: 'Ay sonunda 1. olan 2000 altın + her güçten 3 kazanır.',
+    en: 'The #1 at month end wins 2000 gold + 3 of each power.',
+  },
+  'lb.youAreFirst': { tr: '👑 Şu an 1. sıradasın!', en: "👑 You're #1 right now!" },
+  'lb.yourRank': { tr: 'Sıran:', en: 'Your rank:' },
   'lb.loading': { tr: 'Yükleniyor…', en: 'Loading…' },
   'lb.empty': { tr: 'Henüz kimse yok.', en: 'Nobody here yet.' },
   'lb.note': {

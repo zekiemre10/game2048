@@ -175,8 +175,35 @@ herkes birebir aynı taş dizisini alır (adil yarış), skorlar ~1sn'de bir eş
 Güvenlik önlemleri: PBKDF2-SHA256 (600k tur, kullanıcıya özel tuz), sabit zamanlı
 karşılaştırma, oturum jetonu **süre sınırı**, girişte hız sınırı, istek gövdesi üst
 sınırı, oda durumunda **üyelik kontrolü** (tohum sızıntısını önler), skor
-doğrulaması (yarış bittikten sonra veya aralık dışı skor kabul edilmez) ve tüm
-hataların JSON yanıta çevrilmesi.
+gönderiminde hız sınırı ve tüm hataların JSON yanıta çevrilmesi.
+
+### 🔒 Skor doğrulama (hile önleme)
+
+Skor tablosu ve aylık şampiyonluk **istemciye güvenmez**. İstemci skoru
+göndermez; yalnızca oyunun **tohumu + hamle dizisini** ("U/D/L/R") gönderir.
+Sunucu (`server/replay.py`) oyunu `mulberry32` ile birebir yeniden oynatıp
+skoru **kendisi hesaplar** ("kural tek yerde"). Böylece konsoldan uydurma bir
+skor göndermek imkânsızdır — bozuk/sahte transkript reddedilir ve
+`flagged_submissions` tablosuna kaydedilir.
+
+- **Determinizm garantisi:** İstemci (`src/app/logic/replay.ts`) ve sunucu
+  (`server/replay.py`) mantığı **birebir aynı** sonucu verir; parite testleriyle
+  (150 fixture + gerçek oyun transkriptleri) doğrulanır.
+- **Güç kullanılan oyunlar sıralamaya girmez** — bomba/karıştır/geri al hamle
+  dizisinden türetilemez; ayrıca herkes eşit şartlarda yarışır.
+- **Günlük meydan okuma:** tohum sunucuda günden hesaplanır (istemci kolay bir
+  tohum seçemez).
+- Ek katmanlar: gönderim **hız sınırı**, akla yatkınlık kaydı, ay sonu ödülü
+  yalnızca doğrulanmış skorla verilir.
+
+```bash
+# Sunucu tarafı replay parite testi (istemci = sunucu skoru)
+python3 server/test_replay_parity.py
+# Uçtan uca: uydurma skor reddi + meşru oyun kabulü
+python3 server/test_submit_integration.py
+# İstemci transkript fixture'larını yeniden üret (nadiren gerekir)
+node scripts/gen-replay-fixtures.mjs
+```
 
 ```bash
 python3 server/app.py     # 127.0.0.1:8092 (GAME2048_PORT ile değiştirilebilir)

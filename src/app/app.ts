@@ -235,28 +235,35 @@ export class App {
   /** Bu oturumda sunucuya bildirilen en yüksek aylık skor. */
   private monthlySent = 0;
   private monthlyTimer: ReturnType<typeof setTimeout> | null = null;
-  private monthlyPending: { score: number; best: number } | null = null;
+  private monthlyQueued = false;
 
-  /** Skoru geciktirmeli olarak sıraya alır (art arda hamlelerde tek istek). */
-  private queueMonthly(score: number, best: number): void {
+  /**
+   * Aylık gönderimi geciktirmeli sıraya alır. Skoru İSTEMCİ göndermez —
+   * flush anında oyunun tohum+hamle transkripti gönderilir, sunucu skoru
+   * kendisi hesaplar. Güç kullanılan oyun HİÇ gönderilmez (sıralamaya girmez).
+   */
+  private queueMonthly(score: number): void {
+    if (this.game.powerUsedThisGame()) return; // güçlü oyun sıralama dışı
     if (score <= this.monthlySent) return;
-    this.monthlyPending = { score, best };
+    this.monthlyQueued = true;
     if (typeof setTimeout === 'undefined') return;
     if (this.monthlyTimer !== null) clearTimeout(this.monthlyTimer);
     this.monthlyTimer = setTimeout(() => this.flushMonthly(), 4000);
   }
 
-  /** Bekleyen aylık skoru hemen gönderir. */
+  /** Bekleyen aylık transkripti hemen gönderir. */
   private flushMonthly(): void {
     if (this.monthlyTimer !== null) {
       clearTimeout(this.monthlyTimer);
       this.monthlyTimer = null;
     }
-    const p = this.monthlyPending;
-    this.monthlyPending = null;
-    if (!p || p.score <= this.monthlySent) return;
-    this.monthlySent = p.score;
-    void this.leaderboard.submitMonthly(p.score, p.best);
+    if (!this.monthlyQueued) return;
+    this.monthlyQueued = false;
+    if (this.game.powerUsedThisGame() || this.game.aiPlayed()) return;
+    const score = this.score();
+    if (score <= this.monthlySent) return;
+    this.monthlySent = score;
+    void this.leaderboard.submitMonthly(this.game.gameTranscript(), score);
   }
 
   /** Günün tahtasını oyna (panel kapanır, oyun başlar). */
@@ -522,19 +529,20 @@ export class App {
         const score = this.score();
         if (score <= 0) return;
 
+        // Güç kullanılan oyun sıralamaya girmez (doğrulanamaz + eşit şartlar)
+        if (this.game.powerUsedThisGame()) return;
+
         // Aynı oyun sonunu iki kez göndermeyi engelle
         const stamp = `${mode}|${s}|${score}|${this.moves()}`;
         if (this.lastSubmitStamp === stamp) return;
         this.lastSubmitStamp = stamp;
 
-        const bestTile = this.game.currentBestTile();
-        this.queueMonthly(score, bestTile);
+        this.queueMonthly(score);
         this.flushMonthly(); // oyun bitti → beklemeden gönder
 
         if (mode === GameMode.Daily) {
-          void this.daily
-            .submit(score, bestTile, this.moves())
-            .then(() => this.daily.load());
+          const t = this.game.gameTranscript();
+          void this.daily.submit(t.moves, score).then(() => this.daily.load());
         }
       });
     });
@@ -546,7 +554,7 @@ export class App {
       untracked(() => {
         if (score <= 0) return;
         if (this.game.aiPlayed()) return; // YZ oynadıysa sayılmaz
-        this.queueMonthly(score, this.game.currentBestTile());
+        this.queueMonthly(score);
       });
     });
 

@@ -1,6 +1,29 @@
 import { BOARD_SIZE, Direction, Tile } from '../models/tile.model';
 
 // ============================================================
+//  Doğrulama transkripti için hamle ↔ karakter eşlemesi.
+//  İstemci hamleleri bu karakterlerle kaydeder; sunucu (Python)
+//  aynı karakterleri okuyup oyunu yeniden oynatır. İKİSİ AYNI
+//  OLMALI — bu yüzden tek kaynak burada.
+// ============================================================
+
+/** Yön → transkript karakteri. */
+export const MOVE_CHAR: Record<Direction, string> = {
+  [Direction.Up]: 'U',
+  [Direction.Down]: 'D',
+  [Direction.Left]: 'L',
+  [Direction.Right]: 'R',
+};
+
+/** Transkript karakteri → yön. */
+export const CHAR_MOVE: Record<string, Direction> = {
+  U: Direction.Up,
+  D: Direction.Down,
+  L: Direction.Left,
+  R: Direction.Right,
+};
+
+// ============================================================
 //  2048 — Saf hamle mantığı (framework'ten bağımsız, test edilebilir)
 //
 //  Temel fikir:

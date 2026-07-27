@@ -26,6 +26,9 @@ import threading
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+# Skoru istemciden değil, tohum+hamleden SUNUCU hesaplar (hile önleme).
+from replay import replay_game, daily_seed
+
 DB_PATH = os.environ.get("GAME2048_DB", os.path.join(os.path.dirname(__file__), "app.db"))
 PORT = int(os.environ.get("GAME2048_PORT", "8092"))
 
@@ -44,6 +47,12 @@ CHAMPION_PRIZE = {
     "gold": 2000,
     "powers": {"time": 3, "bomb": 3, "shuffle": 3, "undo": 3, "hint": 3},
 }
+
+# --- Skor doğrulama (replay) ----------------------------------
+MAX_MOVES = 100_000  # transkript üst sınırı (uzun oyun ~1000-3000 hamle)
+VALID_SIZES = (3, 4, 5)
+SUBMIT_MAX = 20       # kullanıcı başına pencere başına skor gönderimi
+SUBMIT_WINDOW = 60    # saniye
 
 LOGIN_MAX_TRIES = 10  # aynı kullanıcı adı için pencere başına deneme
 # Kısa pencere bilinçli bir tercih: kaba kuvvetin hızını keser ama parolasını
@@ -82,6 +91,74 @@ def login_allowed(username_lower: str) -> bool:
 def login_succeeded(username_lower: str) -> None:
     with _login_lock:
         _login_tries.pop(username_lower, None)
+
+
+# Genel hız sınırı (bellek içi): {(kova, anahtar): [zaman damgaları]}
+_rate_buckets = {}
+_rate_lock = threading.Lock()
+
+
+def rate_ok(bucket: str, key, max_n: int, window: int) -> bool:
+    """Pencere içinde en fazla max_n işleme izin verir. Kova başına ayrı sayaç."""
+    now = time.time()
+    k = (bucket, key)
+    with _rate_lock:
+        times = [t for t in _rate_buckets.get(k, []) if now - t < window]
+        if len(times) >= max_n:
+            _rate_buckets[k] = times
+            return False
+        times.append(now)
+        _rate_buckets[k] = times
+        return True
+
+
+def submit_allowed(user_id: int) -> bool:
+    """Skor gönderimi (ödül yolu): kullanıcı başına dakikada SUBMIT_MAX."""
+    return rate_ok("submit", user_id, SUBMIT_MAX, SUBMIT_WINDOW)
+
+
+def flag_submission(conn, me, endpoint, reason, claimed, computed, moves, seed):
+    """Şüpheli/geçersiz gönderimi inceleme için kaydeder."""
+    try:
+        conn.execute(
+            "INSERT INTO flagged_submissions "
+            "(user_id, username, endpoint, reason, claimed_score, computed_score, "
+            "moves, seed, created) VALUES (?,?,?,?,?,?,?,?,?)",
+            (me["id"], me["username"], endpoint, reason, claimed, computed,
+             moves, seed, int(time.time())),
+        )
+        conn.commit()
+    except Exception:
+        traceback.print_exc()
+
+
+def verify_transcript(b):
+    """
+    Gönderilen transkripti (tohum + hamleler) doğrular ve SUNUCUNUN
+    hesapladığı skoru döndürür.
+
+    Dönen: (ok, score, best, info)
+      ok=False ise info bir hata sebebi ('invalid_replay' vb.).
+      ok=True ise score/best sunucu-hesaplı GÜVENİLİR değerlerdir.
+    """
+    seed = int(b.get("seed") or 0) & 0xFFFFFFFF
+    moves = b.get("moves")
+    size = int(b.get("size") or 4)
+
+    if not isinstance(moves, str):
+        return False, 0, 0, "missing_transcript"
+    if size not in VALID_SIZES:
+        return False, 0, 0, "bad_size"
+    if len(moves) > MAX_MOVES:
+        return False, 0, 0, "too_long"
+
+    result = replay_game(seed, moves, size)
+    if not result["valid"]:
+        # Bozuk/sahte transkript: bir hamle tahtayı değiştirmiyor veya
+        # geçersiz karakter → replay skoru güvenilmez.
+        return False, 0, 0, "invalid_replay"
+
+    return True, result["score"], result["maxTile"], "ok"
 
 
 # --------------------------------------------------------------------------
@@ -178,6 +255,21 @@ def init_db():
             username TEXT NOT NULL,
             score INTEGER NOT NULL,
             claimed INTEGER NOT NULL DEFAULT 0,
+            created INTEGER NOT NULL
+        );
+        -- Şüpheli/redddedilen skor gönderimleri (inceleme için).
+        -- Doğrudan reddetmek yerine önce GÖZLEMLE: reddedilen ya da akla
+        -- yatkınlık denetimine takılan gönderimler buraya yazılır.
+        CREATE TABLE IF NOT EXISTS flagged_submissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            endpoint TEXT NOT NULL,        -- monthly | daily
+            reason TEXT NOT NULL,          -- invalid_replay | claimed_mismatch | ...
+            claimed_score INTEGER,         -- istemcinin iddia ettiği (varsa)
+            computed_score INTEGER,        -- sunucunun replay ile bulduğu
+            moves INTEGER,                 -- transkript uzunluğu
+            seed INTEGER,
             created INTEGER NOT NULL
         );
         CREATE TABLE IF NOT EXISTS daily_scores (
@@ -1112,6 +1204,9 @@ class Handler(BaseHTTPRequestHandler):
             me = self._auth_row(conn)
             if not me:
                 return self._send(401, {"error": "unauthorized"})
+            # Canlı yoklama ~1.2sn: cömert sınır (spam/DoS'a karşı).
+            if not rate_ok("room", me["id"], 180, 60):
+                return self._send(429, {"error": "too_many_requests"})
             b = self._body()
             code = (b.get("code") or "").strip().upper()
             score = int(b.get("score") or 0)
@@ -1221,6 +1316,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(404, {"error": "room_not_found"})
             if room["host_id"] != me["id"]:
                 return self._send(403, {"error": "not_host"})
+            if not rate_ok("room", me["id"], 300, 60):
+                return self._send(429, {"error": "too_many_requests"})
             score = int(b.get("score") or 0)
             best = int(b.get("best") or 0)
             if not 0 <= score <= MAX_SCORE or not 0 <= best <= MAX_SCORE:
@@ -1350,21 +1447,38 @@ class Handler(BaseHTTPRequestHandler):
         return {"month": row["month"], "score": row["score"], **CHAMPION_PRIZE}
 
     def _monthly_submit(self):
-        """POST /monthly/submit {score,best} -> bu ayın skorunu bildir.
+        """POST /monthly/submit {seed,moves,size} -> bu ayın skorunu bildir.
 
-        Yalnızca ayın mevcut en iyisinden YÜKSEKSE güncellenir. Ay
-        anahtarı sunucudan alınır (geçmiş aya skor yazılamaz).
+        Skor İSTEMCİDEN ALINMAZ: sunucu tohum+hamle dizisini yeniden
+        oynatıp skoru KENDİSİ hesaplar. Böylece konsoldan uydurma skor
+        gönderilemez. Ayın mevcut en iyisinden yüksekse güncellenir.
         """
         conn = db()
         try:
             me = self._auth_row(conn)
             if not me:
                 return self._send(401, {"error": "unauthorized"})
+            if not submit_allowed(me["id"]):
+                return self._send(429, {"error": "too_many_submissions"})
+
             b = self._body()
-            score = int(b.get("score") or 0)
-            best = int(b.get("best") or 0)
-            if not 0 <= score <= MAX_SCORE or not 0 <= best <= MAX_SCORE:
+            claimed = int(b.get("score") or 0)  # yalnızca kayıt/kıyas için
+            ok, score, best, info = verify_transcript(b)
+            seed = int(b.get("seed") or 0) & 0xFFFFFFFF
+            moves_len = len(b.get("moves") or "")
+
+            if not ok:
+                # Bozuk/sahte transkript → reddet + incelemeye kaydet
+                flag_submission(conn, me, "monthly", info, claimed, None,
+                                moves_len, seed)
                 return self._send(400, {"error": "invalid_score"})
+
+            # Akla yatkınlık: istemcinin iddiası sunucu skorundan ÇOK
+            # saparsa (ör. eski/bozuk istemci) gözlem için işaretle —
+            # ama sunucu skoru güvenilir olduğu için yine de kabul et.
+            if claimed and abs(claimed - score) > max(50, score // 20):
+                flag_submission(conn, me, "monthly", "claimed_mismatch",
+                                claimed, score, moves_len, seed)
 
             month = utc_month()
             now = int(time.time())
@@ -1383,7 +1497,9 @@ class Handler(BaseHTTPRequestHandler):
                     (month, me["id"], me["username"], score, best, now),
                 )
                 conn.commit()
-            return self._send(200, {"ok": True, "improved": improved, "month": month})
+            return self._send(200, {
+                "ok": True, "improved": improved, "month": month, "score": score,
+            })
         finally:
             conn.close()
 
@@ -1475,26 +1591,44 @@ class Handler(BaseHTTPRequestHandler):
             conn.close()
 
     def _daily_submit(self):
-        """POST /daily/submit {score,best,moves} -> günün sonucunu kaydet.
+        """POST /daily/submit {moves} -> günün sonucunu kaydet.
 
-        Yalnızca ÖNCEKİNDEN İYİYSE güncellenir; gün anahtarı sunucudan
-        alınır (istemci geçmiş bir güne skor yazamasın).
+        Skor İSTEMCİDEN ALINMAZ: sunucu, GÜNÜN tohumunu (gün anahtarından)
+        kendisi hesaplar ve hamle dizisini yeniden oynatır. Böylece oyuncu
+        ne skoru uydurabilir ne de kolay bir tohum seçebilir.
         """
         conn = db()
         try:
             me = self._auth_row(conn)
             if not me:
                 return self._send(401, {"error": "unauthorized"})
+            if not submit_allowed(me["id"]):
+                return self._send(429, {"error": "too_many_submissions"})
+
             b = self._body()
-            score = int(b.get("score") or 0)
-            best = int(b.get("best") or 0)
-            moves = int(b.get("moves") or 0)
-            if not 0 <= score <= MAX_SCORE or not 0 <= best <= MAX_SCORE:
-                return self._send(400, {"error": "invalid_score"})
-            if not 0 <= moves <= 1_000_000:
+            claimed = int(b.get("score") or 0)
+            day = utc_day()
+            moves_str = b.get("moves")
+            if not isinstance(moves_str, str) or len(moves_str) > MAX_MOVES:
+                flag_submission(conn, me, "daily", "missing_transcript",
+                                claimed, None, 0, 0)
                 return self._send(400, {"error": "invalid_score"})
 
-            day = utc_day()
+            # GÜNÜN tohumu sunucudan; istemcinin gönderdiği tohum yok sayılır.
+            seed = daily_seed(day)
+            result = replay_game(seed, moves_str, 4)  # günlük her zaman 4×4
+            if not result["valid"]:
+                flag_submission(conn, me, "daily", "invalid_replay",
+                                claimed, None, len(moves_str), seed)
+                return self._send(400, {"error": "invalid_score"})
+
+            score = result["score"]
+            best = result["maxTile"]
+            moves = result["moves"]
+            if claimed and abs(claimed - score) > max(50, score // 20):
+                flag_submission(conn, me, "daily", "claimed_mismatch",
+                                claimed, score, moves, seed)
+
             now = int(time.time())
             prev = conn.execute(
                 "SELECT score FROM daily_scores WHERE day=? AND user_id=?",

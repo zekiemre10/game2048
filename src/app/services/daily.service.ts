@@ -65,18 +65,19 @@ export class DailyService {
   }
 
   /**
-   * Günün sonucunu gönderir. Sunucu yalnızca ÖNCEKİNDEN İYİYSE kaydeder,
-   * gün anahtarını da kendisi belirler (geçmişe skor yazılamaz).
+   * Günün sonucunu gönderir. Skoru İSTEMCİ HESAPLAMAZ: yalnızca hamle
+   * dizisi gönderilir; sunucu GÜNÜN tohumunu kendisi hesaplayıp oyunu
+   * yeniden oynatır (hile önleme + herkes aynı tahta).
    * @returns sonuç iyileştiyse true
    */
-  async submit(score: number, best: number, moves: number): Promise<boolean> {
+  async submit(moves: string, claimedScore = 0): Promise<boolean> {
     const headers = this.auth.authHeaders();
-    if (!headers) return false;
+    if (!headers || !moves) return false;
     try {
       const res = await fetch(`${API_BASE}/daily/submit`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ score, best, moves }),
+        body: JSON.stringify({ moves, score: claimedScore }),
       });
       if (!res.ok) return false;
       const j = await res.json().catch(() => ({}));

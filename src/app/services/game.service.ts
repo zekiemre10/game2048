@@ -9,7 +9,7 @@ import {
   TIME_ATTACK_SECONDS,
   Tile,
 } from '../models/tile.model';
-import { applyMove, hasAnyMove } from '../logic/board-logic';
+import { MOVE_CHAR, applyMove, hasAnyMove } from '../logic/board-logic';
 import {
   AiLevel,
   MoveReview,
@@ -309,14 +309,58 @@ export class GameService {
   );
 
   /**
-   * Yarış modunda ortak tohumlu RNG (tüm oyuncular aynı taş dizisini alır).
-   * null ise normal `Math.random` kullanılır.
+   * Aktif oyunun tohumlu RNG'si. ARTIK HER OYUN TOHUMLUDUR — böylece
+   * sunucu, tohum + hamle dizisinden oyunu birebir yeniden oynatıp skoru
+   * kendisi hesaplayabilir (skor tablosu hile yapılamaz olur).
+   * null yalnızca oyun yokken (başlık ekranı) olur.
    */
-  private raceRng: (() => number) | null = null;
+  private gameRng: (() => number) | null = null;
 
-  /** Aktif rastgelelik kaynağı (yarışta tohumlu, aksi halde Math.random). */
+  /** Aktif oyunun tohumu (doğrulama transkriptinde gönderilir). */
+  readonly gameSeed = signal<number>(0);
+
+  /** Bu oyunda uygulanan hamlelerin dizisi ("U/D/L/R"). */
+  private recordedMoves = '';
+
+  /**
+   * Bu oyunda GÜÇ kullanıldı mı? Kullanıldıysa oyun şampiyonluk
+   * sıralamasına GİRMEZ (bomba/karıştır/geri al hamle dizisinden
+   * türetilemez; ayrıca herkesin eşit şartlarda yarışması için).
+   */
+  readonly powerUsedThisGame = signal<boolean>(false);
+
+  /** Aktif rastgelelik kaynağı (her oyun tohumlu; oyun yoksa Math.random). */
   private rand(): number {
-    return this.raceRng ? this.raceRng() : Math.random();
+    return this.gameRng ? this.gameRng() : Math.random();
+  }
+
+  /**
+   * Yeni bir doğrulanabilir oyun kaydı başlatır: tohumu ayarlar, hamle
+   * kaydını ve güç bayrağını sıfırlar. Tüm start* fonksiyonları çağırır.
+   */
+  private beginRecordedGame(seed: number): void {
+    const s = seed >>> 0;
+    this.gameSeed.set(s);
+    this.gameRng = mulberry32(s);
+    this.recordedMoves = '';
+    this.powerUsedThisGame.set(false);
+  }
+
+  /** Rastgele 32-bit tohum (tohumsuz modlar için). */
+  private randomSeed(): number {
+    return Math.floor(Math.random() * 0x100000000) >>> 0;
+  }
+
+  /**
+   * Sunucuya gönderilecek doğrulama transkripti.
+   * Sunucu bunu yeniden oynatıp skoru KENDİSİ hesaplar.
+   */
+  gameTranscript(): { seed: number; moves: string; size: number } {
+    return {
+      seed: this.gameSeed(),
+      moves: this.recordedMoves,
+      size: this.boardSize(),
+    };
   }
 
   constructor() {
@@ -345,7 +389,7 @@ export class GameService {
    * - TimeAttack: sabit geri sayım, en yüksek skor.
    */
   startMode(mode: GameMode, size: number = BOARD_SIZE): void {
-    this.raceRng = null; // normal oyun → gerçek rastgelelik
+    this.beginRecordedGame(this.randomSeed()); // her oyun tohumlu → doğrulanabilir
     this.cancelAutoplay(); // sürüyorsa gösterimi bitir, eski durumu ATMA
     this.paused.set(false);
     this.aiAssisted.set(false); // yeni oyun → temiz sayfa
@@ -391,7 +435,7 @@ export class GameService {
     this.aiAssisted.set(false);
     this.resetAssistHints();
     this.resetMoveReview();
-    this.raceRng = mulberry32(dailySeed(day) >>> 0);
+    this.beginRecordedGame(dailySeed(day)); // tohum günden türetilir
     this.dailyDay.set(day);
     this.mode.set(GameMode.Daily);
     this.boardSize.set(BOARD_SIZE); // günlük her zaman 4×4 (adil)
@@ -417,7 +461,7 @@ export class GameService {
     this.aiAssisted.set(false); // yeni yarış → temiz sayfa
     this.resetAssistHints();
     this.resetMoveReview();
-    this.raceRng = mulberry32(seed >>> 0);
+    this.beginRecordedGame(seed); // yarış: ortak tohum (herkes aynı taşlar)
     this.mode.set(GameMode.Race);
     this.boardSize.set(BOARD_SIZE); // yarış her zaman 4×4
     this.tiles.set([]);
@@ -716,7 +760,7 @@ export class GameService {
 
   /** Anlık seviyeyi (yeniden) başlatır: boş tahta + geri sayım. */
   private startLevel(): void {
-    this.raceRng = null;
+    this.beginRecordedGame(this.randomSeed());
     this.cancelAutoplay(); // sürüyorsa gösterimi bitir, eski durumu ATMA
     this.paused.set(false);
     this.aiAssisted.set(false); // yeni seviye → temiz sayfa
@@ -751,7 +795,7 @@ export class GameService {
     this.cancelAutoplay(); // ana ekrana dönerken geri yüklenecek bir şey yok
     this.stopTimer();
     this.paused.set(false);
-    this.raceRng = null;
+    this.gameRng = null;
     this.status.set(GameStatus.Idle);
   }
 
@@ -964,6 +1008,9 @@ export class GameService {
     this.powers.update((inv) => ({ ...inv, [id]: Math.max(0, inv[id] - 1) }));
     savePowers(this.powers());
     this.trackMission('powers', 1); // görev: güç kullan
+    // Güç kullanılan oyun şampiyonluk sıralamasına GİRMEZ (doğrulanamaz +
+    // eşit şartlar). Yalnızca sıralama dışı bırakır; oyun normal devam eder.
+    this.powerUsedThisGame.set(true);
   }
 
   /** +30 saniye: yalnızca seviye modunda ve oynanırken. */
@@ -1454,6 +1501,10 @@ export class GameService {
 
     const result = applyMove(this.tiles(), direction, this.boardSize());
     if (!result.moved) return false; // geçersiz hamle → sayaç ARTMAZ
+
+    // Doğrulama transkriptine ekle (yalnızca UYGULANAN hamleler).
+    // Sunucu bu diziyi yeniden oynatıp skoru kendisi hesaplar.
+    this.recordedMoves += MOVE_CHAR[direction];
 
     // Hamle kalitesi: YALNIZCA insan hamleleri, asistan açıkken ve tahta
     // henüz DEĞİŞMEDEN değerlendirilir (kıyas hamle öncesi pozisyona göre).

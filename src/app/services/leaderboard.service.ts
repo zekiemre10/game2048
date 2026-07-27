@@ -81,17 +81,22 @@ export class LeaderboardService {
   }
 
   /**
-   * Bu ayki skoru bildirir (oyun bitince çağrılır).
-   * Sunucu yalnızca ayın mevcut en iyisinden yüksekse kaydeder.
+   * Bu ayki skoru bildirir (oyun bitince/yarıda bırakınca çağrılır).
+   * Skoru İSTEMCİ HESAPLAMAZ: tohum + hamle dizisi gönderilir, sunucu
+   * oyunu yeniden oynatıp skoru kendisi bulur (hile önleme). `score`
+   * yalnızca sunucunun kıyas/kayıt için görebilmesi amacıyla eklenir.
    */
-  async submitMonthly(score: number, best: number): Promise<void> {
+  async submitMonthly(
+    transcript: { seed: number; moves: string; size: number },
+    score: number,
+  ): Promise<void> {
     const headers = this.auth.authHeaders();
-    if (!headers || score <= 0) return;
+    if (!headers || !transcript.moves) return;
     try {
       await fetch(`${API_BASE}/monthly/submit`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ score, best }),
+        body: JSON.stringify({ ...transcript, score }),
       });
     } catch {
       /* çevrimdışı — sessiz */

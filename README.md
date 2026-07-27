@@ -47,7 +47,8 @@ Hedefe ulaşınca sonraki seviyeye geçersin. Ulaştığın en yüksek seviye ka
 
 Oyunun içinde, **API anahtarı ve internet gerektirmeyen** bir yapay zekâ çalışır:
 `logic/ai.ts` içindeki **expectimax** arama motoru (yılan-gradyan sezgiseli, şans
-düğümü örneklemesi, sert düğüm bütçesi). Tüm YZ özellikleri bu tek motordan gelir:
+düğümü örneklemesi, **yinelemeli derinleşme + zaman sınırı**). Tüm YZ özellikleri
+bu tek motordan gelir:
 
 - 💡 **Hamle önerisi** — oyun başına 5 hak; en iyi yönü ok olarak gösterir
 - 🤖 **YZ gösterimi** — "YZ Oynasın" ile motoru izle. **Yalnızca örnektir:** durdurunca
@@ -63,6 +64,32 @@ düğümü örneklemesi, sert düğüm bütçesi). Tüm YZ özellikleri bu tek m
 Ayarlar'daki **🧠 YZ Asistanı** anahtarı öneri, hamle kalitesi ve pozisyon
 göstergesini birlikte açar/kapatır. Hamle başına ek maliyet ortanca **~2 ms**
 (en kötü ~40 ms) — arayüz hiç takılmaz.
+
+### Zorluk merdiveni (ölçülmüş)
+
+Bot rakibin üç zorluğu **artan güç sırasında** olmalı. Motor
+`scripts/ai-bench.mjs` ile ölçülür (4×4, seviye başına 18 tam oyun, aynı
+tohumlarla eşli karşılaştırma):
+
+| Seviye | Arama | Ort. skor | 2048'e ulaşma | ms/hamle |
+|--------|-------|-----------|---------------|----------|
+| Kolay  | derinlik 1 + %30 rastgele | 1.447 | %0 | 0.02 |
+| Orta   | derinlik 2 | 30.573 | %67 | 0.09 |
+| **Uzman** | **derinlik 3→4 (yinelemeli)** | **65.064** | **%94** | **16.9** |
+
+**Uzman, Orta'dan +%112.8 daha iyi** (eşli 18 oyunun 14'ünü kazandı, medyan
+oran 2.41×); hamle başına **16.9 ms ≤ 30 ms**.
+
+**Eski hata:** Uzman, Orta'dan *daha kötü* oynuyordu (−%47.8). Sebep: sabit bir
+**düğüm bütçesi** (10.000) arama ağacının ortasında bitiyor, bazı dallar
+derinlik 4, bazıları derinlik 1-2 değerlendiriliyordu — eşit olmayan
+derinlikler karşılaştırılınca seçim bozuluyordu. **Çözüm:** düğüm bütçesi
+kaldırıldı, yerine **yinelemeli derinleşme + zaman sınırı** kondu — derinlik
+kademeli artar, süre dolunca yarım kalan derinlik atılır ve son TAM tamamlanan
+derinliğin sonucu kullanılır → hep tutarlı derinlikte karşılaştırma. Ardışık
+derinlik farkı bu sezgiselde küçük (~%8) olduğundan Orta ile Uzman iki derinlik
+ayrıldı. `ai-strength.spec.ts` seviye başına asgari skoru ve sıralamayı
+(Uzman ≥ Orta×1.2) regresyon olarak korur.
 
 ## Özellikler
 

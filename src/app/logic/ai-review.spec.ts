@@ -1,5 +1,5 @@
 import { Direction } from '../models/tile.model';
-import { ValueGrid, bestMove, positionHealth, reviewMove } from './ai';
+import { ValueGrid, positionHealth, reviewMove } from './ai';
 
 describe('YZ — hamle kalitesi (reviewMove)', () => {
   it('YZ ile aynı hamle "best" sayılır', () => {
@@ -9,11 +9,14 @@ describe('YZ — hamle kalitesi (reviewMove)', () => {
       [0, 0, 0, 64],
       [0, 0, 0, 128],
     ];
-    const best = bestMove(g, 'medium')!;
-    const rev = reviewMove(g, best, 'medium');
+    // reviewMove KENDİ referans derinliğinde en iyi yönü belirler; o yönü
+    // oynamak 'best' sayılmalı. (bestMove'a bağlanmıyoruz — o seviyeye göre
+    // farklı derinlikte arar; hamle kalitesi ise sabit derinlikte değerlendirir.)
+    const probe = reviewMove(g, Direction.Down, 'medium')!;
+    const rev = reviewMove(g, probe.best, 'medium');
     expect(rev).not.toBeNull();
     expect(rev!.rating).toBe('best');
-    expect(rev!.best).toBe(best);
+    expect(rev!.best).toBe(probe.best);
   });
 
   it('geçersiz (tahtayı değiştirmeyen) hamle değerlendirilmez', () => {

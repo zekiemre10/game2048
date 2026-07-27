@@ -186,17 +186,41 @@ const DIRECTIONS: Direction[] = [
   Direction.Right,
 ];
 
+/** Yüksek çözünürlüklü saat (tarayıcı/Node/test hepsinde çalışır). */
+function now(): number {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
 /**
- * Düğüm bütçesi: aramanın toplam maliyetini SERT şekilde sınırlar.
- * Bütçe bitince dal anında sezgisel değerle kapanır. Böylece tahta
- * dolduğunda bile hesap birkaç ms sürer → arayüz asla donmaz.
+ * Arama, SABİT derinlikte tam olarak yapılır (eski "düğüm bütçesi" kesintisi
+ * KALDIRILDI — o, dalları farklı derinliklerde bırakıp karşılaştırmayı
+ * bozuyordu). Süreyi yinelemeli derinleşme + zaman sınırı yönetir: derinlik
+ * kademeli artar, süre dolunca yarım kalan derinlik ATILIR ve son TAM
+ * tamamlanan derinliğin sonucu kullanılır → hep tutarlı derinlik.
+ *
+ * Dallanmayı bağlı tutmak için şans düğümü en çok `sampleK` boş hücre örnekler
+ * (küçük K → daha derine inilebilir; büyük K → daha isabetli beklenen değer).
  */
-let budget = 0;
+const TIMEOUT = Symbol('ai-timeout');
+let deadline = Infinity;
+let sampleK = 4;
+let nodeCounter = 0;
+/**
+ * Şans düğümünde düşük olasılıklı 4-taşı da genişletilsin mi?
+ * false → yalnızca 2-taşı (0.9 olasılık) genişletilir → dallanma yarıya iner
+ * → bir seviye daha DERİNE inilebilir. Uzman bunu kullanır (derinlik > isabet).
+ */
+let expandFour = true;
+
+/** Süre kontrolü — her düğümde performance.now() çağırmamak için seyrek. */
+function checkTime(): void {
+  if ((++nodeCounter & 511) === 0 && now() > deadline) throw TIMEOUT;
+}
 
 /** Oyuncu düğümü: en iyi hamlenin değeri. */
 function maxNode(g: ValueGrid, depth: number): number {
-  if (depth === 0 || budget <= 0) return evaluate(g);
-  budget--;
+  if (depth === 0) return evaluate(g);
+  checkTime();
   let best = -Infinity;
   for (const dir of DIRECTIONS) {
     const { grid, moved } = simulateMove(g, dir);
@@ -209,21 +233,75 @@ function maxNode(g: ValueGrid, depth: number): number {
 
 /** Şans düğümü: rastgele taş üretiminin beklenen değeri. */
 function chanceNode(g: ValueGrid, depth: number): number {
-  if (depth === 0 || budget <= 0) return evaluate(g);
+  if (depth === 0) return evaluate(g);
   const cells = emptyCells(g);
   if (cells.length === 0) return evaluate(g);
-  budget--;
+  checkTime();
 
-  // Dallanmayı sınırla: en çok 4 temsilci hücre örnekle.
-  const sample = cells.length > 4 ? sampleCells(cells, 4) : cells;
+  // Dallanmayı sınırla: en çok sampleK temsilci hücre örnekle.
+  const sample = cells.length > sampleK ? sampleCells(cells, sampleK) : cells;
   let total = 0;
   const per = 1 / sample.length;
   for (const [r, c] of sample) {
-    total += per * 0.9 * maxNode(placeTile(g, r, c, 2), depth);
-    total += per * CHANCE_OF_FOUR * maxNode(placeTile(g, r, c, 4), depth);
+    if (expandFour) {
+      total += per * 0.9 * maxNode(placeTile(g, r, c, 2), depth);
+      total += per * CHANCE_OF_FOUR * maxNode(placeTile(g, r, c, 4), depth);
+    } else {
+      // Yalnızca 2-taşı (0.9); 4-taşı atlanır → dallanma yarı → daha derin.
+      total += per * maxNode(placeTile(g, r, c, 2), depth);
+    }
   }
   return total;
 }
+
+/**
+ * Bir pozisyonda her yönün expectimax değerini SABİT derinlikte hesaplar.
+ * (bestMove ve reviewMove ortak kullanır — tutarlı karşılaştırma.)
+ * Süre dolarsa TIMEOUT fırlatır (çağıran yakalar).
+ */
+function scoreDirections(
+  g: ValueGrid,
+  legal: Direction[],
+  depth: number,
+): Map<Direction, number> {
+  const out = new Map<Direction, number>();
+  for (const dir of legal) {
+    const { grid } = simulateMove(g, dir);
+    out.set(dir, chanceNode(grid, depth - 1));
+  }
+  return out;
+}
+
+/** Seviye ayarları: derinlik aralığı, süre sınırı, şans örnekleme genişliği. */
+interface LevelCfg {
+  minDepth: number;
+  maxDepth: number;
+  timeCapMs: number;
+  sampleK: number;
+  expandFour: boolean;
+}
+// Merdiven DERİNLİK farkına oturur (hepsi sampleK 2, tam olasılık).
+// ÖNEMLİ: bu sezgisel değerle ardışık derinlikler (3→4) yalnızca ~%8 fark
+// veriyor — kabul kriteri olan %20'yi tutturmak için Orta ile Uzman İKİ
+// derinlik ayrı: Orta=2, Uzman=4. Böylece Uzman "iki hamle daha ileri bakar".
+const LEVEL_CFG: Record<AiLevel, LevelCfg> = {
+  // Kolay: derinlik 1 + ara sıra rastgele (bestMove içinde) → zayıf rakip.
+  easy: { minDepth: 1, maxDepth: 1, timeCapMs: 8, sampleK: 2, expandFour: true },
+  // Orta: derinlik 2 — makul ama en iyi değil.
+  medium: { minDepth: 2, maxDepth: 2, timeCapMs: 12, sampleK: 2, expandFour: true },
+  // Uzman: yinelemeli derinleşme 3→4. minDepth 3 KRİTİK: derinlik 3 hızlıca
+  // tamamlanıp bir YEDEK sağlar; sonra derinlik 4 denenir. (minDepth'i 4
+  // yaparsak derinlik 4 zaman aşımına uğradığında hiç tamamlanmış derinlik
+  // kalmaz ve hamle rastgele ilk yöne düşerdi.)
+  expert: { minDepth: 3, maxDepth: 4, timeCapMs: 26, sampleK: 2, expandFour: true },
+};
+
+/**
+ * Bir derinlikten diğerine maliyet büyüme çarpanı (kaba tahmin).
+ * Bir sonraki derinliğin süresini öngörüp SIĞMAYACAKSA hiç denememek için
+ * kullanılır → doğrulanamayacak derinliğe girip 26ms boşa harcanmaz.
+ */
+const DEPTH_GROWTH = 8;
 
 /** Deterministik "örnekleme": eşit aralıklı hücreler (rastgelelik yok → test kararlı). */
 function sampleCells(cells: Array<[number, number]>, k: number): Array<[number, number]> {
@@ -285,18 +363,14 @@ export function describeGame(
   return (lang === 'en' ? en : tr).join('\n');
 }
 
-/** Boş hücre sayısına göre arama derinliği (performans dengesi). */
-function depthFor(g: ValueGrid, maxDepth: number): number {
-  const e = emptyCells(g).length;
-  if (e > 8) return Math.min(maxDepth, 2);
-  if (e > 4) return Math.min(maxDepth, 3);
-  return maxDepth;
-}
-
 /**
  * En iyi hamleyi döndürür (hamle yoksa null).
- * `level` derinliği ve rastgeleliği belirler.
+ * `level` derinliği/genişliği/süreyi belirler.
  * `rand` verilirse (0..1) kolay modda ara sıra rastgele hamle yapılır.
+ *
+ * Yinelemeli derinleşme: derinlik minDepth'ten maxDepth'e artar; her derinlik
+ * TAM tamamlanır. Süre (timeCapMs) dolunca içinde bulunulan derinlik yarım
+ * kalırsa ATILIR ve son tam tamamlanan derinliğin en iyi hamlesi döner.
  */
 export function bestMove(
   g: ValueGrid,
@@ -310,29 +384,42 @@ export function bestMove(
   if (level === 'easy' && rand && rand() < 0.3) {
     return legal[Math.floor(rand() * legal.length)];
   }
+  if (legal.length === 1) return legal[0];
 
-  // Derinlik + düğüm bütçesi: ikisi birlikte hesabı birkaç ms'de tutar.
-  const maxDepth = level === 'easy' ? 2 : level === 'medium' ? 3 : 4;
-  const total = level === 'easy' ? 1200 : level === 'medium' ? 4000 : 10000;
-  const depth = depthFor(g, maxDepth);
+  const cfg = LEVEL_CFG[level];
+  sampleK = cfg.sampleK;
+  expandFour = cfg.expandFour;
+  const start = now();
+  deadline = start + cfg.timeCapMs;
+  nodeCounter = 0;
 
-  // Bütçe yönler ARASINDA eşit paylaştırılır. Tek ortak bütçe kullanılırsa
-  // ilk yön bütçeyi tüketir ve kalan yönler sığ (statik) değerle karşılaştırılır;
-  // seçim liyakate değil, dizideki sıraya göre yapılmış olurdu.
-  const perDir = Math.max(200, Math.floor(total / legal.length));
-
-  let best: Direction | null = null;
-  let bestVal = -Infinity;
-  for (const dir of legal) {
-    const { grid } = simulateMove(g, dir);
-    budget = perDir; // her yöne eşit derinlik hakkı
-    const v = chanceNode(grid, depth - 1);
-    if (v > bestVal) {
-      bestVal = v;
-      best = dir;
+  let best = legal[0];
+  let prevDepthMs = 0;
+  for (let depth = cfg.minDepth; depth <= cfg.maxDepth; depth++) {
+    // Bir sonraki derinlik zamana SIĞMAYACAKSA hiç deneme (boşa harcama yok).
+    if (depth > cfg.minDepth) {
+      const elapsed = now() - start;
+      if (elapsed + prevDepthMs * DEPTH_GROWTH > cfg.timeCapMs) break;
+    }
+    const dStart = now();
+    try {
+      const vals = scoreDirections(g, legal, depth);
+      // Bu derinlik TAM tamamlandı → en iyisini benimse.
+      let bestVal = -Infinity;
+      for (const dir of legal) {
+        const v = vals.get(dir)!;
+        if (v > bestVal) {
+          bestVal = v;
+          best = dir;
+        }
+      }
+      prevDepthMs = now() - dStart;
+    } catch (e) {
+      if (e === TIMEOUT) break; // (emniyet) yarım derinlik → önceki derinlik
+      throw e;
     }
   }
-  return best ?? legal[0];
+  return best;
 }
 
 // --- Hamle kalitesi -----------------------------------------
@@ -363,18 +450,19 @@ export function reviewMove(
   // Tek seçenek varsa kıyaslanacak bir şey yok → kusursuz say.
   if (legal.length === 1) return { rating: 'best', best: played };
 
-  const maxDepth = level === 'easy' ? 2 : level === 'medium' ? 3 : 4;
-  const total = level === 'easy' ? 1200 : level === 'medium' ? 4000 : 10000;
-  const depth = depthFor(g, maxDepth);
-  const perDir = Math.max(200, Math.floor(total / legal.length));
+  // Hamle kalitesi SABİT derinlikte değerlendirilir (tüm yönler eşit
+  // derinlikte kıyaslanmalı). Süre sınırı yok — dallanma zaten bağlı.
+  sampleK = 3;
+  expandFour = true;
+  deadline = Infinity;
+  nodeCounter = 0;
+  const vals = scoreDirections(g, legal, 4);
 
   let bestDir = legal[0];
   let bestVal = -Infinity;
   let playedVal = -Infinity;
   for (const dir of legal) {
-    const { grid } = simulateMove(g, dir);
-    budget = perDir;
-    const v = chanceNode(grid, depth - 1);
+    const v = vals.get(dir)!;
     if (dir === played) playedVal = v;
     if (v > bestVal) {
       bestVal = v;

@@ -364,6 +364,8 @@ python3 server/test_rooms_bot_server.py
 python3 server/test_bot_parity.py
 # İstemci transkript fixture'larını yeniden üret (nadiren gerekir)
 node scripts/gen-replay-fixtures.mjs
+# Ölü çeviri anahtarı kontrolü (CI'da da koşar — ölü anahtar birikmesin)
+npm run check:i18n
 ```
 
 ```bash

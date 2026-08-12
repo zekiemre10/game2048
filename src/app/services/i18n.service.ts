@@ -17,9 +17,6 @@ const DICT: Record<string, { tr: string; en: string }> = {
     tr: "Taşları birleştir, <strong>2048</strong>'e ulaş!",
     en: 'Merge the tiles, reach <strong>2048</strong>!',
   },
-  'start.play': { tr: 'Başla', en: 'Play' },
-  'start.levelMode': { tr: '🎯 Seviye Modu', en: '🎯 Level Mode' },
-  'start.modeLabel': { tr: 'MOD', en: 'MODE' },
   'start.sizeLabel': { tr: 'TAHTA', en: 'BOARD' },
   'mode.classic': { tr: 'Klasik', en: 'Classic' },
   'mode.classicDesc': { tr: 'Sonsuz · 2048’e ulaş', en: 'Endless · reach 2048' },
@@ -246,15 +243,10 @@ const DICT: Record<string, { tr: string; en: string }> = {
 
   // Mağaza
   'store.title': { tr: '🛒 Mağaza', en: '🛒 Store' },
-  'store.note': {
-    tr: 'Altınlarını güçlere ve temalara harca.',
-    en: 'Spend your gold on powers and themes.',
-  },
   'store.tabThemes': { tr: '🎨 Temalar', en: '🎨 Themes' },
   'store.tabPowers': { tr: '⚡ Güçler', en: '⚡ Powers' },
   // Oyun içi yan paneldeki "Güçler" bölüm başlığı
   'hud.powers': { tr: 'Güçlerin', en: 'Your powers' },
-  'store.tabAch': { tr: '🏅 Başarımlar', en: '🏅 Achievements' },
   'store.used': { tr: '✓ Kullanımda', en: '✓ In use' },
   'store.select': { tr: 'Seç', en: 'Select' },
   'store.unlocked': { tr: '✓ Açıldı', en: '✓ Unlocked' },
@@ -278,7 +270,6 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'prof.pointsLeft': { tr: 'puan kaldı', en: 'points to go' },
   'prof.maxRank': { tr: '🎉 En yüksek ünvan!', en: '🎉 Highest rank!' },
   'prof.changeAvatar': { tr: 'Avatarı değiştir', en: 'Change avatar' },
-  'prof.seeAch': { tr: '🏅 Başarımları Gör', en: '🏅 View Achievements' },
   'prof.achievements': { tr: '🏅 Başarımlar', en: '🏅 Achievements' },
   'ach.note': {
     tr: 'Hedefleri tamamla, altın kazan. Kilitli olanlarda ne kadar yaklaştığını görebilirsin.',
@@ -291,7 +282,6 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'nav.settings': { tr: 'Ayarlar', en: 'Settings' },
   'nav.profile': { tr: 'Profil', en: 'Profile' },
   'nav.home': { tr: 'Ana Ekran', en: 'Home' },
-  'prof.nameLabel': { tr: 'Oyuncu adı', en: 'Player name' },
   'prof.loginForName': {
     tr: 'Adın için giriş yap (kayıt olduğun kullanıcı adı)',
     en: 'Log in for your name (your registered username)',
@@ -462,38 +452,7 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'mp.err.error': { tr: 'Bir hata oluştu.', en: 'Something went wrong.' },
 
   // Yapay zekâ (koç + analiz)
-  'nav.coach': { tr: 'YZ Koç', en: 'AI Coach' },
-  'coach.title': { tr: '🧠 YZ Koç', en: '🧠 AI Coach' },
-  'coach.note': {
-    tr: '2048 stratejisi sor, yapay zekâ sana yardımcı olsun.',
-    en: 'Ask about 2048 strategy — the AI will help you.',
-  },
-  'coach.placeholder': { tr: 'Bir şey sor…', en: 'Ask something…' },
-  'coach.send': { tr: 'Sor', en: 'Ask' },
-  'coach.thinking': { tr: 'Düşünüyor…', en: 'Thinking…' },
-  'coach.loginNeeded': {
-    tr: 'YZ koçu kullanmak için giriş yapmalısın.',
-    en: 'You need to sign in to use the AI coach.',
-  },
-  'coach.empty': {
-    tr: 'Merhaba! 2048’de nasıl daha iyi olurum diye sorabilirsin. 👇',
-    en: 'Hi! Ask me how to get better at 2048. 👇',
-  },
-  'coach.q1': { tr: '2048’e nasıl ulaşırım?', en: 'How do I reach 2048?' },
-  'coach.q2': { tr: 'En iyi strateji nedir?', en: "What's the best strategy?" },
-  'coach.q3': { tr: 'Sık yapılan hatalar neler?', en: 'What are common mistakes?' },
   'ov.analyze': { tr: '🔍 YZ Analizi', en: '🔍 AI Analysis' },
-  'ov.analyzing': { tr: 'Analiz ediliyor…', en: 'Analyzing…' },
-  'ai.err.ai_unavailable': {
-    tr: 'YZ şu an kullanılamıyor (sunucuda API anahtarı ayarlı değil).',
-    en: 'AI is currently unavailable (no API key on the server).',
-  },
-  'ai.err.unauthorized': {
-    tr: 'Bunun için giriş yapmalısın.',
-    en: 'You need to sign in for this.',
-  },
-  'ai.err.network': { tr: 'Bağlantı hatası.', en: 'Connection error.' },
-  'ai.err.error': { tr: 'YZ yanıt veremedi, tekrar dene.', en: 'AI could not respond, try again.' },
 };
 
 @Injectable({ providedIn: 'root' })

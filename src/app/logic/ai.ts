@@ -373,7 +373,8 @@ function sampleCells(cells: Array<[number, number]>, k: number): Array<[number, 
 /**
  * Anahtar gerektirmeyen algoritmik oyun-sonu değerlendirmesi.
  * Skor/hamle verimliliği, en büyük kare ve köşe kullanımına göre kısa,
- * yapıcı bir metin üretir (LLM analizi yoksa yedek olarak kullanılır).
+ * yapıcı bir metin üretir. Oyun-sonu değerlendirmesinin TEK yoludur (harici
+ * bir servis/LLM yoktur — her şey istemcide, çevrimdışı çalışır).
  */
 export function describeGame(
   grid: ValueGrid,

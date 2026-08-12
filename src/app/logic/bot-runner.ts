@@ -17,28 +17,24 @@ import {
 
 const CHANCE_OF_FOUR = 0.1;
 
-/** Bot adından (🤖 Bot (Uzman)) zorluk seviyesini çıkarır. */
+/** Bot adından (🤖 Bot (Uzman)) zorluk seviyesini çıkarır. TR ve EN adları tanır. */
 export function levelFromName(name: string): AiLevel {
-  if (name.includes('Kolay') || name.toLowerCase().includes('easy')) return 'easy';
-  if (name.includes('Uzman') || name.toLowerCase().includes('expert')) return 'expert';
+  const s = name.toLowerCase();
+  if (name.includes('Kolay') || s.includes('easy')) return 'easy';
+  if (name.includes('Uzman') || s.includes('expert')) return 'expert';
+  if (name.includes('Zor') || s.includes('hard')) return 'hard';
   return 'medium';
 }
 
-/** Zorluğa göre hamle hızı (ms). */
+/** Zorluğa göre hamle hızı (ms) — güçlü seviye daha hızlı/akıcı oynar. */
 function speedFor(level: AiLevel): number {
-  return level === 'easy' ? 480 : level === 'medium' ? 340 : 240;
+  return level === 'easy' ? 480 : level === 'medium' ? 360 : level === 'hard' ? 280 : 240;
 }
 
 export class BotRunner {
   private grid: ValueGrid;
   /** Taş üretimi için tohumlu RNG — insan oyuncuyla birebir aynı akış. */
   private readonly rng: () => number;
-  /**
-   * Hamle rastgeleliği için AYRI bir RNG. Kolay seviyede bestMove rastgele
-   * sayı çeker; aynı akış kullanılsaydı bot her hamlede taş üretim dizisini
-   * kaydırır ve "aynı tohum → aynı taşlar" adalet güvencesi bozulurdu.
-   */
-  private readonly moveRng: () => number;
   private readonly speedMs: number;
   private stopped = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -53,7 +49,6 @@ export class BotRunner {
     size = 4,
   ) {
     this.rng = mulberry32(seed >>> 0);
-    this.moveRng = mulberry32((seed ^ 0x9e3779b9) >>> 0);
     this.speedMs = speedFor(level);
     this.grid = emptyGrid(size);
     // İnsanla aynı tohum → aynı iki başlangıç taşı (adil).
@@ -96,7 +91,7 @@ export class BotRunner {
 
   private step(): void {
     if (this.stopped) return;
-    const dir = bestMove(this.grid, this.level, this.moveRng);
+    const dir = bestMove(this.grid, this.level);
     if (!dir) {
       this.done = true;
       this.stop();

@@ -2627,8 +2627,68 @@
   margin-bottom: 0.3rem;
 }
 
-.mp-botlevels button {
-  font-size: 0.85rem;
+// --- Bot zorluk seçimi: 4 kademe, ölçülmüş güç göstergeli ---
+.mp-botlevels {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.4rem;
+}
+
+.mp-botlevel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border, rgba(128, 128, 128, 0.3));
+  background: var(--panel-bg, rgba(255, 255, 255, 0.6));
+  cursor: pointer;
+  text-align: left;
+  border-left-width: 4px;
+  transition: transform 0.08s ease, box-shadow 0.15s ease;
+}
+.mp-botlevel:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+}
+.mp-botlevel.lvl-easy { border-left-color: #3fb950; }
+.mp-botlevel.lvl-medium { border-left-color: #d29922; }
+.mp-botlevel.lvl-hard { border-left-color: #db6d28; }
+.mp-botlevel.lvl-expert { border-left-color: #f85149; }
+
+.mp-botlevel-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.mp-botlevel-str {
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+.mp-botlevel-bar {
+  display: block;
+  width: 100%;
+  height: 4px;
+  margin-top: 0.15rem;
+  border-radius: 3px;
+  background: rgba(128, 128, 128, 0.22);
+  overflow: hidden;
+}
+.mp-botlevel-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: currentColor;
+}
+.mp-botlevel.lvl-easy .mp-botlevel-bar i { background: #3fb950; }
+.mp-botlevel.lvl-medium .mp-botlevel-bar i { background: #d29922; }
+.mp-botlevel.lvl-hard .mp-botlevel-bar i { background: #db6d28; }
+.mp-botlevel.lvl-expert .mp-botlevel-bar i { background: #f85149; }
+
+.mp-botstrength-hint {
+  font-size: 0.72rem;
+  opacity: 0.6;
+  margin: 0.35rem 0 0;
 }
 
 .mp-botremove {

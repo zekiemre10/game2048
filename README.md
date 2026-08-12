@@ -53,8 +53,9 @@ bu tek motordan gelir:
 - 💡 **Hamle önerisi** — oyun başına 5 hak; en iyi yönü ok olarak gösterir
 - 🤖 **YZ gösterimi** — "YZ Oynasın" ile motoru izle. **Yalnızca örnektir:** durdurunca
   tahtan, skorun, sürün ve hakların aynen geri gelir; ilerlemen etkilenmez
-- 🏁 **YZ rakibi** — çok oyunculu odaya 3 zorlukta bot ekle (Kolay / Orta / Uzman);
-  bot da insanla **aynı tohumlu** taş dizisini oynar
+- 🏁 **YZ rakibi** — çok oyunculu odaya 4 zorlukta bot ekle (Kolay / Orta / Zor /
+  Uzman); her düğme seçim ekranında **ölçülmüş gücünü** (2048'e ulaşma oranı)
+  gösterir; bot da insanla **aynı tohumlu** taş dizisini oynar
 - ✨ **Hamle kalitesi** — her hamlen YZ'nin seçimiyle kıyaslanır: *Mükemmel · İyi ·
   Daha iyisi vardı (↑)* — oyun sonunda **doğruluk yüzdesi** özeti
 - 🟢 **Canlı pozisyon göstergesi** — tahtanın sağlığı (İyi / Riskli / Tehlikeli);
@@ -67,29 +68,41 @@ göstergesini birlikte açar/kapatır. Hamle başına ek maliyet ortanca **~2 ms
 
 ### Zorluk merdiveni (ölçülmüş)
 
-Bot rakibin üç zorluğu **artan güç sırasında** olmalı. Motor
-`scripts/ai-bench.mjs` ile ölçülür (4×4, seviye başına 18 tam oyun, aynı
-tohumlarla eşli karşılaştırma):
+Bot rakibin **dört zorluğu** artan güçtedir ve gelişen oyuncuya **kademeli**
+bir merdiven sunar. Motor `scripts/ai-bench.mjs` ile ölçülür (4×4, tam oyun):
 
-| Seviye | Arama | Ort. skor | 2048'e ulaşma | ms/hamle |
-|--------|-------|-----------|---------------|----------|
-| Kolay  | derinlik 1 + %30 rastgele | 1.447 | %0 | 0.02 |
-| Orta   | derinlik 2 | 30.573 | %67 | 0.09 |
-| **Uzman** | **derinlik 3→4 (yinelemeli)** | **65.064** | **%94** | **16.9** |
+| Seviye | Arama | Ort. skor | 2048'e ulaşma | ms/hamle | Önceki kademeye oran |
+|--------|-------|-----------|---------------|----------|----------------------|
+| Kolay  | derinlik 1 (sığ) | 5.041 | %0 | 0.02 | — |
+| Orta   | derinlik 2, kaba örnekleme + düz sezgisel | 15.192 | %23 | 0.03 | **3.0×** |
+| Zor    | derinlik 2, tam sezgisel | 35.038 | %67 | 0.08 | **2.3×** |
+| **Uzman** | **derinlik 3→4 (yinelemeli)** | **55.343** | **%100** | **17.7** | **1.6×** |
 
-**Uzman, Orta'dan +%112.8 daha iyi** (eşli 18 oyunun 14'ünü kazandı, medyan
-oran 2.41×); hamle başına **16.9 ms ≤ 30 ms**.
+Her kademe bir öncekinden ölçülebilir şekilde güçlü ve **ardışık fark 5 katı
+geçmiyor** (kademeli geçiş). Uzman hamle başına **17.7 ms ≤ 30 ms**.
+*(Kolay/Orta/Zor 30 oyun; Uzman yavaş olduğundan 10 oyun.)*
 
-**Eski hata:** Uzman, Orta'dan *daha kötü* oynuyordu (−%47.8). Sebep: sabit bir
-**düğüm bütçesi** (10.000) arama ağacının ortasında bitiyor, bazı dallar
-derinlik 4, bazıları derinlik 1-2 değerlendiriliyordu — eşit olmayan
-derinlikler karşılaştırılınca seçim bozuluyordu. **Çözüm:** düğüm bütçesi
-kaldırıldı, yerine **yinelemeli derinleşme + zaman sınırı** kondu — derinlik
-kademeli artar, süre dolunca yarım kalan derinlik atılır ve son TAM tamamlanan
-derinliğin sonucu kullanılır → hep tutarlı derinlikte karşılaştırma. Ardışık
-derinlik farkı bu sezgiselde küçük (~%8) olduğundan Orta ile Uzman iki derinlik
-ayrıldı. `ai-strength.spec.ts` seviye başına asgari skoru ve sıralamayı
-(Uzman ≥ Orta×1.2) regresyon olarak korur.
+**Eski hata (bu iş):** Kolay ile Orta arasında **25 kat uçurum** vardı — Kolay
+2048'e hiç ulaşmıyor, Orta oyunların %97'sinde ulaşıyordu; arada seçenek yoktu.
+İki sebep vardı: (1) Kolay **%30 tamamen rastgele** hamle yapıyordu — tek kötü
+hamle köşe düzenini bozup tahtayı kilitliyor, ipuçlarıyla çelişiyordu; (2) tek
+lever derinlikti ve derinlik 1→2 arası skoru 3.5k'dan 33k'ya sıçratıyordu.
+
+**Çözüm:** rastgele hamle **tamamen kaldırıldı** — artık her seviye **hep
+mantıklı** oynar. Zayıflatma üç **deterministik** knob üzerinden yapılır:
+- **derinlik** — kaç hamle ileri baktığı (baskın lever),
+- **sampleK** — şans düğümü örnekleme genişliği (1 = kaba beklenen değer),
+- **snakePow / emptyMul** — sezgisel güç (köşe/monotonluk gradyanı + boş hücre
+  ödülü; düşük değerler yapıyı zayıflatır ama makul hamleyi bozmaz).
+
+Kolay–Orta boşluğu, derinlik 2'de kaba örnekleme + düzleştirilmiş sezgiselle
+dolduruldu (Orta = "iki hamle ileri ama isabetsiz"). Değerler
+`scripts/ai-calibrate.mjs` taramasıyla banda oturtuldu; `ai-strength.spec.ts`
+seviye eşiklerini, sıralamayı ve ≤5× geçişi regresyon olarak korur.
+
+> **Çok oyunculu not:** yeni **Zor** kademesinin bot adının sunucu tarafında
+> "Zor"/"Hard" olarak etiketlenmesi gerekir; istemci `levelFromName` bu adı
+> zaten tanır (TR+EN). Sunucu tanımıyorsa bot güvenli şekilde Orta'ya düşer.
 
 ## Özellikler
 

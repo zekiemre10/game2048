@@ -1028,7 +1028,7 @@ export class App {
   }
 
   /** Odaya YZ botu ekle (host). */
-  async onAddBot(difficulty: 'easy' | 'medium' | 'expert'): Promise<void> {
+  async onAddBot(difficulty: 'easy' | 'medium' | 'hard' | 'expert'): Promise<void> {
     this.mpError.set('');
     const r = await this.mp.addBot(difficulty);
     if (!r.ok) this.mpError.set(`mp.err.${r.error}`);

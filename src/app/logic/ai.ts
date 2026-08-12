@@ -26,8 +26,8 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
-/** YZ zorluk seviyeleri. */
-export type AiLevel = 'easy' | 'medium' | 'expert';
+/** YZ zorluk seviyeleri (güç sırası: easy < medium < hard < expert). */
+export type AiLevel = 'easy' | 'medium' | 'hard' | 'expert';
 
 const CHANCE_OF_FOUR = 0.1;
 
@@ -131,15 +131,21 @@ export function hasMoves(g: ValueGrid): boolean {
 
 // --- Değerlendirme (heuristik) ------------------------------
 
-const weightCache = new Map<number, ValueGrid>();
+const weightCache = new Map<string, ValueGrid>();
 
 /**
  * "Yılan" gradyan ağırlık matrisi: en büyük ağırlık bir köşede,
  * satırlar bumerang sırayla azalır. Büyük taşları köşede tutup
  * monoton dizmeyi ödüllendirir (klasik güçlü 2048 sezgiseli).
+ *
+ * `pow` gradyanın GÜCÜnü ayarlar (zorluk kademesi için): w = base^(idx·pow).
+ *   pow = 1   → tam gradyan (güçlü köşe/monotonluk disiplini)
+ *   pow < 1  → gradyan DÜZLEŞİR → bot köşe düzenini daha az umursar (zayıflar,
+ *              ama yine mantıklı; rastgele değil). pow = 0 → tamamen düz.
  */
-function snakeWeights(n: number): ValueGrid {
-  const cached = weightCache.get(n);
+function snakeWeights(n: number, pow: number): ValueGrid {
+  const key = `${n}:${pow}`;
+  const cached = weightCache.get(key);
   if (cached) return cached;
   const w = emptyGrid(n);
   // 5×5'te üs 24'e kadar çıkar; taban 4 olursa ağırlık×değer 5.8e17'ye ulaşır
@@ -150,18 +156,27 @@ function snakeWeights(n: number): ValueGrid {
   for (let r = 0; r < n; r++) {
     const cols = r % 2 === 0 ? [...Array(n).keys()] : [...Array(n).keys()].reverse();
     for (const c of cols) {
-      w[r][c] = Math.pow(base, idx);
+      w[r][c] = Math.pow(base, idx * pow);
       idx--;
     }
   }
-  weightCache.set(n, w);
+  weightCache.set(key, w);
   return w;
 }
+
+// Sezgisel ZAYIFLATMA knobları — zorluk merdiveni bunlarla kurulur; her
+// bestMove çağrısı seviyeye göre ayarlar (rastgele hamle YOK, bot hep mantıklı
+// oynar, sadece daha az iyi):
+//   heuristicSnakePow → köşe/monotonluk gradyan gücü (bkz. snakeWeights)
+//   heuristicEmptyMul → boş hücre (hayatta kalma) ödülü çarpanı; düşük = daha
+//                       az ileri görüşlü, tahtayı erken doldurur.
+let heuristicSnakePow = 1;
+let heuristicEmptyMul = 4;
 
 /** Izgarayı puanlar (yüksek = daha iyi). */
 export function evaluate(g: ValueGrid): number {
   const n = g.length;
-  const w = snakeWeights(n);
+  const w = snakeWeights(n, heuristicSnakePow);
   let weighted = 0;
   let empties = 0;
   let maxVal = 0;
@@ -173,7 +188,7 @@ export function evaluate(g: ValueGrid): number {
       if (v > maxVal) maxVal = v;
     }
   // Boş hücreler hayatta kalmayı sağlar → oyun ilerledikçe ölçeklenen ödül.
-  return weighted + empties * maxVal * 4;
+  return weighted + empties * maxVal * heuristicEmptyMul;
 }
 
 // --- Expectimax ---------------------------------------------
@@ -272,29 +287,57 @@ function scoreDirections(
   return out;
 }
 
-/** Seviye ayarları: derinlik aralığı, süre sınırı, şans örnekleme genişliği. */
-interface LevelCfg {
+/** Seviye ayarları: derinlik aralığı, süre sınırı, şans örnekleme + sezgisel güç. */
+export interface LevelCfg {
   minDepth: number;
   maxDepth: number;
   timeCapMs: number;
   sampleK: number;
   expandFour: boolean;
+  /** Köşe/monotonluk gradyan gücü (1 = tam, <1 = düzleştir → zayıf). */
+  snakePow: number;
+  /** Boş hücre ödülü çarpanı (yüksek = daha ileri görüşlü). */
+  emptyMul: number;
 }
-// Merdiven DERİNLİK farkına oturur (hepsi sampleK 2, tam olasılık).
-// ÖNEMLİ: bu sezgisel değerle ardışık derinlikler (3→4) yalnızca ~%8 fark
-// veriyor — kabul kriteri olan %20'yi tutturmak için Orta ile Uzman İKİ
-// derinlik ayrı: Orta=2, Uzman=4. Böylece Uzman "iki hamle daha ileri bakar".
+// DÖRT KADEMELİ MERDİVEN — hepsi DETERMİNİSTİK (rastgele hamle YOK).
+// Ölçümle görüldü ki tek başına derinlik büyük sıçramalar yapıyor (d1~3.5k
+// çöker, d2~33k, d4~70k) ve d1→d2 arasında 8k'lık bir boşluk var. Merdiven bu
+// yüzden ÜÇ deterministik knobun birleşimiyle kurulur:
+//   • depth   — kaç hamle ileri baktığı (baskın)
+//   • sampleK — şans düğümü örnekleme genişliği (1 = kaba beklenen değer)
+//   • snakePow/emptyMul — sezgisel güç (köşe disiplini + hayatta kalma ödülü)
+// Değerler scripts/ai-calibrate.mjs taramasıyla ölçülen ~5k · 15k · 35k · 55k
+// bandına (ardışık oran 3.0× · 2.3× · 1.6×, hepsi ≤5×) oturtuldu;
+// scripts/ai-bench.mjs ile doğrulanır.
 const LEVEL_CFG: Record<AiLevel, LevelCfg> = {
-  // Kolay: derinlik 1 + ara sıra rastgele (bestMove içinde) → zayıf rakip.
-  easy: { minDepth: 1, maxDepth: 1, timeCapMs: 8, sampleK: 2, expandFour: true },
-  // Orta: derinlik 2 — makul ama en iyi değil.
-  medium: { minDepth: 2, maxDepth: 2, timeCapMs: 12, sampleK: 2, expandFour: true },
+  // Kolay: SIĞ (d1) — sadece tek hamle ileri bakar, taş üretimini planlayamaz →
+  // ~512'de tıkanır. Rastgele değil, sadece kısa görüşlü. Orta bir insan yener.
+  easy: { minDepth: 1, maxDepth: 1, timeCapMs: 8, sampleK: 2, expandFour: true, snakePow: 1, emptyMul: 4 },
+  // Orta: iki hamle ileri (d2) ama KABA — tek şans hücresi örnekler (sampleK 1),
+  // 4-taşını yok sayar ve DÜZLEŞMİŞ gradyanla (snakePow 0.3) oynar. Mantıklı
+  // ama isabetsiz → ~1024-2048 civarı. Bu, d1 ile tam-d2 arasındaki boşluğu doldurur.
+  medium: { minDepth: 2, maxDepth: 2, timeCapMs: 12, sampleK: 1, expandFour: false, snakePow: 0.3, emptyMul: 1 },
+  // Zor: iki hamle ileri + TAM sezgisel + isabetli beklenen değer → güçlü, çoğu insanı yener.
+  hard: { minDepth: 2, maxDepth: 2, timeCapMs: 16, sampleK: 2, expandFour: true, snakePow: 1, emptyMul: 4 },
   // Uzman: yinelemeli derinleşme 3→4. minDepth 3 KRİTİK: derinlik 3 hızlıca
   // tamamlanıp bir YEDEK sağlar; sonra derinlik 4 denenir. (minDepth'i 4
   // yaparsak derinlik 4 zaman aşımına uğradığında hiç tamamlanmış derinlik
   // kalmaz ve hamle rastgele ilk yöne düşerdi.)
-  expert: { minDepth: 3, maxDepth: 4, timeCapMs: 26, sampleK: 2, expandFour: true },
+  expert: { minDepth: 3, maxDepth: 4, timeCapMs: 26, sampleK: 2, expandFour: true, snakePow: 1, emptyMul: 4 },
 };
+
+/**
+ * Bir seviyenin ayarını çalışma anında değiştirir. YALNIZCA ölçüm/kalibrasyon
+ * içindir (scripts/ai-calibrate.mjs) — uygulama kodu çağırmaz.
+ */
+export function configureLevel(level: AiLevel, patch: Partial<LevelCfg>): void {
+  Object.assign(LEVEL_CFG[level], patch);
+}
+
+/** Bir seviyenin geçerli ayarının kopyası (ölçüm raporu için). */
+export function levelConfig(level: AiLevel): LevelCfg {
+  return { ...LEVEL_CFG[level] };
+}
 
 /**
  * Bir derinlikten diğerine maliyet büyüme çarpanı (kaba tahmin).
@@ -365,30 +408,27 @@ export function describeGame(
 
 /**
  * En iyi hamleyi döndürür (hamle yoksa null).
- * `level` derinliği/genişliği/süreyi belirler.
- * `rand` verilirse (0..1) kolay modda ara sıra rastgele hamle yapılır.
+ * `level` derinliği/genişliği/süreyi VE sezgisel gücü belirler.
+ *
+ * Zorluk seviyeleri RASTGELE hamle YAPMAZ (eski %30 rastgele davranışı
+ * kaldırıldı — köşe düzenini bozup ipuçlarıyla çelişiyordu). Bunun yerine
+ * zayıf seviyeler sezgiseli zayıflatır (snakePow/emptyMul) ama hep mantıklı
+ * oynar.
  *
  * Yinelemeli derinleşme: derinlik minDepth'ten maxDepth'e artar; her derinlik
  * TAM tamamlanır. Süre (timeCapMs) dolunca içinde bulunulan derinlik yarım
  * kalırsa ATILIR ve son tam tamamlanan derinliğin en iyi hamlesi döner.
  */
-export function bestMove(
-  g: ValueGrid,
-  level: AiLevel = 'medium',
-  rand?: () => number,
-): Direction | null {
+export function bestMove(g: ValueGrid, level: AiLevel = 'medium'): Direction | null {
   const legal = DIRECTIONS.filter((d) => simulateMove(g, d).moved);
   if (legal.length === 0) return null;
-
-  // Kolay: %30 rastgele oyna (insana şans tanı)
-  if (level === 'easy' && rand && rand() < 0.3) {
-    return legal[Math.floor(rand() * legal.length)];
-  }
   if (legal.length === 1) return legal[0];
 
   const cfg = LEVEL_CFG[level];
   sampleK = cfg.sampleK;
   expandFour = cfg.expandFour;
+  heuristicSnakePow = cfg.snakePow;
+  heuristicEmptyMul = cfg.emptyMul;
   const start = now();
   deadline = start + cfg.timeCapMs;
   nodeCounter = 0;
@@ -450,10 +490,12 @@ export function reviewMove(
   // Tek seçenek varsa kıyaslanacak bir şey yok → kusursuz say.
   if (legal.length === 1) return { rating: 'best', best: played };
 
-  // Hamle kalitesi SABİT derinlikte değerlendirilir (tüm yönler eşit
-  // derinlikte kıyaslanmalı). Süre sınırı yok — dallanma zaten bağlı.
+  // Hamle kalitesi SABİT derinlikte ve TAM sezgiselle değerlendirilir (tüm
+  // yönler eşit derinlikte, nesnel güçte kıyaslanmalı). Süre sınırı yok.
   sampleK = 3;
   expandFour = true;
+  heuristicSnakePow = 1;
+  heuristicEmptyMul = 4;
   deadline = Infinity;
   nodeCounter = 0;
   const vals = scoreDirections(g, legal, 4);

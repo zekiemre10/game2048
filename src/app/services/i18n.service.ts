@@ -423,7 +423,17 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'mp.addBot': { tr: '🤖 Bot Ekle', en: '🤖 Add Bot' },
   'mp.botEasy': { tr: 'Kolay', en: 'Easy' },
   'mp.botMedium': { tr: 'Orta', en: 'Medium' },
+  'mp.botHard': { tr: 'Zor', en: 'Hard' },
   'mp.botExpert': { tr: 'Uzman', en: 'Expert' },
+  // Seçim ekranında gösterilen ölçülmüş güç (scripts/ai-bench.mjs, 30 oyun).
+  'mp.botEasyStr': { tr: '2048: %0 · 512–1024', en: '2048: 0% · 512–1024' },
+  'mp.botMediumStr': { tr: '2048: %23 · 1024–2048', en: '2048: 23% · 1024–2048' },
+  'mp.botHardStr': { tr: '2048: %67 · 2048–4096', en: '2048: 67% · 2048–4096' },
+  'mp.botExpertStr': { tr: '2048: %95 · 4096+', en: '2048: 95% · 4096+' },
+  'mp.botStrengthHint': {
+    tr: 'Zorluk = ortalama 30 oyunda 2048’e ulaşma oranı',
+    en: 'Difficulty = share of 30 games reaching 2048',
+  },
   'mp.startRace': { tr: '🏁 Yarışı Başlat', en: '🏁 Start Race' },
   'mp.needTwo': {
     tr: 'Başlatmak için en az 2 oyuncu gerekir.',

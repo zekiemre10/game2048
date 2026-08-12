@@ -6,7 +6,7 @@
 //  hamle başına süreyi raporlar.
 //
 //  Çalıştır:  node scripts/ai-bench.mjs [oyunSayisi] [seviyeler]
-//    örn:     node scripts/ai-bench.mjs 30 easy,medium,expert
+//    örn:     node scripts/ai-bench.mjs 30 easy,medium,hard,expert
 // ============================================================
 import { build } from 'esbuild';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -83,7 +83,7 @@ function pct(a, p) {
 
 async function main() {
   const N = Number(process.argv[2] || 30);
-  const levels = (process.argv[3] || 'easy,medium,expert').split(',');
+  const levels = (process.argv[3] || 'easy,medium,hard,expert').split(',');
   // Eşli mod: tüm seviyeler AYNI tohum dizisini oynar → varyans düşer,
   // "%20 daha iyi" farkı güvenilir ölçülür. (mulberry32, sabit tohumlar.)
   const paired = process.argv[4] === 'paired';
@@ -138,36 +138,38 @@ async function main() {
     );
   }
 
-  // Uzman > Orta kontrolü
-  if (results.expert && results.medium) {
-    const gain = ((results.expert.avg - results.medium.avg) / results.medium.avg) * 100;
+  // --- Merdiven kontrolü: her kademe bir öncekinden güçlü + ardışık ≤5× ---
+  const order = ['easy', 'medium', 'hard', 'expert'].filter((l) => results[l]);
+  if (order.length >= 2) {
     console.log('\n' + '-'.repeat(60));
-    console.log(
-      `Uzman vs Orta (ortalama): ${gain >= 0 ? '+' : ''}${gain.toFixed(1)}% ` +
-        `(${gain >= 20 ? 'HEDEF SAGLANDI ✓ (>=%20)' : 'YETERSIZ ✗ (<%20)'})`,
-    );
-    // Eşli mod: aynı tohumda Uzman kaç oyunda Orta'yı geçti (varyanstan bağımsız)
-    if (paired) {
-      const e = perGame.expert, m = perGame.medium;
-      let wins = 0, ratioSum = 0;
-      for (let i = 0; i < e.length; i++) {
-        if (e[i] > m[i]) wins++;
-        ratioSum += m[i] > 0 ? e[i] / m[i] : 1;
-      }
-      const medianRatio = (() => {
-        const r = e.map((x, i) => (m[i] > 0 ? x / m[i] : 1)).sort((a, b) => a - b);
-        return r[Math.floor(r.length / 2)];
-      })();
+    console.log('MERDİVEN (ardışık geçiş):');
+    let monotonic = true;
+    let within5x = true;
+    for (let i = 1; i < order.length; i++) {
+      const prev = results[order[i - 1]].avg;
+      const cur = results[order[i]].avg;
+      const ratio = prev > 0 ? cur / prev : Infinity;
+      const up = cur > prev;
+      if (!up) monotonic = false;
+      if (ratio > 5) within5x = false;
       console.log(
-        `Eşli: Uzman ${wins}/${e.length} oyunda Orta'yı geçti · ` +
-          `ort. oran ${(ratioSum / e.length).toFixed(2)}× · medyan oran ${medianRatio.toFixed(2)}×`,
+        `  ${order[i - 1].padEnd(6)} → ${order[i].padEnd(6)}: ` +
+          `${Math.round(prev)} → ${Math.round(cur)}  (${ratio.toFixed(2)}×) ` +
+          `${up ? '↑' : '↓ DÜŞÜŞ ✗'} ${ratio <= 5 ? '' : '· 5× AŞILDI ✗'}`,
       );
     }
+    console.log(
+      `\nHer kademe bir öncekinden güçlü: ${monotonic ? 'EVET ✓' : 'HAYIR ✗'}` +
+        ` · Ardışık fark ≤5×: ${within5x ? 'EVET ✓' : 'HAYIR ✗'}`,
+    );
+  }
+  if (results.expert) {
     console.log(
       `Uzman ms/hamle: ${results.expert.msPerMove.toFixed(2)} ` +
         `(${results.expert.msPerMove <= 30 ? '30ms altinda ✓' : '30ms USTUNDE ✗'})`,
     );
   }
+  void perGame;
 }
 
 main().catch((e) => {

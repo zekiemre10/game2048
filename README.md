@@ -266,6 +266,17 @@ skor göndermek imkânsızdır — bozuk/sahte transkript reddedilir ve
 - **Determinizm garantisi:** İstemci (`src/app/logic/replay.ts`) ve sunucu
   (`server/replay.py`) mantığı **birebir aynı** sonucu verir; parite testleriyle
   (150 fixture + gerçek oyun transkriptleri) doğrulanır.
+- **Çok oyunculu oda skorları da doğrulanır:** `/rooms/progress` artık istemcinin
+  skorunu kabul etmez; canlı yarışta gönderilen **hamle transkripti** odanın
+  tohumuyla her bildirimde yeniden oynatılıp skoru sunucu hesaplar. Böylece bir
+  oyuncu konsoldan skorunu şişirip arkadaşlarını yenemez; sahte transkript
+  reddedilip `flagged_submissions`'a yazılır, skor `MAX()` ile yazıldığından
+  sıra dışı/eski bildirim skoru geriletemez. (2048 replay'i tam-sayı ve hızlı
+  olduğundan tam replay ucuzdur; artımlı doğrulamaya gerek yoktur.)
+- **Bot skoru istemciden hiç alınmaz:** bot artık **sunucuda** koşar (yukarıdaki
+  "Sunucu botu" bölümü); `/rooms/botprogress` kaldırıldı. Karar gerekçesi:
+  transkript doğrulaması botu da kapsayabilirdi, ama asıl temiz çözüm — botun
+  rakibin (host'un) istemcisinden hiç geçmemesi — sunucuda koşturmaktır.
 - **Güç kullanılan oyunlar sıralamaya girmez** — bomba/karıştır/geri al hamle
   dizisinden türetilemez; ayrıca herkes eşit şartlarda yarışır.
 - **Günlük meydan okuma:** tohum sunucuda günden hesaplanır (istemci kolay bir
@@ -278,6 +289,12 @@ skor göndermek imkânsızdır — bozuk/sahte transkript reddedilir ve
 python3 server/test_replay_parity.py
 # Uçtan uca: uydurma skor reddi + meşru oyun kabulü
 python3 server/test_submit_integration.py
+# Oda skoru doğrulaması: uydurma reddi + meşru kabul + canlı sıralama
+python3 server/test_rooms_progress_verify.py
+# Sunucu botu: bot sunucuda koşuyor + skor manipüle edilemez
+python3 server/test_rooms_bot_server.py
+# Bot motoru paritesi: Python botu = TS botu (birebir)
+python3 server/test_bot_parity.py
 # İstemci transkript fixture'larını yeniden üret (nadiren gerekir)
 node scripts/gen-replay-fixtures.mjs
 ```

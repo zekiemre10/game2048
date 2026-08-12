@@ -206,15 +206,16 @@ export class MultiplayerService {
     try {
       let updated: RoomState | null = null;
       if (room.status === 'racing' && this.raceStarted) {
-        // Kendi ilerlemeni gönder — yanıt güncel oda durumudur (bot skorları
-        // sunucuda üretilir, yanıtta gelir; istemci bot ilerlemesi bildirmez).
+        // Kendi ilerlemeni gönder — yanıt güncel oda durumudur. Skoru DEĞİL,
+        // HAMLE TRANSKRİPTİni gönderiyoruz: sunucu odanın tohumuyla yeniden
+        // oynatıp skoru KENDİSİ hesaplar (konsoldan skor şişirme engellenir).
+        // Bot skorları da sunucuda üretilir; istemci bot ilerlemesi bildirmez.
         const res = await fetch(`${API_BASE}/rooms/progress`, {
           method: 'POST',
           headers: { ...headers, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             code: room.code,
-            score: this.game.score(),
-            best: this.game.currentBestTile(), // bu yarıştaki en yüksek kare
+            moves: this.game.gameTranscript().moves,
             done: this.game.status() !== GameStatus.Playing,
           }),
         });

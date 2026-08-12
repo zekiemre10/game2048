@@ -1311,7 +1311,19 @@ class Handler(BaseHTTPRequestHandler):
             conn.close()
 
     def _room_progress(self):
-        """POST /rooms/progress {code, score, best, done} -> ilerlememi bildir."""
+        """POST /rooms/progress {code, moves, done} -> ilerlememi bildir.
+
+        Skor artık İSTEMCİDEN alınmaz (eskiden {score,best} doğrudan yazılıyordu,
+        tek denetim MAX_SCORE'du → oyuncu konsoldan skorunu şişirip arkadaşlarını
+        yenebiliyordu). Artık gönderilen HAMLE TRANSKRİPTİ odanın tohumuyla
+        sunucuda yeniden oynatılıp skoru SUNUCU hesaplar (OYUN-225 deseni,
+        verify_transcript). Bozuk/sahte transkript reddedilir ve
+        flagged_submissions'a yazılır.
+
+        Maliyet: 2048 replay'i tam-sayı ve hızlıdır; oda oyunu ~yüzlerce hamle
+        olduğundan her bildirimin TAM replay'i ucuzdur (artımlı doğrulamaya gerek
+        yok). Skor MAX() ile yazılır → geç/sıra dışı gelen bildirim skoru geriletemez.
+        """
         conn = db()
         try:
             me = self._auth_row(conn)
@@ -1322,13 +1334,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(429, {"error": "too_many_requests"})
             b = self._body()
             code = (b.get("code") or "").strip().upper()
-            score = int(b.get("score") or 0)
-            best = int(b.get("best") or 0)
             done = 1 if b.get("done") else 0
-            # Skorlar tamamen istemciden geliyordu: negatif/uçuk değerler ve
-            # yarış bittikten SONRA gönderilen güncellemeler kabul ediliyordu.
-            if not 0 <= score <= MAX_SCORE or not 0 <= best <= MAX_SCORE:
-                return self._send(400, {"error": "invalid_score"})
+            moves = b.get("moves")
+            if not isinstance(moves, str) or len(moves) > MAX_MOVES:
+                return self._send(400, {"error": "invalid_transcript"})
             room = conn.execute("SELECT * FROM rooms WHERE code=?", (code,)).fetchone()
             if not room:
                 return self._send(404, {"error": "room_not_found"})
@@ -1343,8 +1352,22 @@ class Handler(BaseHTTPRequestHandler):
                 # istemci son durumu görebilsin diye oda yine döndürülür
                 # (aksi hâlde yarışın bittiğini hiç öğrenemezdi).
                 return self._send(200, {"room": room_state(conn, code)})
+            # Skoru TOHUM (oda) + HAMLE dizisinden SUNUCU hesaplar.
+            ok, score, best, info = verify_transcript(
+                {"seed": room["seed"], "moves": moves, "size": 4}
+            )
+            if not ok:
+                # Bozuk/sahte transkript → skor GÜNCELLENMEZ, incelemeye kaydedilir.
+                # (Meşru istemci daima geçerli transkript gönderir; buraya yalnızca
+                # kurcalanmış gönderim düşer.) Oda durumu yine dönülür ki canlı
+                # sıralama bozulmasın.
+                flag_submission(conn, me, "room", info, None, None, moves[:MAX_MOVES], room["seed"])
+                return self._send(200, {"room": room_state(conn, code)})
+            # MAX(): transkript yalnızca büyür → skor monoton; sıra dışı gelen
+            # eski bildirim skoru geriletemez.
             conn.execute(
-                "UPDATE room_players SET score=?, best=?, done=? WHERE code=? AND user_id=?",
+                "UPDATE room_players SET score=MAX(score,?), best=MAX(best,?), "
+                "done=MAX(done,?) WHERE code=? AND user_id=?",
                 (score, best, done, code, me["id"]),
             )
             conn.commit()

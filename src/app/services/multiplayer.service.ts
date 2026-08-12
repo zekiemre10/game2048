@@ -3,13 +3,16 @@ import { API_BASE, AuthService } from './auth.service';
 import { GameService } from './game.service';
 import { GameMode, GameStatus } from '../models/tile.model';
 import { AiLevel, isAiLevel } from '../logic/ai';
-import { BotRunner, resolveBotLevel } from '../logic/bot-runner';
 
 // ============================================================
 //  2048 — Çok oyunculu yarış servisi
 //  Oda kur / kodla katıl / host başlatır / canlı skor tablosu.
 //  Ortak tohum (seed) ile herkes aynı taşları alır (adil yarış).
 //  Gerçek zamana yakın: oda durumu ~1.2sn'de bir yoklanır.
+//
+//  NOT: Botlar artık SUNUCUDA koşar (adil, kararlı, manipüle edilemez). İstemci
+//  bot çalıştırmaz; skorları oda durumunda sunucudan gelir. (Eski host-tarayıcı
+//  botu ve /rooms/botprogress kaldırıldı.)
 // ============================================================
 
 export interface RoomPlayer {
@@ -55,15 +58,6 @@ export class MultiplayerService {
 
   private loopOn = false;
   private raceStarted = false;
-  /** Host'un çalıştırdığı botlar (botId → koşucu). */
-  private bots = new Map<number, BotRunner>();
-  private botsStarted = false;
-  /**
-   * Host'un eklerken kaydettiği bot seviyeleri (botId → seviye). Sunucu oda
-   * durumunda `level` alanını taşır; bu harita yalnızca o alan gelene kadar
-   * (dağıtım penceresi / eski oda) KÖPRÜdür — seviye asla isimden çözülmez.
-   */
-  private botLevels = new Map<number, AiLevel>();
 
   /** Oda kur (host). */
   async createRoom(duration = 180): Promise<MpResult> {
@@ -89,7 +83,6 @@ export class MultiplayerService {
       const j = await res.json().catch(() => ({}));
       if (!res.ok) return { ok: false, error: j.error || 'error' };
       this.raceStarted = false;
-      this.stopBots();
       this.room.set(j.room);
       this.startLoop();
       return { ok: true };
@@ -120,31 +113,22 @@ export class MultiplayerService {
     }
   }
 
-  /** Odaya YZ botu ekle (yalnızca host, lobide). */
+  /**
+   * Odaya YZ botu ekle (yalnızca host, lobide). Bot SUNUCUDA koşacak; seviyesi
+   * sunucuya veri olarak gider ve oda durumunda `level` alanı olarak döner.
+   */
   async addBot(difficulty: AiLevel = 'medium'): Promise<MpResult> {
     // Zorluğu İSTEMCİDE de doğrula (sunucu da doğrular) — geçersiz kademe gitmesin.
     if (!isAiLevel(difficulty)) return { ok: false, error: 'invalid_level' };
-    const res = await this.botAction('/rooms/addbot', { difficulty });
-    // Sunucu eklenen botun kimliğini döndürür → seviyesini VERİ olarak kaydet
-    // (isimden çözmek yerine). Sunucu artık level'i oda durumunda da taşıyor;
-    // bu kayıt yalnızca o alan gelene kadar köprü olarak durur.
-    if (res.ok && typeof res.body?.['botId'] === 'number') {
-      this.botLevels.set(res.body['botId'] as number, difficulty);
-    }
-    return { ok: res.ok, error: res.error };
+    return this.botAction('/rooms/addbot', { difficulty });
   }
 
   /** Botu çıkar (host, lobide). */
   async removeBot(botId: number): Promise<MpResult> {
-    const res = await this.botAction('/rooms/removebot', { botId });
-    if (res.ok) this.botLevels.delete(botId);
-    return { ok: res.ok, error: res.error };
+    return this.botAction('/rooms/removebot', { botId });
   }
 
-  private async botAction(
-    path: string,
-    extra: unknown,
-  ): Promise<MpResult & { body?: Record<string, unknown> }> {
+  private async botAction(path: string, extra: unknown): Promise<MpResult> {
     const room = this.room();
     const headers = this.auth.authHeaders();
     if (!room || !headers) return { ok: false, error: 'error' };
@@ -157,18 +141,10 @@ export class MultiplayerService {
       const j = await res.json().catch(() => ({}));
       if (!res.ok) return { ok: false, error: j.error || 'error' };
       if (j.room) this.room.set(j.room);
-      return { ok: true, body: j };
+      return { ok: true };
     } catch {
       return { ok: false, error: 'network' };
     }
-  }
-
-  /** Tüm botları durdurur ve temizler. */
-  private stopBots(): void {
-    for (const bot of this.bots.values()) bot.stop();
-    this.bots.clear();
-    this.botLevels.clear();
-    this.botsStarted = false;
   }
 
   /** Odadan ayrıl. */
@@ -178,7 +154,6 @@ export class MultiplayerService {
     this.loopOn = false;
     this.loopGen++; // uçuştaki yoklamaları ve yetim zamanlayıcıları geçersiz kıl
     this.raceStarted = false;
-    this.stopBots();
     this.room.set(null);
     this.notice.set('');
     this.endRaceGame(); // yarıştan çıkıldıysa sayaç boşuna işlemesin
@@ -231,23 +206,8 @@ export class MultiplayerService {
     try {
       let updated: RoomState | null = null;
       if (room.status === 'racing' && this.raceStarted) {
-        // Host: bot ilerlemelerini bildir
-        if (this.isHost() && this.bots.size > 0) {
-          for (const [botId, bot] of this.bots) {
-            fetch(`${API_BASE}/rooms/botprogress`, {
-              method: 'POST',
-              headers: { ...headers, 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                code: room.code,
-                botId,
-                score: bot.score,
-                best: bot.best,
-                done: bot.done,
-              }),
-            }).catch(() => {});
-          }
-        }
-        // Kendi ilerlemeni gönder — yanıt güncel oda durumudur
+        // Kendi ilerlemeni gönder — yanıt güncel oda durumudur (bot skorları
+        // sunucuda üretilir, yanıtta gelir; istemci bot ilerlemesi bildirmez).
         const res = await fetch(`${API_BASE}/rooms/progress`, {
           method: 'POST',
           headers: { ...headers, 'Content-Type': 'application/json' },
@@ -268,7 +228,6 @@ export class MultiplayerService {
           // Oda kapandı (host ayrıldı)
           this.loopOn = false;
           this.loopGen++;
-          this.stopBots();
           this.raceStarted = false;
           this.room.set(null);
           this.notice.set('mp.err.room_closed');
@@ -298,22 +257,7 @@ export class MultiplayerService {
       const remaining = Math.max(2, next.duration - (now - started));
       this.game.startRace(next.seed, remaining);
     }
-    // Host: yarış başladıysa botları çalıştır (aynı tohumla, adil).
-    if (next.status === 'racing' && this.isHost() && !this.botsStarted) {
-      this.botsStarted = true;
-      for (const p of next.players) {
-        if (p.isBot) {
-          // Seviye VERİDEN: sunucunun p.level alanı, yoksa ekleme anında
-          // kaydedilen seviye, o da yoksa güvenli varsayılan (isimden ASLA).
-          const level = resolveBotLevel(p.level, this.botLevels.get(p.id));
-          const bot = new BotRunner(next.seed, level);
-          bot.start();
-          this.bots.set(p.id, bot);
-        }
-      }
-    }
-    if (next.status === 'finished' && this.bots.size > 0) {
-      this.stopBots();
-    }
+    // Botlar SUNUCUDA koşar (adil, kararlı, manipüle edilemez); istemci artık
+    // bot çalıştırmaz. Skorları oda durumunda sunucudan gelir.
   }
 }

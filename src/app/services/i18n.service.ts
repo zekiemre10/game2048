@@ -458,6 +458,7 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'mp.err.room_full': { tr: 'Oda dolu.', en: 'The room is full.' },
   'mp.err.invalid_score': { tr: 'Geçersiz skor.', en: 'Invalid score.' },
   'mp.err.invalid_level': { tr: 'Geçersiz zorluk seviyesi.', en: 'Invalid difficulty level.' },
+  'mp.err.too_many_bots': { tr: 'Bu odada en fazla 5 bot olabilir.', en: 'This room allows at most 5 bots.' },
   'mp.err.error': { tr: 'Bir hata oluştu.', en: 'Something went wrong.' },
 
   // Yapay zekâ (koç + analiz)

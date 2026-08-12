@@ -150,6 +150,14 @@ const weightCache = new Map<string, ValueGrid>();
  *   pow = 1   → tam gradyan (güçlü köşe/monotonluk disiplini)
  *   pow < 1  → gradyan DÜZLEŞİR → bot köşe düzenini daha az umursar (zayıflar,
  *              ama yine mantıklı; rastgele değil). pow = 0 → tamamen düz.
+ *
+ * Ağırlıklar TAM SAYIYA yuvarlanır (floor(x+0.5)). Bunun iki nedeni var:
+ *   1. `pow` tek transandantal (Math.pow) işlemdir; sonucu tam sayıya sabitleyince
+ *      tüm değerlendirme tam-sayı/IEEE aritmetiğine iner → sunucudaki Python bot
+ *      motoruyla BİREBİR aynı sonucu üretir (bkz. server/bot_ai.py, parite testi).
+ *   2. Bu tabloda hiçbir değer .5 sınırına yakın değil, dolayısıyla JS ve Python
+ *      pow'u son bitte farklı yuvarlasa bile floor(x+0.5) aynı tam sayıyı verir.
+ * (pow=1 için değerler zaten tam sayı: base^idx — yuvarlama etkisizdir.)
  */
 function snakeWeights(n: number, pow: number): ValueGrid {
   const key = `${n}:${pow}`;
@@ -164,7 +172,7 @@ function snakeWeights(n: number, pow: number): ValueGrid {
   for (let r = 0; r < n; r++) {
     const cols = r % 2 === 0 ? [...Array(n).keys()] : [...Array(n).keys()].reverse();
     for (const c of cols) {
-      w[r][c] = Math.pow(base, idx * pow);
+      w[r][c] = Math.floor(Math.pow(base, idx * pow) + 0.5);
       idx--;
     }
   }
@@ -468,6 +476,117 @@ export function bestMove(g: ValueGrid, level: AiLevel = 'medium'): Direction | n
     }
   }
   return best;
+}
+
+// --- Sunucu botu: deterministik oyun (parite) ---------------
+//
+// Çok oyunculu yarıştaki bot SUNUCUDA koşar (adil, kararlı, manipüle edilemez).
+// Sunucu tohumdan botun TÜM oyununu bir kez oynatıp skor çizelgesini yayınlar.
+// Bunun için bot motoru TAMAMEN DETERMİNİSTİK olmalı: SABİT derinlik (zaman
+// sınırı yok) + tam-sayı ağırlıklar. Aşağıdaki botMove/playBotGame, sunucudaki
+// server/bot_ai.py ile BİREBİR aynı oyunu üretir (parite: test_bot_parity.py).
+
+/** Sunucu botunun seviye başına SABİT arama derinliği (Python ile paylaşılır). */
+export const BOT_DEPTH: Record<AiLevel, number> = {
+  easy: 1,
+  medium: 2,
+  hard: 2,
+  expert: 3, // Zor'dan (2) net güçlü; Python precompute'u makul tutar.
+};
+
+/** Hamle → transkript karakteri (replay ile uyumlu; ai.ts bağımsız kalsın diye yerel). */
+const BOT_MOVE_CHAR: Record<Direction, string> = {
+  [Direction.Up]: 'U',
+  [Direction.Down]: 'D',
+  [Direction.Left]: 'L',
+  [Direction.Right]: 'R',
+};
+
+/** Izgaranın en büyük karesi. */
+function maxTileOf(g: ValueGrid): number {
+  let m = 0;
+  for (const row of g) for (const v of row) if (v > m) m = v;
+  return m;
+}
+
+/**
+ * Bot hamlesi: SABİT derinlikte (BOT_DEPTH), zaman sınırı OLMADAN expectimax.
+ * Tamamen deterministik → aynı tahtada hep aynı hamle, makineden bağımsız.
+ * (bestMove'un aksine yinelemeli derinleşme/zaman kapısı yoktur.)
+ */
+export function botMove(g: ValueGrid, level: AiLevel): Direction | null {
+  const legal = DIRECTIONS.filter((d) => simulateMove(g, d).moved);
+  if (legal.length === 0) return null;
+  if (legal.length === 1) return legal[0];
+
+  const cfg = LEVEL_CFG[level];
+  sampleK = cfg.sampleK;
+  expandFour = cfg.expandFour;
+  heuristicSnakePow = cfg.snakePow;
+  heuristicEmptyMul = cfg.emptyMul;
+  deadline = Infinity;
+  nodeCounter = 0;
+
+  const vals = scoreDirections(g, legal, BOT_DEPTH[level]);
+  let best = legal[0];
+  let bestVal = -Infinity;
+  for (const dir of legal) {
+    const v = vals.get(dir)!;
+    if (v > bestVal) {
+      bestVal = v;
+      best = dir;
+    }
+  }
+  return best;
+}
+
+/** Botun oynadığı deterministik oyunun sonucu (skor ZAMAN çizelgesiyle). */
+export interface BotGame {
+  /** Hamleler transkripti ("ULDR…") — replay ile uyumlu. */
+  moves: string;
+  /** scores[k] = k. hamleden SONRA kümülatif skor (scores[0] = 0). */
+  scores: number[];
+  /** bests[k] = k. hamleden sonra en büyük kare (bests[0] = başlangıç). */
+  bests: number[];
+  maxTile: number;
+  finalScore: number;
+}
+
+/**
+ * Tohumdan botun oyununu SONUNA (ya da maxMoves'a) kadar oynatır ve skor
+ * ZAMAN ÇİZELGESİni döndürür. Taş üretimi mulberry32 ile insan oyuncuyla AYNI
+ * tohumlu diziyi kullanır (adalet). Sunucu bunu yarış başında bir kez çağırıp
+ * çizelgeyi yayınlar; Python eşi server/bot_ai.py.play_bot_game.
+ */
+export function playBotGame(seed: number, level: AiLevel, maxMoves: number): BotGame {
+  const rand = mulberry32(seed >>> 0);
+  let g = emptyGrid(4);
+  const spawn = () => {
+    const cells = emptyCells(g);
+    if (!cells.length) return;
+    const [r, c] = cells[Math.floor(rand() * cells.length)];
+    g = placeTile(g, r, c, rand() < CHANCE_OF_FOUR ? 4 : 2);
+  };
+  spawn();
+  spawn();
+
+  const moves: string[] = [];
+  const scores: number[] = [0];
+  const bests: number[] = [maxTileOf(g)];
+  let score = 0;
+  for (let m = 0; m < maxMoves; m++) {
+    const dir = botMove(g, level);
+    if (dir === null) break;
+    const res = simulateMove(g, dir);
+    if (!res.moved) break;
+    g = res.grid;
+    score += res.gained;
+    moves.push(BOT_MOVE_CHAR[dir]);
+    spawn();
+    scores.push(score);
+    bests.push(maxTileOf(g));
+  }
+  return { moves: moves.join(''), scores, bests, maxTile: maxTileOf(g), finalScore: score };
 }
 
 // --- Hamle kalitesi -----------------------------------------

@@ -55,7 +55,8 @@ bu tek motordan gelir:
   tahtan, skorun, sürün ve hakların aynen geri gelir; ilerlemen etkilenmez
 - 🏁 **YZ rakibi** — çok oyunculu odaya 4 zorlukta bot ekle (Kolay / Orta / Zor /
   Uzman); her düğme seçim ekranında **ölçülmüş gücünü** (2048'e ulaşma oranı)
-  gösterir; bot da insanla **aynı tohumlu** taş dizisini oynar
+  gösterir; bot **SUNUCUDA** koşar (adil, kararlı, manipüle edilemez) ve insanla
+  **aynı tohumlu** taş dizisini oynar
 - ✨ **Hamle kalitesi** — her hamlen YZ'nin seçimiyle kıyaslanır: *Mükemmel · İyi ·
   Daha iyisi vardı (↑)* — oyun sonunda **doğruluk yüzdesi** özeti
 - 🟢 **Canlı pozisyon göstergesi** — tahtanın sağlığı (İyi / Riskli / Tehlikeli);
@@ -103,9 +104,42 @@ seviye eşiklerini, sıralamayı ve ≤5× geçişi regresyon olarak korur.
 **Bot zorluğu VERİ olarak taşınır** (görünen addan çözülmez — o kırılgandı: ad
 çevrilince/emoji eklenince seviye sessizce Orta'ya düşerdi). Sunucu `/rooms/addbot`
 seviyeyi doğrular ve `room_players.level` sütununda saklar, oda durumunda `level`
-alanı olarak döndürür. İstemci `resolveBotLevel(p.level, …)` ile veriden okur;
-görünen bot adı seviyeden ve aktif dilden üretilir (dil değişince ad da güncellenir).
-Eski odalardaki (alan boş) botlar güvenle **Orta**'ya düşer.
+alanı olarak döndürür. Görünen bot adı seviyeden ve aktif dilden üretilir (dil
+değişince ad da güncellenir). Eski odalardaki (alan boş) botlar güvenle **Orta**'ya düşer.
+
+### Sunucu botu — çok oyunculu yarışta bot SUNUCUDA koşar
+
+Bot eskiden **host'un tarayıcısında** koşuyor ve skorunu host'un istemcisi
+bildiriyordu. Üç sorun vardı: **kararsızlık** (host sekmeyi kapatınca/arka plana
+alınca bot durur/yavaşlar), **adaletsizlik** (hız host'un cihazına bağlıydı) ve
+**güvenilmezlik** (host, botun — rakibinin — skorunu istediği gibi değiştirebilirdi).
+
+**Tasarım kararı: oda başında tek seferlik skor ÇİZELGESİ (gerçek zamanlı sunucu
+botu değil).** Oyun tohumlu ve mantık saf olduğundan botun oyunu deterministiktir;
+yarış başlayınca sunucu botun oyununu **bir kez** oynatıp kümülatif skor zaman
+çizelgesini üretir, yarış boyunca geçen süreye göre yayınlar. Gerekçe: gerçek
+zamanlı hesap **sürekli CPU** tüketir ve çok odada ölçeklenmez; çizelge yaklaşımının
+CPU maliyeti **tek seferliktir** ve aynı adaleti/manipülasyon direncini sağlar.
+
+Nasıl:
+- **Motor Python'a taşındı** (`server/bot_ai.py`), istemcideki `ai.ts` bot
+  fonksiyonlarının birebir eşi. Determinizm için **sabit derinlik** (zaman sınırı
+  yok) ve **tam-sayı ağırlıklar** kullanılır → tek transandantal işlem (`pow`)
+  sabitlenir, geri kalan her şey IEEE/tam-sayı aritmetiğidir. Parite
+  `server/test_bot_parity.py` (TS'in ürettiği `bot_fixtures.json`) ile korunur:
+  **aynı tohum → Python ve TS birebir aynı oyun** (24/24 fixture).
+- **Skor yalnızca sunucuda** üretilir; `/rooms/botprogress` **kaldırıldı** — istemciden
+  bot skoru artık kabul edilmez.
+- Skor çizelgesi **artımlı** yayınlanır: hesap yarış saatini ~9× geçer (Uzman d3'te
+  ~26ms/hamle hesap vs 240ms/hamle tempo), böylece ~20s'lik hesap arka planda
+  birikirken bot hiç aç kalmaz.
+- **CPU koruması:** oda başına en çok **5 bot**; yalnızca yarış süresini kaplayacak
+  kadar hamle hesaplanır. Ölçülen önhesap (180s yarış): Kolay 65ms · Orta 0.5s ·
+  Zor 1.8s · **Uzman ~20s** (arka planda, bir kez; Uzman derinliği bu yüzden 3).
+- **Host sekmesi kapansa da** bot devam eder (çizelge sunucuda); host insan ayrılırsa
+  kuruculuk başka insana devredilir, bot etkilenmez.
+- İstemci artık bot çalıştırmaz (eski `BotRunner` kaldırıldı); "YZ Oynasın" gösterimi
+  ayrı ve tek-oyuncudur.
 
 ## Özellikler
 

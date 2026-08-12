@@ -28,6 +28,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 # Skoru istemciden değil, tohum+hamleden SUNUCU hesaplar (hile önleme).
 from replay import replay_game, daily_seed
+# Çok oyunculu bot artık SUNUCUDA koşar (adil, kararlı, manipüle edilemez).
+from bot_ai import play_bot_game, BOT_SPEED_MS
+
+# Zorluk kademeleri (istemci AI_LEVELS ile aynı) + oda başına bot sınırı.
+BOT_LEVELS = ("easy", "medium", "hard", "expert")
+MAX_BOTS_PER_ROOM = 5
 
 DB_PATH = os.environ.get("GAME2048_DB", os.path.join(os.path.dirname(__file__), "app.db"))
 PORT = int(os.environ.get("GAME2048_PORT", "8092"))
@@ -505,6 +511,82 @@ def gen_room_code(conn) -> str:
     return "".join(secrets.choice(ROOM_ALPHABET) for _ in range(6))
 
 
+# ---------------------------------------------------------------------------
+#  Sunucu botu: skor ZAMAN ÇİZELGESİ (yarış başında bir kez hesaplanır)
+#
+#  Bot artık host'un tarayıcısında değil, SUNUCUDA koşar. Yarış başlayınca
+#  tohumdan botun oyununu (deterministik) bir kez oynatıp kümülatif skor
+#  çizelgesini belleğe koyarız; room_state geçen SÜREYE göre skoru buradan
+#  üretir. Faydalar: host sekmeyi kapatsa da bot devam eder; hız host cihazından
+#  bağımsız; skor manipüle edilemez (istemciden bot skoru KABUL EDİLMEZ).
+#
+#  Maliyet: hesap yarış saatini ~9× geçer (26ms/hamle hesap vs 240ms/hamle
+#  tempo), bu yüzden ARTIMLI yayınlanır (on_progress) → bot hiç aç kalmaz ve
+#  Uzman'ın ~20s'lik hesabı arka planda birikirken skor pürüzsüz ilerler.
+# ---------------------------------------------------------------------------
+_bot_timelines = {}       # (code, bot_id) -> {"speed": ms, "scores": [...], "bests": [...]}
+_bot_computing = set()    # hesaplanmakta olan (code, bot_id)
+_bot_lock = threading.Lock()
+
+
+def _bot_max_moves(level, duration):
+    """Yarış süresini kaplayacak hamle sayısı (+küçük tampon)."""
+    speed = BOT_SPEED_MS.get(level, 360)
+    return (int(duration) * 1000) // speed + 6
+
+
+def _compute_bot_timeline(code, bot_id, seed, level, duration):
+    """Arka plan: botun oyununu oynat, çizelgeyi ARTIMLI belleğe yaz."""
+    key = (code, bot_id)
+    speed = BOT_SPEED_MS.get(level, 360)
+
+    def publish(scores, bests):
+        with _bot_lock:
+            _bot_timelines[key] = {"speed": speed, "scores": list(scores), "bests": list(bests)}
+
+    try:
+        play_bot_game(int(seed), level, _bot_max_moves(level, duration), on_progress=publish)
+    except Exception:
+        traceback.print_exc()
+    finally:
+        with _bot_lock:
+            _bot_computing.discard(key)
+
+
+def _ensure_bot_timeline(code, bot_id, seed, level, duration):
+    """Çizelge yoksa arka planda hesaplat (bloklamaz, tek sefer)."""
+    key = (code, bot_id)
+    with _bot_lock:
+        if key in _bot_timelines or key in _bot_computing:
+            return
+        _bot_computing.add(key)
+    threading.Thread(
+        target=_compute_bot_timeline,
+        args=(code, bot_id, seed, level or "medium", duration),
+        daemon=True,
+    ).start()
+
+
+def _bot_score_at(code, bot_id, elapsed_ms):
+    """Geçen süreye göre (skor, best, done). Çizelge henüz yoksa (0,0,False)."""
+    with _bot_lock:
+        tl = _bot_timelines.get((code, bot_id))
+    if not tl or len(tl["scores"]) <= 1:
+        return 0, 0, False
+    last = len(tl["scores"]) - 1
+    moves = int(elapsed_ms // tl["speed"])
+    if moves > last:
+        moves = last
+    return tl["scores"][moves], tl["bests"][moves], moves >= last
+
+
+def _drop_bot_timelines(code):
+    """Oda kapanınca/yeniden başlayınca o odanın çizelgelerini bellekten sil."""
+    with _bot_lock:
+        for key in [k for k in _bot_timelines if k[0] == code]:
+            _bot_timelines.pop(key, None)
+
+
 def room_state(conn, code):
     room = conn.execute("SELECT * FROM rooms WHERE code=?", (code,)).fetchone()
     if not room:
@@ -516,31 +598,48 @@ def room_state(conn, code):
         conn.execute("UPDATE rooms SET status='finished' WHERE code=?", (code,))
         conn.commit()
         status = "finished"
-    players = conn.execute(
-        "SELECT user_id, username, level, score, best, done FROM room_players "
-        "WHERE code=? ORDER BY score DESC, best DESC, username ASC",
+    rows = conn.execute(
+        "SELECT user_id, username, level, score, best, done FROM room_players WHERE code=?",
         (code,),
     ).fetchall()
+    started = room["started_at"]
+    racing = status in ("racing", "finished") and started
+    # Bitmiş yarışta skoru son ana sabitle; devam edende geçen süreye göre.
+    elapsed_ms = max(0, (min(now, started + room["duration"]) - started)) * 1000 if racing else 0
+
+    players = []
+    for p in rows:
+        is_bot = p["user_id"] < 0
+        score, best, done = p["score"], p["best"], bool(p["done"])
+        if is_bot:
+            if racing:
+                # Bot skoru YALNIZCA sunucuda üretilir (çizelgeden), istemciden değil.
+                _ensure_bot_timeline(code, p["user_id"], room["seed"], p["level"], room["duration"])
+                score, best, done = _bot_score_at(code, p["user_id"], elapsed_ms)
+            else:
+                score, best, done = 0, 0, False
+        players.append({
+            "id": p["user_id"],
+            "username": p["username"],
+            "score": score,
+            "best": best,
+            "done": done,
+            "isBot": is_bot,        # botlar negatif kimlikli
+            "level": p["level"],    # bot zorluğu (VERİ); insanlarda null
+        })
+
+    # Sıralama: skor ↓, en büyük kare ↓, ad ↑ (bot skorları hesaplandıktan SONRA).
+    players.sort(key=lambda x: (-x["score"], -x["best"], x["username"]))
+
     return {
         "code": room["code"],
         "hostId": room["host_id"],
         "status": status,
         "seed": room["seed"],
         "duration": room["duration"],
-        "startedAt": room["started_at"],
+        "startedAt": started,
         "now": now,
-        "players": [
-            {
-                "id": p["user_id"],
-                "username": p["username"],
-                "score": p["score"],
-                "best": p["best"],
-                "done": bool(p["done"]),
-                "isBot": p["user_id"] < 0,  # botlar negatif kimlikli
-                "level": p["level"],        # bot zorluğu (VERİ); insanlarda null
-            }
-            for p in players
-        ],
+        "players": players,
     }
 
 
@@ -679,8 +778,6 @@ class Handler(BaseHTTPRequestHandler):
             return self._room_addbot()
         if p == "/rooms/removebot":
             return self._room_removebot()
-        if p == "/rooms/botprogress":
-            return self._room_botprogress()
         if p == "/daily/submit":
             return self._daily_submit()
         if p == "/monthly/submit":
@@ -1166,6 +1263,7 @@ class Handler(BaseHTTPRequestHandler):
                     # İnsan kalmadı → odayı (ve botlarını) kaldır
                     conn.execute("DELETE FROM room_players WHERE code=?", (code,))
                     conn.execute("DELETE FROM rooms WHERE code=?", (code,))
+                    _drop_bot_timelines(code)  # bot çizelgelerini bellekten sil
             else:
                 conn.execute(
                     "DELETE FROM room_players WHERE code=? AND user_id=?",
@@ -1201,6 +1299,13 @@ class Handler(BaseHTTPRequestHandler):
                 "UPDATE room_players SET score=0, best=0, done=0 WHERE code=?", (code,)
             )
             conn.commit()
+            # Botların skor çizelgesini arka planda hesaplamaya BAŞLAT (deterministik,
+            # tohumdan). Hesap yarış saatini geçtiği için çizelge hep önde kalır.
+            _drop_bot_timelines(code)  # yeniden başlatmaya karşı temiz başla
+            for b in conn.execute(
+                "SELECT user_id, level FROM room_players WHERE code=? AND user_id<0", (code,)
+            ).fetchall():
+                _ensure_bot_timeline(code, b["user_id"], room["seed"], b["level"], room["duration"])
             return self._send(200, {"room": room_state(conn, code)})
         finally:
             conn.close()
@@ -1271,6 +1376,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(403, {"error": "not_host"})
             if room["status"] != "lobby":
                 return self._send(409, {"error": "already_started"})
+            # Oda başına bot sınırı — sunucu CPU koruması (bot oyunu sunucuda
+            # hesaplanır; sınırsız bot sunucuyu zorlardı).
+            bot_count = conn.execute(
+                "SELECT COUNT(*) AS n FROM room_players WHERE code=? AND user_id<0", (code,)
+            ).fetchone()["n"]
+            if bot_count >= MAX_BOTS_PER_ROOM:
+                return self._send(409, {"error": "too_many_bots"})
             # En küçük mevcut kimliğin altında yeni negatif bot kimliği
             row = conn.execute(
                 "SELECT MIN(user_id) AS m FROM room_players WHERE code=?", (code,)
@@ -1314,41 +1426,8 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             conn.close()
 
-    def _room_botprogress(self):
-        """POST /rooms/botprogress {code, botId, score, best, done} -> bot ilerlemesi (host)."""
-        conn = db()
-        try:
-            me = self._auth_row(conn)
-            if not me:
-                return self._send(401, {"error": "unauthorized"})
-            b = self._body()
-            code = (b.get("code") or "").strip().upper()
-            bot_id = b.get("botId")
-            room = conn.execute("SELECT * FROM rooms WHERE code=?", (code,)).fetchone()
-            if not room:
-                return self._send(404, {"error": "room_not_found"})
-            if room["host_id"] != me["id"]:
-                return self._send(403, {"error": "not_host"})
-            if not rate_ok("room", me["id"], 300, 60):
-                return self._send(429, {"error": "too_many_requests"})
-            score = int(b.get("score") or 0)
-            best = int(b.get("best") or 0)
-            if not 0 <= score <= MAX_SCORE or not 0 <= best <= MAX_SCORE:
-                return self._send(400, {"error": "invalid_score"})
-            conn.execute(
-                "UPDATE room_players SET score=?, best=?, done=? WHERE code=? AND user_id=? AND user_id<0",
-                (
-                    score,
-                    best,
-                    1 if b.get("done") else 0,
-                    code,
-                    int(bot_id) if bot_id is not None else 0,
-                ),
-            )
-            conn.commit()
-            return self._send(200, {"ok": True})
-        finally:
-            conn.close()
+    # NOT: /rooms/botprogress KALDIRILDI. Bot skoru artık YALNIZCA sunucuda
+    # (skor çizelgesinden) üretilir; istemciden bot skoru kabul edilmez.
 
     def _leaderboard(self):
         """GET /leaderboard?scope=monthly|global|friends -> skor sıralaması.

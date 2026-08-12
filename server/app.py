@@ -47,6 +47,48 @@ MAX_BODY = 256 * 1024  # istek gövdesi üst sınırı (bellek koruması)
 MAX_DATA = 64 * 1024  # /sync ile saklanabilecek en büyük ilerleme kaydı
 MAX_SCORE = 10_000_000  # makul üst sınır (uydurma skorları ele)
 
+# --- Backend sertleştirme (CORS + içerik filtresi) --------------------------
+# CORS: yalnızca oyunun yayınlandığı köken(ler)e izin ver (eskiden "*" idi →
+# herhangi bir site API'yi tarayıcıdan kullanabiliyordu). Ortamdan okunur;
+# varsayılan canlı köken + yerel geliştirme (ng serve).
+_DEFAULT_ORIGINS = "http://34.158.136.9,http://localhost:4200,http://127.0.0.1:4200"
+CORS_ORIGINS = {
+    o.strip() for o in os.environ.get("GAME2048_CORS_ORIGINS", _DEFAULT_ORIGINS).split(",") if o.strip()
+}
+
+# Yasaklı kelimeler (TR + EN) — kullanıcı adı ve sohbet için. İKİ grup:
+#  • BANNED_EXACT: kısa/ikircikli olanlar TAM KELİME eşleşir (klasik→"sik" gibi
+#    yanlış-pozitif olmasın).
+#  • BANNED_SUB: uzun/kesin olanlar AYRAÇSIZ metinde aranır ("s.i.k.t.i.r" veya
+#    "s1ktir" gibi kaçışları da yakalar).
+BANNED_EXACT = {"amk", "aq", "sik", "pic", "ibne", "pust", "yavsak"}
+BANNED_SUB = {
+    "orospu", "siktir", "sikeyim", "sikik", "pezevenk", "gavat", "kahpe",
+    "amcik", "yarrak", "yarak", "gotveren", "oglunu",
+    "fuck", "shit", "bitch", "asshole", "bastard", "cunt", "nigger",
+    "faggot", "whore", "motherfuck",
+}
+_TR_MAP = str.maketrans("çğıîöşüâ", "cgiiosua")
+_LEET_MAP = str.maketrans("013457@$", "oieastas")
+
+
+def _normalize_text(s: str) -> str:
+    """Küçük harf + TR harfleri + leet → ASCII; ayraçlar boşluğa (kaçışları aç)."""
+    s = str(s).lower().translate(_TR_MAP).translate(_LEET_MAP)
+    return re.sub(r"[^a-z0-9]+", " ", s)
+
+
+def contains_banned(text) -> bool:
+    """Metin yasaklı kelime içeriyor mu (kullanıcı adı + sohbet filtresi)."""
+    if not text:
+        return False
+    norm = _normalize_text(text)
+    tokens = norm.split()
+    if any(t in BANNED_EXACT for t in tokens):
+        return True
+    joined = "".join(tokens)
+    return any(w in joined for w in BANNED_SUB)
+
 # Ay sonu şampiyonluk ödülü — bilinçli olarak BÜYÜK: bir aylık rekabetin
 # karşılığı, normal günlük ödüllerin çok üzerinde olmalı.
 CHAMPION_PRIZE = {
@@ -288,6 +330,16 @@ def init_db():
             moves INTEGER NOT NULL DEFAULT 0,
             updated INTEGER NOT NULL,
             PRIMARY KEY (day, user_id)
+        );
+        -- Kullanıcıdan kullanıcıya şikayet (report) — yönetim paneli inceler.
+        CREATE TABLE IF NOT EXISTS reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            reporter_id INTEGER NOT NULL,
+            target_id INTEGER NOT NULL,
+            reason TEXT NOT NULL,           -- spam | harassment | cheating | other
+            detail TEXT,                    -- serbest metin (kısıtlı)
+            context TEXT,                   -- chat | profile | game
+            created INTEGER NOT NULL
         );
         """
     )
@@ -728,13 +780,31 @@ class Handler(BaseHTTPRequestHandler):
         if body:
             self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        # Yerel geliştirme için CORS (prodda aynı origin)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        # CORS: yalnızca İZİNLİ köken(ler) (eskiden "*" idi → her site API'yi
+        # tarayıcıdan kullanabiliyordu). İstek kökeni izinliyse yansıt; değilse
+        # ACAO gönderme (tarayıcı engeller). Aynı-köken istekte Origin yoktur.
+        origin = self.headers.get("Origin")
+        if origin and origin in CORS_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Max-Age", "86400")
+        # Güvenlik başlıkları — API yalnızca JSON döndürür, sıkı CSP uygundur.
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
         self.end_headers()
         if body:
             self.wfile.write(body)
+
+    def _ip(self) -> str:
+        """İstemci IP'si — nginx arkasındaysa X-Forwarded-For ilk hop, yoksa soket."""
+        xff = self.headers.get("X-Forwarded-For", "")
+        if xff:
+            return xff.split(",")[0].strip()
+        return self.client_address[0] if self.client_address else "?"
 
     def _body(self) -> dict:
         raw = self.headers.get("Content-Length", 0) or 0
@@ -782,6 +852,13 @@ class Handler(BaseHTTPRequestHandler):
         sayı (`{"id": "abc"}`) işleyiciyi çökertiyor, istemciye yanıt hiç
         yazılmadığı için bağlantı resetleniyordu.
         """
+        # IP bazlı GENEL istek sınırı (kaba DoS/kötüye kullanım guard'ı). Yalnızca
+        # gerçek istemci IP'si bilindiğinde (nginx X-Forwarded-For) uygulanır;
+        # aksi hâlde tüm kullanıcılar tek proxy IP'sini paylaşır ve sınır herkesi
+        # yanlışlıkla düşürürdü (asıl IP sınırı nginx limit_req ile de yapılabilir).
+        # Cömerttir → normal oyun (oda yoklaması ~1.2sn) etkilenmez.
+        if self.headers.get("X-Forwarded-For") and not rate_ok("ip", self._ip(), 600, 60):
+            return self._send(429, {"error": "too_many_requests"})
         try:
             route()
         except BadRequest as exc:
@@ -836,6 +913,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._friend_remove()
         if p == "/messages":
             return self._message_send()
+        if p == "/report":
+            return self._report()
         if p == "/rooms/create":
             return self._room_create()
         if p == "/rooms/join":
@@ -864,12 +943,17 @@ class Handler(BaseHTTPRequestHandler):
 
     # --- Rotalar ---
     def _register(self):
+        # Kayıt hız sınırı: IP başına 10 dakikada 8 (toplu hesap açmayı engelle).
+        if not rate_ok("register", self._ip(), 8, 600):
+            return self._send(429, {"error": "too_many_attempts"})
         b = self._body()
         username = (b.get("username") or "").strip()
         password = b.get("password") or ""
         email = (b.get("email") or "").strip()
         if not USERNAME_RE.match(username):
             return self._send(400, {"error": "invalid_username"})
+        if contains_banned(username):
+            return self._send(400, {"error": "banned_username"})
         if not EMAIL_RE.match(email):
             return self._send(400, {"error": "invalid_email"})
         if len(password) < 6:
@@ -995,6 +1079,9 @@ class Handler(BaseHTTPRequestHandler):
             me = self._auth_row(conn)
             if not me:
                 return self._send(401, {"error": "unauthorized"})
+            # Numaralandırmaya karşı: kullanıcı başına dakikada 30 arama.
+            if not rate_ok("search", me["id"], 30, 60):
+                return self._send(429, {"error": "too_many_requests"})
             q = ""
             if "?" in self.path:
                 from urllib.parse import parse_qs
@@ -1022,6 +1109,9 @@ class Handler(BaseHTTPRequestHandler):
             me = self._auth_row(conn)
             if not me:
                 return self._send(401, {"error": "unauthorized"})
+            # İstek sağanağına karşı: kullanıcı başına dakikada 20 arkadaş isteği.
+            if not rate_ok("friend_req", me["id"], 20, 60):
+                return self._send(429, {"error": "too_many_requests"})
             b = self._body()
             target = None
             if b.get("id"):
@@ -1178,6 +1268,9 @@ class Handler(BaseHTTPRequestHandler):
             me = self._auth_row(conn)
             if not me:
                 return self._send(401, {"error": "unauthorized"})
+            # Mesaj sağanağına karşı: kullanıcı başına dakikada 30 mesaj.
+            if not rate_ok("msg", me["id"], 30, 60):
+                return self._send(429, {"error": "too_many_requests"})
             b = self._body()
             to = b.get("to")
             body = (b.get("body") or "").strip()
@@ -1187,6 +1280,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(400, {"error": "empty_message"})
             if len(body) > 500:
                 body = body[:500]
+            # İçerik filtresi (TR+EN yasaklı kelime).
+            if contains_banned(body):
+                return self._send(400, {"error": "banned_word"})
             if not are_friends(conn, me["id"], int(to)):
                 return self._send(403, {"error": "not_friends"})
             now = int(time.time())
@@ -1264,6 +1360,47 @@ class Handler(BaseHTTPRequestHandler):
             conn.close()
 
     # --- Çok oyunculu (yarış odaları) --------------------------
+    def _report(self):
+        """POST /report {targetId|targetUsername, reason, detail?, context?}
+        Kullanıcıdan kullanıcıya şikayet — yönetim paneli inceler (reports tablosu)."""
+        conn = db()
+        try:
+            me = self._auth_row(conn)
+            if not me:
+                return self._send(401, {"error": "unauthorized"})
+            # Şikayet sağanağına karşı: kullanıcı başına saatte 10.
+            if not rate_ok("report", me["id"], 10, 3600):
+                return self._send(429, {"error": "too_many_requests"})
+            b = self._body()
+            target = None
+            if b.get("targetId"):
+                target = conn.execute(
+                    "SELECT id FROM users WHERE id=?", (int(b["targetId"]),)
+                ).fetchone()
+            elif b.get("targetUsername"):
+                target = conn.execute(
+                    "SELECT id FROM users WHERE username_lower=?",
+                    (str(b["targetUsername"]).strip().lower(),),
+                ).fetchone()
+            if not target:
+                return self._send(404, {"error": "user_not_found"})
+            if target["id"] == me["id"]:
+                return self._send(400, {"error": "cannot_report_self"})
+            reason = str(b.get("reason") or "other").strip().lower()
+            if reason not in ("spam", "harassment", "cheating", "other"):
+                reason = "other"
+            detail = str(b.get("detail") or "")[:500]
+            context = str(b.get("context") or "")[:32]
+            conn.execute(
+                "INSERT INTO reports (reporter_id, target_id, reason, detail, context, created) "
+                "VALUES (?,?,?,?,?,?)",
+                (me["id"], target["id"], reason, detail, context, int(time.time())),
+            )
+            conn.commit()
+            return self._send(200, {"ok": True})
+        finally:
+            conn.close()
+
     def _room_create(self):
         """POST /rooms/create {duration?} -> yeni oda (host = ben)."""
         conn = db()
@@ -1271,6 +1408,9 @@ class Handler(BaseHTTPRequestHandler):
             me = self._auth_row(conn)
             if not me:
                 return self._send(401, {"error": "unauthorized"})
+            # Oda havuzunu doldurmaya karşı: kullanıcı başına dakikada 10 oda.
+            if not rate_ok("room_create", me["id"], 10, 60):
+                return self._send(429, {"error": "too_many_requests"})
             b = self._body()
             duration = int(b.get("duration") or 180)
             duration = max(30, min(600, duration))

@@ -284,6 +284,35 @@ skor göndermek imkânsızdır — bozuk/sahte transkript reddedilir ve
 - Ek katmanlar: gönderim **hız sınırı**, akla yatkınlık kaydı, ay sonu ödülü
   yalnızca doğrulanmış skorla verilir.
 
+### 🛡️ Backend sertleştirme
+
+Herkese açık API kötüye kullanıma karşı sertleştirildi:
+
+- **CORS daraltıldı:** eskiden `Access-Control-Allow-Origin: *` idi (her site
+  API'yi tarayıcıdan kullanabiliyordu). Artık yalnızca **izinli köken(ler)**
+  yansıtılır (`GAME2048_CORS_ORIGINS` ortam değişkeni; varsayılan canlı köken +
+  yerel geliştirme). İzinsiz köken ACAO **almaz**.
+- **Güvenlik başlıkları:** her yanıtta `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` ve sıkı
+  `Content-Security-Policy: default-src 'none'` (API yalnızca JSON döner).
+- **Uç nokta hız sınırları (429):** girişin yanında artık **kayıt** (IP başına
+  8/10dk), **mesaj** (30/dk), **arkadaş isteği** (20/dk), **oda kurma** (10/dk),
+  **kullanıcı arama** (30/dk) ve **şikayet** (10/saat) sınırlıdır. Auth'lu uçlar
+  kullanıcı-kimliğiyle sınırlanır (ters-proxy IP'sinden bağımsız, doğru). Ayrıca
+  gerçek istemci IP'si biliniyorsa (nginx `X-Forwarded-For`) kaba bir **genel IP
+  sınırı** uygulanır (asıl IP sınırı nginx `limit_req` ile de yapılabilir).
+- **İçerik filtresi (TR + EN):** yasaklı kelime listesi kullanıcı adı (kayıtta)
+  ve sohbet mesajlarında uygulanır; leet/ayraç kaçışları normalize edilerek
+  yakalanır, `klasik→sik` gibi yanlış-pozitifler tam-kelime eşleşmeyle önlenir.
+- **Şikayet (report):** kullanıcıdan kullanıcıya `/report` uç noktası;
+  kayıtlar **reports** tablosuna yazılır (yönetim paneli inceler).
+- **Kullanıcı arama:** asgari 2 karakter, en çok 15 sonuç, LIKE joker kaçırma
+  (numaralandırma önlenir) + hız sınırı.
+- **Hata sızıntısı yok:** tüm işleyici hataları merkezî olarak JSON'a çevrilir;
+  traceback yalnızca sunucu günlüğüne gider, istemci genel bir hata kodu alır.
+
+Normal oyun akışı bu sınırlardan etkilenmez (test edildi).
+
 ### ☁️ Bulut senkronu — alan bazlı birleştirme (son-yazan-kazanır DEĞİL)
 
 İlerleme cihazlar arasında senkronlanır. Eskiden `/sync` gelen bloğu **körü
@@ -325,6 +354,8 @@ python3 server/test_replay_parity.py
 python3 server/test_submit_integration.py
 # Bulut senkronu birleştirme: iki cihaz + rekor/başarım/altın + göç
 python3 server/test_sync_merge.py
+# Backend sertleştirme: CORS + hız sınırları + içerik filtresi + report + hata
+python3 server/test_hardening.py
 # Oda skoru doğrulaması: uydurma reddi + meşru kabul + canlı sıralama
 python3 server/test_rooms_progress_verify.py
 # Sunucu botu: bot sunucuda koşuyor + skor manipüle edilemez

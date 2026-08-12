@@ -140,36 +140,46 @@ export class AuthService {
     }
   }
 
-  /** /me çağır: kullanıcıyı + hesaptaki ilerlemeyi getir/uygula. */
+  /**
+   * Açılış/giriş: kullanıcıyı getir ve yerel ilerlemeyi buluttakiyle BİRLEŞTİR.
+   * Eskiden /me buluttaki veriyi yerelin ÜZERİNE yazıyordu → o cihazda çevrimdışı
+   * kazanılan her şey siliniyordu. Artık /sync ile yerel snapshot gönderilir;
+   * sunucu ALAN BAZLI birleştirir (bkz. merge_progress) ve birleşmiş sonucu döner.
+   */
   async refresh(): Promise<void> {
     if (!this.token) return;
     try {
-      const res = await fetch(`${API}/me`, {
-        headers: { Authorization: `Bearer ${this.token}` },
+      const res = await fetch(`${API}/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.token}`,
+        },
+        body: JSON.stringify({ data: this.game.accountSnapshot() }),
       });
       if (!res.ok) {
         if (res.status === 401) this.clear();
         return;
       }
       const json = await res.json();
-      this.user.set(json.user);
+      if (json.user) this.user.set(json.user);
       if (json.data && typeof json.data === 'object') {
         this.game.applyAccountSnapshot(json.data);
       }
-      // Hesap verisi uygulandı → artık yerelden buluta yazmak güvenli.
+      // Hesap verisi birleşti/uygulandı → artık yerelden buluta yazmak güvenli.
       this.syncReady = true;
     } catch {
       /* çevrimdışı — sessiz geç */
     }
   }
 
-  /** Yerel ilerlemeyi hesaba yükle (giriş varsa). */
+  /** Yerel ilerlemeyi hesaba yükle + sunucunun birleşmiş sonucunu geri uygula. */
   async syncUp(): Promise<void> {
     if (!this.token) return;
     const data = this.pendingSnapshot ?? this.game.accountSnapshot();
     this.pendingSnapshot = null;
     try {
-      await fetch(`${API}/sync`, {
+      const res = await fetch(`${API}/sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -179,6 +189,15 @@ export class AuthService {
         // Sekme kapanırken de isteğin tamamlanmasını sağlar.
         keepalive: true,
       });
+      // Sunucu birleşmiş (güvenilir) veriyi döndürür → diğer cihazda kazanılan
+      // ilerleme bu cihaza da yansır (yerel = birleşmiş). Sekme kapanışında
+      // yanıt gelmeyebilir; sorun değil, bir sonraki senkron yakalar.
+      if (res.ok) {
+        const json = await res.json().catch(() => null);
+        if (json?.data && typeof json.data === 'object') {
+          this.game.applyAccountSnapshot(json.data);
+        }
+      }
     } catch {
       /* sessiz */
     }

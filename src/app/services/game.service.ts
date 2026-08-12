@@ -79,6 +79,7 @@ const GOLD_KEY = 'game2048.gold';
 
 /** Bugüne kadar kazanılan toplam altının anahtarı. */
 const TOTAL_EARNED_KEY = 'game2048.totalGoldEarned';
+const PREFS_AT_KEY = 'game2048.prefsAt'; // ad/avatar en son ne zaman değişti (bulut birleştirmede LWW)
 
 /** Ödülü alınmış seviyelerin localStorage anahtarı. */
 const REWARDED_LEVELS_KEY = 'game2048.rewardedLevels';
@@ -183,6 +184,8 @@ export class GameService {
 
   /** Bugüne kadar kazanılan toplam altın (başarım için). */
   readonly totalGoldEarned = signal<number>(loadTotalEarned());
+  /** Ad/avatar en son ne zaman değişti (bulut birleştirmede tercih LWW'si için). */
+  private readonly prefsUpdatedAt = signal<number>(loadPrefsAt());
 
   /** Ödülü zaten alınmış seviyeler (tekrar tamamlamada altın verilmez). */
   private readonly rewardedLevels = new Set<number>(loadRewardedLevels());
@@ -1104,6 +1107,14 @@ export class GameService {
     const clean = name.trim().slice(0, 16) || 'Oyuncu';
     this.playerName.set(clean);
     saveName(clean);
+    this.touchPrefs(); // tercih değişti → bulut birleştirmede LWW için damga
+  }
+
+  /** Tercih (ad/avatar) değiştiğinde zaman damgasını günceller. */
+  private touchPrefs(): void {
+    const ts = Date.now();
+    this.prefsUpdatedAt.set(ts);
+    savePrefsAt(ts);
   }
 
   /** Seçili profil avatarı (kalıcı + hesapla senkron). */
@@ -1114,13 +1125,22 @@ export class GameService {
     if (!AVATARS.includes(a)) return;
     this.avatar.set(a);
     saveAvatar(a);
+    this.touchPrefs(); // tercih değişti → bulut birleştirmede LWW için damga
   }
 
   // --- Hesap senkronizasyonu ----------------------------------
 
-  /** Hesaba kaydedilecek ilerleme anlık görüntüsü. */
+  /**
+   * Hesaba kaydedilecek ilerleme anlık görüntüsü. Sürüm + zaman damgaları,
+   * sunucunun ALAN BAZLI birleştirmesi içindir (bkz. server merge_progress):
+   * rekorlar/sayaçlar MAX, başarımlar birleşim, altın kazanılan/harcanan MAX,
+   * ad/avatar prefsAt'a göre en son değişen kazanır.
+   */
   accountSnapshot(): Record<string, unknown> {
     return {
+      v: 2,
+      updatedAt: Date.now(),
+      prefsAt: this.prefsUpdatedAt(),
       gold: this.gold(),
       totalGoldEarned: this.totalGoldEarned(),
       bestScore: this.bestScore(),
@@ -1169,6 +1189,12 @@ export class GameService {
       this.unlockedAchievements.set(
         new Set((d['achievements'] as unknown[]).filter((x) => typeof x === 'string') as string[]),
       );
+    }
+    // Tercih zaman damgası (birleşmiş değer sunucudan) — LWW tutarlılığı için.
+    const pa = num(d['prefsAt']);
+    if (pa !== null) {
+      this.prefsUpdatedAt.set(pa);
+      savePrefsAt(pa);
     }
     // Kalıcı kaydet
     saveGold(this.gold());
@@ -1875,6 +1901,27 @@ function saveTotalEarned(total: number): void {
   try {
     if (typeof localStorage === 'undefined') return;
     localStorage.setItem(TOTAL_EARNED_KEY, String(total));
+  } catch {
+    /* yoksay */
+  }
+}
+
+/** Tercih (ad/avatar) son değişiklik zaman damgasını okur. */
+function loadPrefsAt(): number {
+  try {
+    if (typeof localStorage === 'undefined') return 0;
+    const n = parseInt(localStorage.getItem(PREFS_AT_KEY) || '0', 10);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Tercih son değişiklik zaman damgasını yazar. */
+function savePrefsAt(ts: number): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(PREFS_AT_KEY, String(ts));
   } catch {
     /* yoksay */
   }

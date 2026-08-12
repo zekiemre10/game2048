@@ -342,6 +342,78 @@ def user_public(row) -> dict:
     return {"id": row["id"], "username": row["username"], "created": row["created"]}
 
 
+# ---------------------------------------------------------------------------
+#  Bulut senkronu: ALAN BAZLI BİRLEŞTİRME (son-yazan-kazanır DEĞİL)
+#
+#  Eskiden /sync gelen bloğu körü körüne yazıyordu → iki cihazda paralel oynanan
+#  ilerleme sessizce siliniyordu (telefon çevrimdışıyken PC'de açılan başarım,
+#  telefon bağlanınca eziliyordu). Artık gelen veri saklananla ALAN ALAN birleşir;
+#  hiçbir taraf sessizce kaybolmaz. Kurallar alan tipine göre:
+#    • Rekorlar + monoton sayaçlar (skor, kare, seviye, oyun/hamle/şampiyonluk,
+#      kazanılan altın) → BÜYÜK olan kazanır (MAX).
+#    • Başarımlar → BİRLEŞİM (iki taraftaki de açık kalır; asla kapanmaz).
+#    • Altın BAKİYESİ → özel: kazanılan(monoton) ve harcanan(=kazanılan−bakiye,
+#      o da monoton) AYRI AYRI MAX; bakiye = kazanılan−harcanan. Böylece bir
+#      cihazda kazanılan, diğerinde harcanan İKİSİ de korunur (kayıp/çoğalma yok).
+#    • Tercihler (ad, avatar) → EN SON değişen kazanır (prefsAt zaman damgası).
+#  Eski (sürümsüz) bloklara toleranslıdır → mevcut hesaplar göçte bozulmaz.
+# ---------------------------------------------------------------------------
+MERGE_MAX_FIELDS = (
+    "bestScore", "bestLevel", "bestTile",
+    "gamesPlayed", "gamesWon", "totalMoves", "championships",
+    "totalGoldEarned",
+)
+
+
+def _mnum(d, k):
+    """d[k] negatif olmayan sayı ise onu, değilse 0 döndürür."""
+    v = d.get(k) if isinstance(d, dict) else None
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) and v >= 0 else 0
+
+
+def merge_progress(base, inc):
+    """İki ilerleme bloğunu ALAN BAZLI birleştirir (yukarıdaki kurallar).
+    base = sunucuda saklanan; inc = istemcinin gönderdiği. Dönen: birleşmiş blok."""
+    if not isinstance(base, dict):
+        base = {}
+    if not isinstance(inc, dict):
+        inc = {}
+    out = {}
+
+    # Rekorlar + monoton sayaçlar → MAX
+    for f in MERGE_MAX_FIELDS:
+        out[f] = max(_mnum(base, f), _mnum(inc, f))
+
+    # Altın bakiyesi → kazanılan/harcanan ayrı ayrı MAX (ikisi de monoton)
+    earned = out["totalGoldEarned"]
+    spent_base = max(0, _mnum(base, "totalGoldEarned") - _mnum(base, "gold"))
+    spent_inc = max(0, _mnum(inc, "totalGoldEarned") - _mnum(inc, "gold"))
+    spent = min(earned, max(spent_base, spent_inc))
+    out["gold"] = max(0, earned - spent)
+
+    # Başarımlar → BİRLEŞİM
+    ach = set()
+    for src in (base, inc):
+        arr = src.get("achievements")
+        if isinstance(arr, list):
+            ach.update(x for x in arr if isinstance(x, str))
+    out["achievements"] = sorted(ach)
+
+    # Tercihler (ad, avatar) → prefsAt'ı büyük olan taraf kazanır
+    base_at, inc_at = _mnum(base, "prefsAt"), _mnum(inc, "prefsAt")
+    primary, secondary = (inc, base) if inc_at > base_at else (base, inc)
+    for f in ("name", "avatar"):
+        if isinstance(primary.get(f), str):
+            out[f] = primary[f]
+        elif isinstance(secondary.get(f), str):
+            out[f] = secondary[f]
+    out["prefsAt"] = max(base_at, inc_at)
+
+    out["v"] = 2
+    out["updatedAt"] = max(_mnum(base, "updatedAt"), _mnum(inc, "updatedAt"))
+    return out
+
+
 def friend_public(row) -> dict:
     """Arkadaş listesi için: kimlik + oyun verisinden birkaç özet alan."""
     try:
@@ -825,7 +897,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(409, {"error": "username_taken"})
 
             salt = secrets.token_hex(16)
-            data = json.dumps(b.get("data") or {})
+            # Yeni hesap: gelen yerel ilerlemeyi v2'ye normalize et (boş tabanla
+            # birleştir) → saklanan blok tutarlı olur, ilk /sync sürprizi olmaz.
+            raw = b.get("data")
+            data = json.dumps(merge_progress({}, raw if isinstance(raw, dict) else {}))
             if len(data) > MAX_DATA:
                 return self._send(400, {"error": "invalid_data"})
             try:
@@ -900,10 +975,17 @@ class Handler(BaseHTTPRequestHandler):
             row = user_from_token(conn, self._token())
             if not row:
                 return self._send(401, {"error": "unauthorized"})
-            data = self._body().get("data")
-            if not isinstance(data, dict):
+            incoming = self._body().get("data")
+            if not isinstance(incoming, dict):
                 return self._send(400, {"error": "invalid_data"})
-            blob = json.dumps(data)
+            # Gelen blok saklananı EZMEZ: alan bazlı BİRLEŞTİRİLİR (bkz.
+            # merge_progress). Böylece başka cihazda kazanılan ilerleme silinmez.
+            try:
+                stored = json.loads(row["data"] or "{}")
+            except Exception:
+                stored = {}
+            merged = merge_progress(stored, incoming)
+            blob = json.dumps(merged)
             # Sınırsız blob ile veritabanını şişirmeyi engelle.
             if len(blob) > MAX_DATA:
                 return self._send(400, {"error": "invalid_data"})
@@ -912,7 +994,9 @@ class Handler(BaseHTTPRequestHandler):
                 (blob, row["id"]),
             )
             conn.commit()
-            return self._send(200, {"ok": True})
+            # Birleşmiş (GÜVENİLİR) veriyi geri döndür → istemci yerelini bununla
+            # günceller, böylece diğer cihazın ilerlemesi de bu cihaza gelir.
+            return self._send(200, {"ok": True, "user": user_public(row), "data": merged})
         finally:
             conn.close()
 

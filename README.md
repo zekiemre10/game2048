@@ -284,11 +284,47 @@ skor göndermek imkânsızdır — bozuk/sahte transkript reddedilir ve
 - Ek katmanlar: gönderim **hız sınırı**, akla yatkınlık kaydı, ay sonu ödülü
   yalnızca doğrulanmış skorla verilir.
 
+### ☁️ Bulut senkronu — alan bazlı birleştirme (son-yazan-kazanır DEĞİL)
+
+İlerleme cihazlar arasında senkronlanır. Eskiden `/sync` gelen bloğu **körü
+körüne yazıyordu** → iki cihazda paralel oynanan ilerleme **sessizce siliniyordu**
+(telefon çevrimdışıyken PC'de açılan başarım, telefon bağlanınca eziliyordu; ya da
+giriş yapınca bulut yereli ezip o cihazda çevrimdışı kazanılanı siliyordu).
+
+Artık gelen veri saklananla **alan alan birleşir** (`server/app.py` →
+`merge_progress`); hiçbir taraf sessizce kaybolmaz. Kurallar alan tipine göre:
+
+| Alan | Kural | Neden |
+|------|-------|-------|
+| Rekorlar (skor, kare, seviye) | **MAX** — büyük olan kazanır | rekor düşmemeli |
+| İstatistikler (oyun/hamle/şampiyonluk) | **MAX** (monoton sayaç) | asla geriye gitmez |
+| Başarımlar | **BİRLEŞİM** | açılan hiçbir başarım kapanmaz |
+| **Altın bakiyesi** | **özel:** kazanılan(monoton) ve harcanan(=kazanılan−bakiye, o da monoton) **ayrı ayrı MAX**; bakiye = kazanılan−harcanan | bir cihazda kazanılan + diğerinde harcanan **ikisi de** korunur → kayıp/çoğalma yok |
+| Tercihler (ad, avatar) | **EN SON** değişen kazanır (`prefsAt` damgası) | çakışan tercihte deterministik |
+
+Her snapshot **sürüm (`v`) + zaman damgası** taşır; sunucu birleştirmeyi bunlarla
+yapar ve **birleşmiş (güvenilir) sonucu geri döndürür** → istemci yerelini onunla
+günceller, böylece diğer cihazın ilerlemesi de bu cihaza gelir. Giriş/açılış artık
+`/me`-ezme yerine `/sync`-birleştirme yolundan geçer. Eski (sürümsüz) bloklara
+toleranslıdır → **mevcut hesaplar göçte bozulmaz** (testle doğrulandı).
+
+> **Altın neden özel, güçler neden şimdilik yerel?** Harcanabilir bir *bakiye*'yi
+> güvenle birleştirmek için tek değer yetmez; kazanılan/harcanan gibi **monoton**
+> geçmiş gerekir (aksi hâlde MAX ile harcanan altın "dirilir", SUM ile çoğalır).
+> Altında `totalGoldEarned` zaten tutulduğundan harcanan = kazanılan−bakiye ile
+> türetilir ve **kesin** birleşir. **Güçler** ise şu an cihaz-yerelidir
+> (senkronlanmaz) → senkron-kaybı yaşamaz; buluta eklendiğinde aynı desenle
+> (güç başına `alınan`/`kullanılan` monoton sayaç, MAX-birleştirme) yapılmalıdır.
+> Geçmiş tutulmadan geriye dönük eklemek ilk birleştirmede miktarı bozabileceği
+> için bu paketde güçler bilinçli olarak yerel bırakıldı.
+
 ```bash
 # Sunucu tarafı replay parite testi (istemci = sunucu skoru)
 python3 server/test_replay_parity.py
 # Uçtan uca: uydurma skor reddi + meşru oyun kabulü
 python3 server/test_submit_integration.py
+# Bulut senkronu birleştirme: iki cihaz + rekor/başarım/altın + göç
+python3 server/test_sync_merge.py
 # Oda skoru doğrulaması: uydurma reddi + meşru kabul + canlı sıralama
 python3 server/test_rooms_progress_verify.py
 # Sunucu botu: bot sunucuda koşuyor + skor manipüle edilemez

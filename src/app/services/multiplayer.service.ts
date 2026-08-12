@@ -2,8 +2,8 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { API_BASE, AuthService } from './auth.service';
 import { GameService } from './game.service';
 import { GameMode, GameStatus } from '../models/tile.model';
-import { AiLevel } from '../logic/ai';
-import { BotRunner, levelFromName } from '../logic/bot-runner';
+import { AiLevel, isAiLevel } from '../logic/ai';
+import { BotRunner, resolveBotLevel } from '../logic/bot-runner';
 
 // ============================================================
 //  2048 — Çok oyunculu yarış servisi
@@ -19,6 +19,8 @@ export interface RoomPlayer {
   best: number;
   done: boolean;
   isBot?: boolean;
+  /** Bot zorluğu VERİ olarak (sunucudan). İnsanlarda tanımsız. */
+  level?: AiLevel;
 }
 
 export interface RoomState {
@@ -56,6 +58,12 @@ export class MultiplayerService {
   /** Host'un çalıştırdığı botlar (botId → koşucu). */
   private bots = new Map<number, BotRunner>();
   private botsStarted = false;
+  /**
+   * Host'un eklerken kaydettiği bot seviyeleri (botId → seviye). Sunucu oda
+   * durumunda `level` alanını taşır; bu harita yalnızca o alan gelene kadar
+   * (dağıtım penceresi / eski oda) KÖPRÜdür — seviye asla isimden çözülmez.
+   */
+  private botLevels = new Map<number, AiLevel>();
 
   /** Oda kur (host). */
   async createRoom(duration = 180): Promise<MpResult> {
@@ -114,15 +122,29 @@ export class MultiplayerService {
 
   /** Odaya YZ botu ekle (yalnızca host, lobide). */
   async addBot(difficulty: AiLevel = 'medium'): Promise<MpResult> {
-    return this.botAction('/rooms/addbot', { difficulty });
+    // Zorluğu İSTEMCİDE de doğrula (sunucu da doğrular) — geçersiz kademe gitmesin.
+    if (!isAiLevel(difficulty)) return { ok: false, error: 'invalid_level' };
+    const res = await this.botAction('/rooms/addbot', { difficulty });
+    // Sunucu eklenen botun kimliğini döndürür → seviyesini VERİ olarak kaydet
+    // (isimden çözmek yerine). Sunucu artık level'i oda durumunda da taşıyor;
+    // bu kayıt yalnızca o alan gelene kadar köprü olarak durur.
+    if (res.ok && typeof res.body?.['botId'] === 'number') {
+      this.botLevels.set(res.body['botId'] as number, difficulty);
+    }
+    return { ok: res.ok, error: res.error };
   }
 
   /** Botu çıkar (host, lobide). */
   async removeBot(botId: number): Promise<MpResult> {
-    return this.botAction('/rooms/removebot', { botId });
+    const res = await this.botAction('/rooms/removebot', { botId });
+    if (res.ok) this.botLevels.delete(botId);
+    return { ok: res.ok, error: res.error };
   }
 
-  private async botAction(path: string, extra: unknown): Promise<MpResult> {
+  private async botAction(
+    path: string,
+    extra: unknown,
+  ): Promise<MpResult & { body?: Record<string, unknown> }> {
     const room = this.room();
     const headers = this.auth.authHeaders();
     if (!room || !headers) return { ok: false, error: 'error' };
@@ -135,7 +157,7 @@ export class MultiplayerService {
       const j = await res.json().catch(() => ({}));
       if (!res.ok) return { ok: false, error: j.error || 'error' };
       if (j.room) this.room.set(j.room);
-      return { ok: true };
+      return { ok: true, body: j };
     } catch {
       return { ok: false, error: 'network' };
     }
@@ -145,6 +167,7 @@ export class MultiplayerService {
   private stopBots(): void {
     for (const bot of this.bots.values()) bot.stop();
     this.bots.clear();
+    this.botLevels.clear();
     this.botsStarted = false;
   }
 
@@ -280,7 +303,10 @@ export class MultiplayerService {
       this.botsStarted = true;
       for (const p of next.players) {
         if (p.isBot) {
-          const bot = new BotRunner(next.seed, levelFromName(p.username));
+          // Seviye VERİDEN: sunucunun p.level alanı, yoksa ekleme anında
+          // kaydedilen seviye, o da yoksa güvenli varsayılan (isimden ASLA).
+          const level = resolveBotLevel(p.level, this.botLevels.get(p.id));
+          const bot = new BotRunner(next.seed, level);
           bot.start();
           this.bots.set(p.id, bot);
         }

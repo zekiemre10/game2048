@@ -11,18 +11,27 @@ import {
   bestMove,
   emptyCells,
   emptyGrid,
+  isAiLevel,
   mulberry32,
   simulateMove,
 } from './ai';
 
 const CHANCE_OF_FOUR = 0.1;
 
-/** Bot adından (🤖 Bot (Uzman)) zorluk seviyesini çıkarır. TR ve EN adları tanır. */
-export function levelFromName(name: string): AiLevel {
-  const s = name.toLowerCase();
-  if (name.includes('Kolay') || s.includes('easy')) return 'easy';
-  if (name.includes('Uzman') || s.includes('expert')) return 'expert';
-  if (name.includes('Zor') || s.includes('hard')) return 'hard';
+/**
+ * Botun zorluk seviyesini VERİDEN çözer (görünen addan DEĞİL).
+ *
+ * Eski `levelFromName` botun adında string arıyordu; ad çevrilince, biçimi
+ * değişince ya da emoji eklenince seviye sessizce "medium"a düşüyordu — fark
+ * edilmesi zor bir hata. Artık seviye veri olarak taşınır:
+ *   1. `level`     — sunucunun oda durumunda döndürdüğü alan (asıl kaynak),
+ *   2. `recorded`  — host'un botu eklerken kaydettiği seviye (sunucu bu alanı
+ *                    henüz döndürmüyorsa köprü),
+ *   3. `'medium'`  — geriye dönük güvenli varsayılan (eski odalardaki botlar).
+ */
+export function resolveBotLevel(level: unknown, recorded?: AiLevel): AiLevel {
+  if (isAiLevel(level)) return level;
+  if (isAiLevel(recorded)) return recorded;
   return 'medium';
 }
 

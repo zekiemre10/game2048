@@ -1008,7 +1008,7 @@
           <div class="mp-result">
             <h3 class="mp-result-title">{{ t('mp.finished') }}</h3>
             @if (mpWinner(); as w) {
-              <p class="mp-winner">{{ t('mp.winner') }} 👤 {{ w.username }} — {{ w.score }}</p>
+              <p class="mp-winner">{{ t('mp.winner') }} {{ w.isBot ? '' : '👤 ' }}{{ mpPlayerName(w) }} — {{ w.score }}</p>
             }
           </div>
         } @else if (room.status === 'lobby') {
@@ -1030,7 +1030,7 @@
                 <span class="mp-rank">{{ i + 1 }}</span>
               }
               <span class="mp-pname">
-                {{ p.isBot ? '' : '👤 ' }}{{ p.username }}
+                {{ p.isBot ? '' : '👤 ' }}{{ mpPlayerName(p) }}
                 @if (isMe(p.id)) { <em>{{ t('mp.you') }}</em> }
                 @if (p.id === room.hostId) { <span class="mp-hosttag">{{ t('mp.host') }}</span> }
               </span>
@@ -1427,7 +1427,7 @@
         @for (p of mpPlayers(); track p.id; let i = $index) {
           <div class="race-row" [class.me]="isMe(p.id)">
             <span class="race-pos">{{ i + 1 }}.</span>
-            <span class="race-name">{{ p.username }}</span>
+            <span class="race-name">{{ mpPlayerName(p) }}</span>
             <span class="race-pts">{{ p.score }}</span>
             @if (p.done) { <span class="race-flag">🏁</span> }
           </div>

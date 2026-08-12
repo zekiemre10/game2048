@@ -100,9 +100,12 @@ dolduruldu (Orta = "iki hamle ileri ama isabetsiz"). Değerler
 `scripts/ai-calibrate.mjs` taramasıyla banda oturtuldu; `ai-strength.spec.ts`
 seviye eşiklerini, sıralamayı ve ≤5× geçişi regresyon olarak korur.
 
-> **Çok oyunculu not:** yeni **Zor** kademesinin bot adının sunucu tarafında
-> "Zor"/"Hard" olarak etiketlenmesi gerekir; istemci `levelFromName` bu adı
-> zaten tanır (TR+EN). Sunucu tanımıyorsa bot güvenli şekilde Orta'ya düşer.
+**Bot zorluğu VERİ olarak taşınır** (görünen addan çözülmez — o kırılgandı: ad
+çevrilince/emoji eklenince seviye sessizce Orta'ya düşerdi). Sunucu `/rooms/addbot`
+seviyeyi doğrular ve `room_players.level` sütununda saklar, oda durumunda `level`
+alanı olarak döndürür. İstemci `resolveBotLevel(p.level, …)` ile veriden okur;
+görünen bot adı seviyeden ve aktif dilden üretilir (dil değişince ad da güncellenir).
+Eski odalardaki (alan boş) botlar güvenle **Orta**'ya düşer.
 
 ## Özellikler
 

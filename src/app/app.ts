@@ -10,7 +10,8 @@ import { I18nService, Lang } from './services/i18n.service';
 import { AuthService } from './services/auth.service';
 import { FriendsService, Friend } from './services/friends.service';
 import { ChatService } from './services/chat.service';
-import { MultiplayerService } from './services/multiplayer.service';
+import { MultiplayerService, RoomPlayer } from './services/multiplayer.service';
+import { isAiLevel } from './logic/ai';
 import { AiService } from './services/ai.service';
 import { LeaderScope, LeaderboardService } from './services/leaderboard.service';
 import { DailyService } from './services/daily.service';
@@ -452,6 +453,19 @@ export class App {
     const p = this.mpPlayers();
     return p.length ? p[0] : null;
   });
+
+  /**
+   * Oyuncunun görünen adı. Botlarda ad, seviyeden ve AKTİF DİLDEN üretilir
+   * (sunum ayrıntısı; iş mantığı `p.level` verisine bakar, isme değil). Böylece
+   * dil değişince bot adı da güncellenir. Seviye verisi yoksa sunucu adına düşer.
+   */
+  protected mpPlayerName(p: RoomPlayer): string {
+    if (p.isBot && isAiLevel(p.level)) {
+      const key = 'mp.bot' + p.level[0].toUpperCase() + p.level.slice(1);
+      return `🤖 Bot (${this.t(key)})`;
+    }
+    return p.username;
+  }
 
   /** Envanterde en az 1 tane olan güçler (oyun içi güç çubuğu için). */
   protected readonly ownedPowers = computed(() =>

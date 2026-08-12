@@ -29,6 +29,14 @@ export function mulberry32(seed: number): () => number {
 /** YZ zorluk seviyeleri (güç sırası: easy < medium < hard < expert). */
 export type AiLevel = 'easy' | 'medium' | 'hard' | 'expert';
 
+/** Geçerli tüm zorluk kademeleri (sıralı). Doğrulama ve UI için tek kaynak. */
+export const AI_LEVELS: readonly AiLevel[] = ['easy', 'medium', 'hard', 'expert'];
+
+/** Bir değerin geçerli bir AiLevel olup olmadığını güvenle kontrol eder. */
+export function isAiLevel(x: unknown): x is AiLevel {
+  return typeof x === 'string' && (AI_LEVELS as readonly string[]).includes(x);
+}
+
 const CHANCE_OF_FOUR = 0.1;
 
 // --- Izgara yardımcıları (saf) ------------------------------

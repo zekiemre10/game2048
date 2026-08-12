@@ -229,6 +229,7 @@ def init_db():
             code TEXT NOT NULL,
             user_id INTEGER NOT NULL,
             username TEXT NOT NULL,
+            level TEXT,                    -- bot zorluğu VERİ olarak (easy|medium|hard|expert); insanlarda NULL
             score INTEGER NOT NULL DEFAULT 0,
             best INTEGER NOT NULL DEFAULT 0,
             done INTEGER NOT NULL DEFAULT 0,
@@ -287,6 +288,12 @@ def init_db():
     # Şema göçü: users.email kolonu (eski DB'de yoksa ekle)
     try:
         conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+    except Exception:
+        pass  # zaten var
+    # Şema göçü: room_players.level (bot zorluğunu VERİ olarak taşı; eskiden
+    # görünen addan çözülüyordu — kırılgandı. Eski DB'de yoksa ekle.)
+    try:
+        conn.execute("ALTER TABLE room_players ADD COLUMN level TEXT")
     except Exception:
         pass  # zaten var
     conn.commit()
@@ -510,7 +517,7 @@ def room_state(conn, code):
         conn.commit()
         status = "finished"
     players = conn.execute(
-        "SELECT user_id, username, score, best, done FROM room_players "
+        "SELECT user_id, username, level, score, best, done FROM room_players "
         "WHERE code=? ORDER BY score DESC, best DESC, username ASC",
         (code,),
     ).fetchall()
@@ -530,6 +537,7 @@ def room_state(conn, code):
                 "best": p["best"],
                 "done": bool(p["done"]),
                 "isBot": p["user_id"] < 0,  # botlar negatif kimlikli
+                "level": p["level"],        # bot zorluğu (VERİ); insanlarda null
             }
             for p in players
         ],
@@ -1250,7 +1258,12 @@ class Handler(BaseHTTPRequestHandler):
             b = self._body()
             code = (b.get("code") or "").strip().upper()
             diff = (b.get("difficulty") or "medium").lower()
-            names = {"easy": "🤖 Bot (Kolay)", "medium": "🤖 Bot (Orta)", "expert": "🤖 Bot (Uzman)"}
+            names = {"easy": "🤖 Bot (Kolay)", "medium": "🤖 Bot (Orta)",
+                     "hard": "🤖 Bot (Zor)", "expert": "🤖 Bot (Uzman)"}
+            # Zorluk VERİ olarak taşınır ve DOĞRULANIR (geçerli kademelerden biri).
+            # Görünen ad yalnızca gösterim içindir; seviye artık ondan çözülmez.
+            if diff not in names:
+                return self._send(400, {"error": "invalid_level"})
             room = conn.execute("SELECT * FROM rooms WHERE code=?", (code,)).fetchone()
             if not room:
                 return self._send(404, {"error": "room_not_found"})
@@ -1265,8 +1278,8 @@ class Handler(BaseHTTPRequestHandler):
             bot_id = min(0, row["m"] or 0) - 1
             try:
                 conn.execute(
-                    "INSERT INTO room_players (code, user_id, username, joined) VALUES (?,?,?,?)",
-                    (code, bot_id, names.get(diff, names["medium"]), int(time.time())),
+                    "INSERT INTO room_players (code, user_id, username, level, joined) VALUES (?,?,?,?,?)",
+                    (code, bot_id, names[diff], diff, int(time.time())),
                 )
             except sqlite3.IntegrityError:
                 # Host butona iki kez bastıysa iki istek de aynı kimliği

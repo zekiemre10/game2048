@@ -1,0 +1,9 @@
+{
+  "//": "Yerel geliştirme proxy'si: ng serve sırasında /api/* isteklerini yerel Python sunucusuna (127.0.0.1:8092) iletir; /api önekini soyar. Üretim sunucusuna bağlanılmaz.",
+  "/api": {
+    "target": "http://127.0.0.1:8092",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/api": "" }
+  }
+}

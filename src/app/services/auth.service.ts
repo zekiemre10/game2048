@@ -1,14 +1,20 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { GameService } from './game.service';
+import { environment } from '../../environments/environment';
 
 // ============================================================
 //  2048 — Hesap servisi (kayıt / giriş)
-//  Backend: http://34.158.136.9/emre/2048/api
 //  Token localStorage'da; giriş yapınca ilerleme hesapla senkronlanır.
 // ============================================================
 
-/** Backend kök adresi (prod/localhost/file:// hepsinden çalışsın diye tam URL). */
-export const API_BASE = 'http://34.158.136.9/emre/2048/api';
+/**
+ * Backend kök adresi — ARTIK KODA GÖMÜLÜ DEĞİL, ortamdan gelir.
+ *   • üretim: same-origin göreli yol (/emre/2048/api) → sayfa HTTPS ise API de
+ *     HTTPS (karışık içerik yok, sabit IP/protokol yok),
+ *   • geliştirme: /api → proxy ile localhost:8092 (üretim sunucusuna bağlanmaz).
+ * (bkz. src/environments/* ve proxy.conf.json)
+ */
+export const API_BASE = environment.apiBase;
 const API = API_BASE;
 const TOKEN_KEY = 'game2048.token';
 

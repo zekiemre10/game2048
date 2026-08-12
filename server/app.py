@@ -42,7 +42,11 @@ USERNAME_RE = re.compile(r"^[A-Za-z0-9_.\-çğışöüÇĞİŞÖÜ ]{2,20}$")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PBKDF2_ITERS = 600_000  # OWASP 2024 önerisi (PBKDF2-SHA256)
 LEGACY_ITERS = 120_000  # eski hesapların hash'i (girişte yükseltilir)
-TOKEN_TTL = 60 * 60 * 24 * 90  # 90 gün
+TOKEN_TTL = 60 * 60 * 24 * 30    # 30 gün (ATIL süre). 90 gün fazla uzundu:
+# sızan jeton bu kadar geçerli kalmamalı. KAYAN pencere (aşağıda user_from_token)
+# aktif kullanıcıyı çıkış yaptırmaz — jeton her kullanımda yenilenir, yalnızca
+# 30 gün HİÇ kullanılmayan oturum ölür. (Tam yenileme-jetonu rotasyonu ileride.)
+TOKEN_REFRESH_AFTER = 60 * 60 * 24  # kayan pencereyi en çok günde bir tazele
 MAX_BODY = 256 * 1024  # istek gövdesi üst sınırı (bellek koruması)
 MAX_DATA = 64 * 1024  # /sync ile saklanabilecek en büyük ilerleme kaydı
 MAX_SCORE = 10_000_000  # makul üst sınır (uydurma skorları ele)
@@ -460,15 +464,24 @@ def user_from_token(conn, token: str):
         return None
     # TOKEN_TTL artık gerçekten uygulanıyor: eskiden sessions.created hiç
     # okunmadığı için sızan bir jeton sonsuza dek geçerli kalıyordu.
-    cutoff = int(time.time()) - TOKEN_TTL
+    now = int(time.time())
+    cutoff = now - TOKEN_TTL
     row = conn.execute(
-        "SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id "
+        "SELECT u.*, s.created AS _sess_created FROM sessions s "
+        "JOIN users u ON u.id = s.user_id "
         "WHERE s.token = ? AND s.created > ?",
         (token, cutoff),
     ).fetchone()
     if row is None:
         # Süresi dolmuş oturumları fırsat buldukça temizle.
         conn.execute("DELETE FROM sessions WHERE created <= ?", (cutoff,))
+        conn.commit()
+        return None
+    # KAYAN pencere: aktif kullanılan jeton yenilenir (created=now) → aktif
+    # kullanıcı çıkış yapmaz, ama ATIL jeton TOKEN_TTL sonra ölür. Yazma
+    # amplifikasyonunu (oda yoklaması ~1.2sn) önlemek için günde bir tazelenir.
+    if now - row["_sess_created"] > TOKEN_REFRESH_AFTER:
+        conn.execute("UPDATE sessions SET created=? WHERE token=?", (now, token))
         conn.commit()
     return row
 

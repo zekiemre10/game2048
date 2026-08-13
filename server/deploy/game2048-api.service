@@ -1,0 +1,58 @@
+# ============================================================
+#  2048 backend API — systemd birimi
+#
+#  Kurulum (sunucuda, bir kez):
+#    sudo cp deploy/game2048-api.service /etc/systemd/system/
+#    sudo systemctl daemon-reload
+#    sudo systemctl enable --now game2048-api
+#  Günlükler:  journalctl -u game2048-api -f
+#
+#  Yollar deploy/README.md'deki konvansiyona göredir; kendi düzenine göre
+#  ExecStart / WorkingDirectory / Environment satırlarını uyarla.
+# ============================================================
+[Unit]
+Description=2048 backend API (hesaplar, skorlar, arkadaşlar, sohbet, çok oyunculu)
+After=network.target
+# nginx bu servise proxy'ler; nginx varsa ondan sonra da başlaması sorun değil.
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Ayrılmış, ayrıcalıksız kullanıcı (root DEĞİL). Oluştur:
+#   sudo useradd --system --home /var/lib/game2048-api --shell /usr/sbin/nologin game2048
+User=game2048
+Group=game2048
+
+WorkingDirectory=/opt/game2048-api
+ExecStart=/usr/bin/python3 /opt/game2048-api/app.py
+
+# --- Ortam ---
+# Veritabanı KOD dizininin DIŞINDA (redeploy DB'yi silmesin/üzerine yazmasın).
+Environment=GAME2048_DB=/var/lib/game2048-api/app.db
+Environment=GAME2048_PORT=8092
+# CORS'u yayın kökenine daraltmak için (bkz. app.py):
+# Environment=GAME2048_CORS_ORIGINS=http://34.158.136.9
+
+# --- Çökünce otomatik yeniden başlat ---
+Restart=on-failure
+RestartSec=3
+# Sonsuz yeniden başlama döngüsünü engelle: 60sn'de 5'ten çok çökerse dur.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+# --- Günlükler journald'a (journalctl -u game2048-api). Boyut sınırı için
+#     journald.conf SystemMaxUse ayarı — bkz. deploy/README.md. ---
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=game2048-api
+
+# --- Güvenlik sertleştirmesi (systemd sandbox) ---
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# Yalnızca DB dizinine yazabilsin:
+ReadWritePaths=/var/lib/game2048-api
+
+[Install]
+WantedBy=multi-user.target

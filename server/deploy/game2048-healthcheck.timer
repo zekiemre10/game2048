@@ -1,0 +1,9 @@
+[Unit]
+Description=2048 API sağlık kontrolünü ~5 dakikada bir çalıştır
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target

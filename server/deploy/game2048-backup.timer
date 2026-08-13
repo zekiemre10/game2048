@@ -1,0 +1,11 @@
+[Unit]
+Description=2048 app.db yedeğini her gün çalıştır
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+# Sunucu o saatte kapalıysa açılınca kaçırılan çalıştırmayı yap.
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,9 @@
+[Unit]
+Description=2048 app.db bakımı (integrity_check + VACUUM)
+
+[Service]
+Type=oneshot
+User=game2048
+Group=game2048
+Environment=GAME2048_DB=/var/lib/game2048-api/app.db
+ExecStart=/opt/game2048-api/deploy/maintenance.sh

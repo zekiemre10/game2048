@@ -1,0 +1,10 @@
+[Unit]
+Description=2048 API sağlık kontrolü (/health)
+
+[Service]
+Type=oneshot
+# root: başarısızlıkta systemctl restart edebilmek için (asılı süreç kurtarma).
+Environment=GAME2048_HEALTH_URL=http://127.0.0.1:8092/health
+Environment=GAME2048_SERVICE=game2048-api
+# Bildirim için (isteğe bağlı): Environment=GAME2048_ALERT_WEBHOOK=https://...
+ExecStart=/opt/game2048-api/deploy/healthcheck.sh

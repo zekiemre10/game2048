@@ -1,0 +1,11 @@
+[Unit]
+Description=2048 app.db yedeği (SQLite .backup)
+
+[Service]
+Type=oneshot
+User=game2048
+Group=game2048
+Environment=GAME2048_DB=/var/lib/game2048-api/app.db
+Environment=GAME2048_BACKUP_DIR=/var/backups/game2048-api
+Environment=GAME2048_BACKUP_RETENTION=14
+ExecStart=/opt/game2048-api/deploy/backup.sh

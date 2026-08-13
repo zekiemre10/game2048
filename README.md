@@ -356,6 +356,8 @@ python3 server/test_submit_integration.py
 python3 server/test_sync_merge.py
 # Backend sertleştirme: CORS + hız sınırları + içerik filtresi + report + hata
 python3 server/test_hardening.py
+# Yedekten geri dönme: sıcak yedek → veri kaybı → geri yükle → veri sağlam
+python3 server/test_backup_restore.py
 # Oda skoru doğrulaması: uydurma reddi + meşru kabul + canlı sıralama
 python3 server/test_rooms_progress_verify.py
 # Sunucu botu: bot sunucuda koşuyor + skor manipüle edilemez
@@ -371,6 +373,11 @@ npm run check:i18n
 ```bash
 python3 server/app.py     # 127.0.0.1:8092 (GAME2048_PORT ile değiştirilebilir)
 ```
+
+**Dağıtım (sunucu):** systemd servisi (otomatik başlatma + çökünce yeniden
+başlatma), nginx yapılandırması, otomatik SQLite yedekleme + geri yükleme, bakım
+(VACUUM) ve sağlık kontrolü — tümü [`server/deploy/`](server/deploy/) altında,
+adımlar [`server/deploy/README.md`](server/deploy/README.md)'de.
 
 **Mimari not:** Oyun mantığı (`logic/`) Angular'dan tamamen bağımsızdır —
 saf fonksiyonlar, girdiyi değiştirmez. Bu sayede hızlı ve güvenilir test edilir.

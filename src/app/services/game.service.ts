@@ -3,6 +3,7 @@ import { EconomyService } from './economy.service';
 import { MissionsService } from './missions.service';
 import { ProfileService } from './profile.service';
 import { AchievementsService, AchievementStats } from './achievements.service';
+import { RewardsService } from './rewards.service';
 import {
   BOARD_SIZE,
   Cell,
@@ -31,22 +32,15 @@ import { DAILY_DURATION, dailySeed, utcDayKey } from '../logic/daily-challenge';
 export type CelebrationKind = 'win' | 'level' | 'achievement';
 import { MAX_LEVEL, levelConfig } from '../models/level.model';
 import { PowerId, PowerInventory, emptyInventory, powerDef } from '../models/power.model';
-import { dayKey, streakAfterActivity, yesterdayKey } from '../logic/daily';
-import { DAILY_REWARDS, DailyReward, cycleDay, rewardForStreak } from '../logic/daily-rewards';
 import { MissionMetric, MissionProgress } from '../models/mission.model';
 import {
   AVATARS,
   loadAssistant,
-  loadDailyDay,
   loadPowers,
   loadRewardedLevels,
-  loadStreak,
-  loadStreakDay,
   saveAssistant,
-  saveDailyDay,
   savePowers,
   saveRewardedLevels,
-  saveStreak,
 } from './game-storage';
 
 /** Avatar listesi kalıcılık katmanında; eski içe aktarımlar için yeniden dışa aç. */
@@ -103,6 +97,9 @@ export class GameService {
 
   /** Başarımlar ayrı serviste; koşul verisi çekirdekten geçer (façade). */
   private readonly achievements = inject(AchievementsService);
+
+  /** Gün serisi + günlük ödül durumu ayrı serviste (façade). */
+  private readonly rewards = inject(RewardsService);
 
   /** Taşlara benzersiz id vermek için artan sayaç. */
   private nextId = 1;
@@ -194,16 +191,11 @@ export class GameService {
   /** Toplam yapılan hamle. */
   readonly totalMoves = this.profile.totalMoves;
 
-  /** Anlık gün serisi. */
-  readonly currentStreak = signal<number>(loadStreak('current'));
-  /** En yüksek seri. */
-  readonly bestStreak = signal<number>(loadStreak('best'));
-  private lastActiveDay = signal<string | null>(loadStreakDay());
-
-  /** Günlük ödülün son alındığı gün. */
-  private lastRewardDay = signal<string | null>(loadDailyDay());
+  /** Gün serisi + günlük ödül durumu RewardsService'te; buradan delege. */
+  readonly currentStreak = this.rewards.currentStreak;
+  readonly bestStreak = this.rewards.bestStreak;
   /** Son günlük ödül miktarı (UI gösterimi için). */
-  readonly lastDailyReward = signal<number>(0);
+  readonly lastDailyReward = this.rewards.lastDailyReward;
 
   /** Açılmış başarım id'leri. */
   readonly unlockedAchievements = this.achievements.unlocked;
@@ -220,8 +212,8 @@ export class GameService {
   /** Kazanma yüzdesi (0-100) — ProfileService'te. */
   readonly winRate = this.profile.winRate;
 
-  /** Bugün günlük ödül alınabilir mi? */
-  readonly canClaimDaily = computed<boolean>(() => this.lastRewardDay() !== dayKey(new Date()));
+  /** Bugün günlük ödül alınabilir mi? (RewardsService'te) */
+  readonly canClaimDaily = this.rewards.canClaimDaily;
 
   /** (Seviye modu) anlık seviyenin hedef karesi. */
   readonly levelTarget = computed<number>(() => levelConfig(this.level()).target);
@@ -1115,30 +1107,25 @@ export class GameService {
     this.profile.persist();
   }
 
-  /** Oyun başlangıcında günün aktivitesini kaydeder (seri). */
+  /**
+   * Oyun başlangıcında günün aktivitesini kaydeder (RewardsService seriyi
+   * ilerletir); ardından seri-başarımlarını kontrol eder (orkestrasyon).
+   */
   private registerActivity(): void {
-    const now = new Date();
-    const today = dayKey(now);
-    const yesterday = yesterdayKey(now);
-    const next = streakAfterActivity(this.currentStreak(), this.lastActiveDay(), today, yesterday);
-    this.currentStreak.set(next);
-    if (next > this.bestStreak()) this.bestStreak.set(next);
-    this.lastActiveDay.set(today);
-    saveStreak(this.currentStreak(), this.bestStreak(), today);
+    this.rewards.registerActivity();
     this.checkAchievements();
   }
 
   /**
-   * Günlük ödülü alır (günde bir kez). Seriye göre altın verir.
+   * Günlük ödülü alır (günde bir kez). Seri + ödül durumunu RewardsService
+   * işler; altın/güç envantere ekleme, seri-başarımı ve kutlama çekirdekte.
    * @returns ödül alındıysa true.
    */
   claimDailyReward(): boolean {
-    const today = dayKey(new Date());
-    if (this.lastRewardDay() === today) return false; // bugün alınmış
+    const reward = this.rewards.claimDaily();
+    if (!reward) return false; // bugün alınmış
 
-    this.registerActivity(); // seriyi güncelle
-    // 7 günlük döngü: seri sürdükçe ödül büyür, aralarda güç gelir.
-    const reward = rewardForStreak(this.currentStreak());
+    this.checkAchievements(); // seri güncellendi → seri başarımları
     if (reward.gold > 0) this.addGold(reward.gold);
     if (reward.power) {
       this.powers.update((inv) => ({
@@ -1147,16 +1134,12 @@ export class GameService {
       }));
       savePowers(this.powers());
     }
-    this.lastRewardDay.set(today);
-    this.lastDailyReward.set(reward.gold);
-    this.claimedReward.set(reward);
-    saveDailyDay(today);
     this.celebrate('achievement'); // ödül alındı 🎉
     return true;
   }
 
-  /** Bugün alınan ödülün ayrıntısı (arayüzde "ne kazandın" için). */
-  readonly claimedReward = signal<DailyReward | null>(null);
+  /** Bugün alınan ödülün ayrıntısı (RewardsService'te). */
+  readonly claimedReward = this.rewards.claimedReward;
 
   /**
    * Ay sonu şampiyonluk ödülünü envantere ekler.
@@ -1188,17 +1171,10 @@ export class GameService {
    * Ödül henüz alınmadıysa, alınınca serinin NE OLACAĞI hesaplanır —
    * böylece takvim doğru günü vurgular (seri kırıldıysa 1'e döner).
    */
-  readonly rewardCycleDay = computed(() => {
-    const now = new Date();
-    const today = dayKey(now);
-    const streak = this.canClaimDaily()
-      ? streakAfterActivity(this.currentStreak(), this.lastActiveDay(), today, yesterdayKey(now))
-      : this.currentStreak();
-    return cycleDay(Math.max(1, streak));
-  });
+  readonly rewardCycleDay = this.rewards.rewardCycleDay;
 
-  /** 7 günlük ödül takvimi (arayüzde gösterilir). */
-  readonly rewardCalendar = DAILY_REWARDS;
+  /** 7 günlük ödül takvimi (RewardsService'te). */
+  readonly rewardCalendar = this.rewards.rewardCalendar;
 
   /** Oyun sonunda istatistikleri günceller (istatistik ProfileService'te). */
   private recordGameEnd(won: boolean): void {

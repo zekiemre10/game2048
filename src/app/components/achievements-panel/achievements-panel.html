@@ -1,0 +1,46 @@
+<div class="settings-backdrop" (click)="close.emit()">
+  <div
+    class="settings-panel"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="t('prof.achievements')"
+    (click)="$event.stopPropagation()"
+  >
+    <h2 class="settings-title">
+      {{ t('prof.achievements') }} ({{ achUnlockedCount() }}/{{ achTotalCount }})
+    </h2>
+    <p class="settings-note">{{ t('ach.note') }}</p>
+
+    <div class="profile-ach-grid">
+      @for (a of ACHIEVEMENTS; track a.id) {
+        <div class="ach-row" [class.locked]="!isAchievementUnlocked(a.id)">
+          <span class="ach-icon">{{ a.icon }}</span>
+          <div class="ach-info">
+            <div class="ach-top">
+              <span class="ach-name">{{ L(a.name, a.nameEn) }}</span>
+              @if (isAchievementUnlocked(a.id)) {
+                <span class="ach-badge done">{{ t('store.unlocked') }}</span>
+              } @else {
+                <span class="ach-badge">💰 {{ a.gold }}</span>
+              }
+            </div>
+            <div class="ach-desc">{{ L(a.desc, a.descEn) }}</div>
+            <!-- Kilitliyse ne kadar yaklaştığını göster -->
+            @if (!isAchievementUnlocked(a.id)) {
+              <div class="mission-bar">
+                <span class="mission-fill" [style.width.%]="achPercent(a.id)"></span>
+              </div>
+              <div class="ach-prog">
+                {{ achProgress(a.id).current }} / {{ achProgress(a.id).target }}
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <button class="btn-primary settings-close" type="button" (click)="close.emit()">
+      {{ t('btn.close') }}
+    </button>
+  </div>
+</div>

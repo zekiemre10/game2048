@@ -1,0 +1,196 @@
+<div class="settings-backdrop" (click)="close.emit()">
+  <div
+    class="settings-panel mp-panel"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="t('mp.title')"
+    (click)="$event.stopPropagation()"
+  >
+    <h2 class="settings-title">{{ t('mp.title') }}</h2>
+
+    @if (!authUser()) {
+      <p class="settings-note">{{ t('mp.loginNeeded') }}</p>
+      <button class="btn-primary" type="button" (click)="onMpLogin()">
+        {{ t('fr.loginCta') }}
+      </button>
+    } @else if (mpRoom(); as room) {
+      <!-- Oda içi: lobi / yarış / sonuç -->
+      <div class="mp-code-box">
+        <span class="mp-code-label">{{ t('mp.roomCode') }}</span>
+        <div class="mp-code-row">
+          <strong class="mp-code">{{ room.code }}</strong>
+          <button class="friend-btn add" type="button" (click)="onCopyCode()">
+            {{ mpCopied() ? t('mp.copied') : t('mp.copy') }}
+          </button>
+        </div>
+        @if (room.status === 'lobby') {
+          <span class="mp-code-hint">{{ t('mp.share') }}</span>
+        }
+      </div>
+
+      @if (room.status === 'finished') {
+        <div class="mp-result">
+          <h3 class="mp-result-title">{{ t('mp.finished') }}</h3>
+          @if (mpWinner(); as w) {
+            <p class="mp-winner">
+              {{ t('mp.winner') }} {{ w.isBot ? '' : '👤 ' }}{{ mpPlayerName(w) }} — {{ w.score }}
+            </p>
+          }
+        </div>
+      } @else if (room.status === 'lobby') {
+        <p class="settings-note">{{ t('mp.waiting') }}</p>
+      }
+
+      <!-- Oyuncu listesi / sıralama -->
+      <h3 class="settings-heading">
+        @if (room.status === 'lobby') {
+          {{ t('mp.players') }} ({{ mpPlayers().length }})
+        } @else {
+          {{ t('mp.leaderboard') }}
+        }
+      </h3>
+      <div class="mp-players">
+        @for (p of mpPlayers(); track p.id; let i = $index) {
+          <div class="mp-player" [class.me]="isMe(p.id)">
+            @if (room.status !== 'lobby') {
+              <span class="mp-rank">{{ i + 1 }}</span>
+            }
+            <span class="mp-pname">
+              {{ p.isBot ? '' : '👤 ' }}{{ mpPlayerName(p) }}
+              @if (isMe(p.id)) {
+                <em>{{ t('mp.you') }}</em>
+              }
+              @if (p.id === room.hostId) {
+                <span class="mp-hosttag">{{ t('mp.host') }}</span>
+              }
+            </span>
+            @if (room.status !== 'lobby') {
+              <span class="mp-score">{{ p.score }}</span>
+              @if (p.done) {
+                <span class="mp-done">{{ t('mp.done') }}</span>
+              }
+            } @else if (p.isBot && mpIsHost()) {
+              <button
+                class="friend-btn ghost mp-botremove"
+                type="button"
+                (click)="onRemoveBot(p.id)"
+              >
+                ✕
+              </button>
+            }
+          </div>
+        }
+      </div>
+
+      @if (mpError()) {
+        <p class="auth-error">{{ t(mpError()) }}</p>
+      }
+
+      <!-- Host: bot ekle (lobide) — 4 kademe, her biri ölçülmüş güç gösterir -->
+      @if (room.status === 'lobby' && mpIsHost()) {
+        <div class="mp-addbots">
+          <span class="mp-addbots-label">{{ t('mp.addBot') }}</span>
+          <div class="mp-botlevels">
+            <button type="button" class="mp-botlevel lvl-easy" (click)="onAddBot('easy')">
+              <span class="mp-botlevel-name">{{ t('mp.botEasy') }}</span>
+              <span class="mp-botlevel-str">{{ t('mp.botEasyStr') }}</span>
+              <span class="mp-botlevel-bar"><i style="width: 5%"></i></span>
+            </button>
+            <button type="button" class="mp-botlevel lvl-medium" (click)="onAddBot('medium')">
+              <span class="mp-botlevel-name">{{ t('mp.botMedium') }}</span>
+              <span class="mp-botlevel-str">{{ t('mp.botMediumStr') }}</span>
+              <span class="mp-botlevel-bar"><i style="width: 33%"></i></span>
+            </button>
+            <button type="button" class="mp-botlevel lvl-hard" (click)="onAddBot('hard')">
+              <span class="mp-botlevel-name">{{ t('mp.botHard') }}</span>
+              <span class="mp-botlevel-str">{{ t('mp.botHardStr') }}</span>
+              <span class="mp-botlevel-bar"><i style="width: 70%"></i></span>
+            </button>
+            <button type="button" class="mp-botlevel lvl-expert" (click)="onAddBot('expert')">
+              <span class="mp-botlevel-name">{{ t('mp.botExpert') }}</span>
+              <span class="mp-botlevel-str">{{ t('mp.botExpertStr') }}</span>
+              <span class="mp-botlevel-bar"><i style="width: 98%"></i></span>
+            </button>
+          </div>
+          <p class="mp-botstrength-hint">{{ t('mp.botStrengthHint') }}</p>
+        </div>
+      }
+
+      <!-- Host: başlat (lobide) -->
+      @if (room.status === 'lobby' && mpIsHost()) {
+        <button
+          class="btn-primary"
+          type="button"
+          [disabled]="mpPlayers().length < 2 || mpBusy()"
+          (click)="onStartRace()"
+        >
+          {{ t('mp.startRace') }}
+        </button>
+        @if (mpPlayers().length < 2) {
+          <p class="mp-hint">{{ t('mp.needTwo') }}</p>
+        }
+      }
+
+      <button class="btn-primary ghost" type="button" (click)="onLeaveRoom()">
+        {{ t('mp.leave') }}
+      </button>
+    } @else {
+      <!-- Oda yok: kur / katıl -->
+      <p class="settings-note">{{ t('mp.intro') }}</p>
+      @if (mpNotice()) {
+        <p class="auth-error">{{ t(mpNotice()) }}</p>
+      }
+
+      <section class="settings-section">
+        <h3 class="settings-heading">{{ t('mp.duration') }}</h3>
+        <div class="lang-choice">
+          <button type="button" [class.active]="mpDuration() === 120" (click)="setMpDuration(120)">
+            {{ t('mp.min2') }}
+          </button>
+          <button type="button" [class.active]="mpDuration() === 180" (click)="setMpDuration(180)">
+            {{ t('mp.min3') }}
+          </button>
+          <button type="button" [class.active]="mpDuration() === 300" (click)="setMpDuration(300)">
+            {{ t('mp.min5') }}
+          </button>
+        </div>
+        <button
+          class="btn-primary mp-create"
+          type="button"
+          [disabled]="mpBusy()"
+          (click)="onCreateRoom()"
+        >
+          {{ t('mp.create') }}
+        </button>
+      </section>
+
+      <section class="settings-section">
+        <h3 class="settings-heading">{{ t('mp.joinLabel') }}</h3>
+        <form class="mp-join" (submit)="$event.preventDefault(); onJoinRoom()">
+          <input
+            type="text"
+            maxlength="6"
+            [value]="mpJoinCode()"
+            (input)="onMpCodeInput($event)"
+            [placeholder]="t('mp.codePlaceholder')"
+            [attr.aria-label]="t('mp.codePlaceholder')"
+          />
+          <button
+            class="btn-primary"
+            type="submit"
+            [disabled]="mpBusy() || mpJoinCode().trim().length < 4"
+          >
+            {{ t('mp.join') }}
+          </button>
+        </form>
+        @if (mpError()) {
+          <p class="auth-error">{{ t(mpError()) }}</p>
+        }
+      </section>
+    }
+
+    <button class="btn-primary ghost settings-close" type="button" (click)="close.emit()">
+      {{ t('btn.close') }}
+    </button>
+  </div>
+</div>

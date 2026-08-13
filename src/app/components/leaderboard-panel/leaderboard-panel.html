@@ -1,0 +1,113 @@
+<div class="settings-backdrop" (click)="close.emit()">
+  <div
+    class="settings-panel"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="t('nav.leaderboard')"
+    (click)="$event.stopPropagation()"
+  >
+    <h2 class="settings-title">{{ t('lb.title') }}</h2>
+
+    <!-- Şampiyonluk ödülü bekliyorsa en üstte göster -->
+    @if (lbPrize(); as prize) {
+      <div class="lb-prize">
+        <span class="lb-prize-title">
+          🏆 {{ t('lb.wonTitle') }} — {{ monthLabel(prize.month) }}
+        </span>
+        <span class="lb-prize-detail"> 💰 {{ prize.gold }} · {{ t('lb.prizePowers') }} </span>
+        <button
+          class="btn-primary lb-prize-btn"
+          type="button"
+          [disabled]="claimingPrize()"
+          (click)="onClaimPrize()"
+        >
+          {{ t('lb.claimPrize') }}
+        </button>
+      </div>
+    }
+
+    <!-- Kapsam: bu ay / tüm zamanlar / arkadaşlar -->
+    <div class="lb-tabs three">
+      <button
+        type="button"
+        [class.active]="lbScope() === 'monthly'"
+        (click)="onLeaderboardScope('monthly')"
+      >
+        {{ t('lb.monthly') }}
+      </button>
+      <button
+        type="button"
+        [class.active]="lbScope() === 'global'"
+        (click)="onLeaderboardScope('global')"
+      >
+        {{ t('lb.global') }}
+      </button>
+      <button
+        type="button"
+        [class.active]="lbScope() === 'friends'"
+        (click)="onLeaderboardScope('friends')"
+      >
+        {{ t('lb.friends') }}
+      </button>
+    </div>
+
+    @if (lbScope() === 'monthly') {
+      <div class="lb-month-bar">
+        <span class="lb-month">📅 {{ monthLabel(lbMonth()) }}</span>
+        <span class="lb-countdown">⏳ {{ daysLeftInMonth() }} {{ t('lb.daysLeft') }}</span>
+      </div>
+      <!-- Ödülün NE ZAMAN geleceği açıkça yazsın -->
+      <p class="lb-prize-info">
+        🏆 {{ t('lb.prizeInfo') }}
+        @if (lbMyRow(); as mine) {
+          <strong class="lb-standing">
+            {{ mine.rank === 1 ? t('lb.youAreFirst') : t('lb.yourRank') + ' ' + mine.rank }}
+          </strong>
+        }
+      </p>
+    }
+
+    @if (lbError()) {
+      <p class="friend-error">{{ t(lbError()) }}</p>
+      @if (!authUser()) {
+        <button class="btn-primary account-cta" type="button" (click)="openAuth.emit()">
+          {{ t('auth.signInCta') }}
+        </button>
+      }
+    } @else if (lbLoading()) {
+      <p class="friend-muted">{{ t('lb.loading') }}</p>
+    } @else if (lbRows().length === 0) {
+      <p class="friend-muted">{{ t('lb.empty') }}</p>
+    } @else {
+      <div class="lb-list">
+        @for (r of lbRows(); track r.id) {
+          <div class="lb-row" [class.me]="r.id === authUser()?.id">
+            <span class="lb-rank" [class]="'m' + r.rank">{{ medalFor(r.rank) }}</span>
+            <span class="lb-name">{{ r.username }}</span>
+            <span class="lb-tile">{{ r.bestTile }}</span>
+            <span class="lb-score">{{ r.bestScore }}</span>
+          </div>
+        }
+      </div>
+
+      <!-- Kendi sıram (ilk 50'de değilsem de görünür) -->
+      @if (lbMyRow(); as mine) {
+        @if (!lbInTop()) {
+          <div class="lb-row me lb-mine">
+            <span class="lb-rank">{{ mine.rank }}.</span>
+            <span class="lb-name">{{ mine.username }}</span>
+            <span class="lb-tile">{{ mine.bestTile }}</span>
+            <span class="lb-score">{{ mine.bestScore }}</span>
+          </div>
+        }
+      }
+      <p class="settings-note lb-note">
+        {{ lbScope() === 'monthly' ? t('lb.monthlyNote') : t('lb.note') }}
+      </p>
+    }
+
+    <button class="btn-primary settings-close" type="button" (click)="close.emit()">
+      {{ t('btn.close') }}
+    </button>
+  </div>
+</div>

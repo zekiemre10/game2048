@@ -1,0 +1,94 @@
+// Panel chrome + geri bildirim (.friend-muted/.friend-error) + eylem düğmesi
+// (.friend-btn) global _panels.scss'ten gelir. Buradakiler arkadaşlar paneline özel.
+
+.friends-panel {
+  text-align: left;
+}
+
+.friend-search input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border, rgba(128, 128, 128, 0.35));
+  background: var(--panel-input-bg, rgba(128, 128, 128, 0.08));
+  color: inherit;
+  font: inherit;
+  font-size: 1rem;
+
+  &:focus-visible {
+    outline: 2px solid var(--accent, #8f7a66);
+    outline-offset: 1px;
+  }
+}
+
+.friend-results {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.friend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.friend-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 10px;
+  background: var(--panel-input-bg, rgba(128, 128, 128, 0.08));
+}
+
+.friend-avatar {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.friend-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.friend-name {
+  flex: 1;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.friend-info .friend-name {
+  flex: none;
+}
+
+.friend-stats {
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+
+.friend-tag {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  opacity: 0.65;
+  font-style: italic;
+}
+
+.friend-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e8503a;
+  border: 2px solid var(--panel-bg, #fff);
+}

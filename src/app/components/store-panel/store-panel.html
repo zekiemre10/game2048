@@ -1,0 +1,91 @@
+<div class="settings-backdrop" (click)="close.emit()">
+  <div
+    class="settings-panel store-panel"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="t('nav.store')"
+    (click)="$event.stopPropagation()"
+  >
+    <div class="store-top">
+      <h2 class="settings-title">{{ t('store.title') }}</h2>
+      <div class="store-gold-pill">💰 {{ gold() }}</div>
+    </div>
+
+    <!-- Sekmeler -->
+    <div class="store-tabs">
+      <button
+        type="button"
+        [class.active]="storeTab() === 'themes'"
+        (click)="setStoreTab('themes')"
+      >
+        {{ t('store.tabThemes') }}
+      </button>
+      <button
+        type="button"
+        [class.active]="storeTab() === 'powers'"
+        (click)="setStoreTab('powers')"
+      >
+        {{ t('store.tabPowers') }}
+      </button>
+    </div>
+
+    <div class="store-grid">
+      @switch (storeTab()) {
+        <!-- TEMALAR (yalnızca satın alınabilir; Açık/Koyu Ayarlar'da) -->
+        @case ('themes') {
+          @for (th of THEMES; track th.id) {
+            @if (th.price > 0) {
+              <div class="store-card" [class.active]="theme() === th.id">
+                <span class="card-swatch" [style.background]="themeGradient(th.swatch)"></span>
+                <span class="card-name">{{ L(th.name, th.nameEn) }}</span>
+                @if (theme() === th.id) {
+                  <span class="card-badge used">{{ t('store.used') }}</span>
+                } @else if (isThemeOwned(th.id)) {
+                  <button class="card-btn" type="button" (click)="onSelectTheme(th.id)">
+                    {{ t('store.select') }}
+                  </button>
+                } @else {
+                  <button
+                    class="card-btn buy"
+                    type="button"
+                    [disabled]="gold() < th.price"
+                    (click)="onBuyTheme(th.id)"
+                  >
+                    💰 {{ th.price }}
+                  </button>
+                }
+              </div>
+            }
+          }
+        }
+        <!-- GÜÇLER -->
+        @case ('powers') {
+          @for (p of POWERS; track p.id) {
+            <div class="store-card">
+              <span class="card-icon">{{ p.icon }}</span>
+              <span class="card-name">
+                {{ L(p.name, p.nameEn) }}
+                @if (powers()[p.id] > 0) {
+                  <span class="card-owned">×{{ powers()[p.id] }}</span>
+                }
+              </span>
+              <span class="card-desc">{{ L(p.desc, p.descEn) }}</span>
+              <button
+                class="card-btn buy"
+                type="button"
+                [disabled]="!canAfford(p.id)"
+                (click)="onBuyPower(p.id)"
+              >
+                💰 {{ p.price }}
+              </button>
+            </div>
+          }
+        }
+      }
+    </div>
+
+    <button class="btn-primary settings-close" type="button" (click)="close.emit()">
+      {{ t('btn.close') }}
+    </button>
+  </div>
+</div>

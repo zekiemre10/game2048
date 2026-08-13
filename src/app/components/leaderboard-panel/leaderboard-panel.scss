@@ -1,0 +1,112 @@
+@use '../../../styles/variables' as v;
+
+// Panel chrome + sıralama satırları (.lb-list/.lb-row/.lb-rank/.lb-name/.lb-tile/
+// .lb-score) + geri bildirim (.friend-*) + giriş çağrısı (.account-cta) global
+// _panels.scss'ten gelir. Buradakiler skor tablosuna özel.
+
+// Şampiyonluk ödülü bildirimi (ay sonu 1.'si için)
+.lb-prize {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.8rem;
+  padding: 0.7rem;
+  border-radius: v.$radius-md;
+  background: linear-gradient(135deg, #f6c945, #f0a020);
+  color: #5a3d00;
+  text-align: center;
+}
+
+.lb-prize-title {
+  font-weight: 800;
+  font-size: 0.98rem;
+}
+
+.lb-prize-detail {
+  font-size: 0.85rem;
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+.lb-prize-btn {
+  width: 100%;
+  background: #5a3d00;
+  color: #ffe9a8;
+}
+
+// Aylık sekme: ay adı + geri sayım satırı
+.lb-month-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: -0.3rem 0 0.4rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.lb-month {
+  opacity: 0.85;
+}
+
+.lb-countdown {
+  color: #d99b2b;
+}
+
+.lb-prize-info {
+  margin: 0 0 0.7rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: v.$radius-md;
+  background: var(--color-cell-empty);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.lb-standing {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--color-button);
+}
+
+.lb-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  margin-bottom: 0.8rem;
+
+  // Üç sekmeli hâli (Bu Ay / Tüm Zamanlar / Arkadaşlar)
+  &.three {
+    grid-template-columns: repeat(3, 1fr);
+
+    button {
+      font-size: 0.78rem;
+      padding: 0.45rem 0.25rem;
+    }
+  }
+
+  button {
+    padding: 0.45rem 0.5rem;
+    border-radius: v.$radius-md;
+    background: var(--color-cell-empty);
+    color: var(--color-text);
+    font-weight: 700;
+    font-size: 0.88rem;
+    transition: all v.$transition-fast;
+
+    &.active {
+      background: var(--color-button);
+      color: var(--color-text-light);
+    }
+  }
+}
+
+// Kendi sıram listede yoksa altta ayrıca gösterilir
+.lb-mine {
+  margin-top: 0.5rem;
+  border-top: 2px dashed var(--color-cell-empty);
+}
+
+.lb-note {
+  margin-top: 0.2rem;
+}

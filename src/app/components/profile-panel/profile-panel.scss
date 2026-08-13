@@ -1,0 +1,292 @@
+@use '../../../styles/variables' as v;
+
+// Panel chrome + ilerleme çubuğu (.mission-bar) + giriş çağrısı (.account-cta)
+// global _panels.scss'ten gelir. Buradakiler profile özel.
+
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.profile-head-avatar {
+  font-size: 1.8rem;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-cell-empty);
+  border-radius: 50%;
+  position: relative;
+  cursor: pointer;
+  transition: transform v.$transition-fast;
+
+  &:hover {
+    transform: scale(1.06);
+  }
+}
+
+.avatar-edit {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  font-size: 0.7rem;
+  background: var(--color-board);
+  border-radius: 50%;
+  padding: 2px;
+  line-height: 1;
+}
+
+.profile-head-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.profile-head-name {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-head-hint {
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+
+// Ünvan (rütbe) rozeti + ilerlemesi
+.rank-badge {
+  align-self: flex-start;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  background: var(--color-button);
+  color: var(--color-text-light);
+}
+
+.rank-progress {
+  margin-bottom: 0.85rem;
+}
+
+.rank-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  margin-bottom: 0.25rem;
+  opacity: 0.85;
+}
+
+.rank-now {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.rank-next {
+  text-align: right;
+}
+
+// Ay sonu şampiyonluk rozeti
+.champ-badge {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f6c945, #f0a020);
+  color: #5a3d00;
+}
+
+// Avatar seçici
+.avatar-picker {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 0.3rem;
+  margin-bottom: 0.85rem;
+  padding: 0.5rem;
+  border-radius: v.$radius-md;
+  background: var(--color-cell-empty);
+}
+
+.avatar-option {
+  aspect-ratio: 1;
+  font-size: 1.25rem;
+  border-radius: v.$radius-sm;
+  background: transparent;
+  transition: transform v.$transition-fast;
+
+  &:hover {
+    transform: scale(1.15);
+  }
+
+  &.selected {
+    background: var(--color-button);
+    box-shadow: 0 0 0 2px var(--color-button);
+  }
+}
+
+@media (max-width: 430px) {
+  .avatar-picker {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+// 7 günlük ödül takvimi
+.reward-week {
+  display: grid;
+  // 7 gün: 4 + 3 dizilir (7. gün geniş vurgu alır)
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.35rem;
+  margin-bottom: 0.7rem;
+}
+
+.rw-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.4rem 0.2rem;
+  border-radius: v.$radius-md;
+  background: var(--color-cell-empty);
+  text-align: center;
+
+  // Alınmış günler soluk + tikli
+  &.claimed {
+    opacity: 0.55;
+  }
+
+  // Bugünün ödülü vurgulu
+  &.today {
+    background: var(--color-button);
+    color: var(--color-text-light);
+    box-shadow: 0 0 0 2px var(--color-button);
+  }
+
+  // 7. gün büyük ödül — son sırada tüm genişliği alır
+  &.big {
+    grid-column: span 4;
+    flex-direction: row;
+    justify-content: center;
+    gap: 0.5rem;
+    background: linear-gradient(135deg, #f6c945, #f0a020);
+    color: #5a3d00;
+
+    &.today {
+      box-shadow: 0 0 0 2px #f0a020;
+    }
+  }
+}
+
+.rw-num {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  opacity: 0.8;
+}
+
+.rw-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.rw-amount {
+  font-size: 0.72rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.rw-power {
+  font-size: 0.72rem;
+}
+
+.rw-tick {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #3fa96b;
+}
+
+// Günlük ödül al / alındı
+.daily-btn {
+  width: 100%;
+  margin-bottom: 0.75rem;
+  background: #f6c945;
+  color: #6b4e00;
+}
+
+.daily-done {
+  text-align: center;
+  padding: 0.5rem;
+  margin-bottom: 0.75rem;
+  color: var(--color-text);
+  opacity: 0.75;
+  font-size: 0.9rem;
+}
+
+// Bugün ne kazanıldığı ("alındı" satırında)
+.daily-got {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-weight: 800;
+}
+
+// İstatistik ızgarası
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.pstat {
+  background: var(--color-cell-empty);
+  border-radius: v.$radius-md;
+  padding: 0.5rem 0.25rem;
+  text-align: center;
+
+  // En iyi skor: profilin başlık sayısı, öne çıksın
+  &.highlight {
+    background: var(--color-button);
+
+    strong,
+    span {
+      color: var(--color-text-light);
+      opacity: 1;
+    }
+  }
+
+  strong {
+    display: block;
+    font-size: 1.2rem;
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  span {
+    font-size: 0.62rem;
+    letter-spacing: 0.5px;
+    opacity: 0.7;
+    color: var(--color-text);
+  }
+}
+
+.account-box {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--panel-border, rgba(128, 128, 128, 0.25));
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}

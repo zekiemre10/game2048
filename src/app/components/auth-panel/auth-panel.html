@@ -1,0 +1,89 @@
+<div class="settings-backdrop" (click)="close.emit()">
+  <div
+    class="settings-panel auth-panel"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="t('auth.title')"
+    (click)="$event.stopPropagation()"
+  >
+    <h2 class="settings-title">{{ t('auth.title') }}</h2>
+    <p class="settings-note">{{ t('auth.note') }}</p>
+
+    <!-- Giriş / Kayıt sekmeleri -->
+    <div class="store-tabs auth-tabs">
+      <button type="button" [class.active]="authTab() === 'login'" (click)="setAuthTab('login')">
+        {{ t('auth.login') }}
+      </button>
+      <button
+        type="button"
+        [class.active]="authTab() === 'register'"
+        (click)="setAuthTab('register')"
+      >
+        {{ t('auth.register') }}
+      </button>
+    </div>
+
+    <form class="auth-form" (submit)="$event.preventDefault(); onAuthSubmit()">
+      <label class="auth-field">
+        <span>{{ t('auth.username') }}</span>
+        <input
+          type="text"
+          autocomplete="username"
+          maxlength="20"
+          [value]="authName()"
+          (input)="onAuthNameInput($event)"
+        />
+      </label>
+      @if (authTab() === 'register') {
+        <label class="auth-field">
+          <span>{{ t('auth.email') }}</span>
+          <input
+            type="email"
+            autocomplete="email"
+            inputmode="email"
+            placeholder="ornek@mail.com"
+            [value]="authEmail()"
+            (input)="onAuthEmailInput($event)"
+          />
+        </label>
+      }
+      <label class="auth-field">
+        <span>{{ t('auth.password') }}</span>
+        <input
+          type="password"
+          [attr.minlength]="authTab() === 'register' ? 6 : null"
+          [attr.autocomplete]="authTab() === 'register' ? 'new-password' : 'current-password'"
+          [value]="authPass()"
+          (input)="onAuthPassInput($event)"
+        />
+      </label>
+
+      @if (authError()) {
+        <p class="auth-error">{{ t(authError()) }}</p>
+      }
+
+      <button class="btn-primary auth-submit" type="submit" [disabled]="authBusy()">
+        @if (authBusy()) {
+          {{ t('auth.working') }}
+        } @else {
+          {{ authTab() === 'register' ? t('auth.register') : t('auth.login') }}
+        }
+      </button>
+    </form>
+
+    <button
+      class="auth-switch"
+      type="button"
+      (click)="setAuthTab(authTab() === 'login' ? 'register' : 'login')"
+    >
+      {{ authTab() === 'login' ? t('auth.noAccount') : t('auth.haveAccount') }}
+    </button>
+
+    <button class="btn-primary home-btn" type="button" (click)="goHome.emit()">
+      🏠 {{ t('nav.home') }}
+    </button>
+    <button class="btn-primary ghost settings-close" type="button" (click)="close.emit()">
+      {{ t('btn.close') }}
+    </button>
+  </div>
+</div>

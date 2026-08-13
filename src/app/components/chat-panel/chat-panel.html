@@ -1,0 +1,62 @@
+@if (activeChat(); as friend) {
+  <div class="settings-backdrop" (click)="close.emit()">
+    <div
+      class="settings-panel chat-panel"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-label]="t('chat.title') + ' — ' + friend.username"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="chat-header">
+        <button class="chat-back" type="button" (click)="close.emit()">
+          {{ t('chat.back') }}
+        </button>
+        <span class="chat-peer">👤 {{ friend.username }}</span>
+      </div>
+
+      <div class="chat-messages">
+        @if (chatMessages().length === 0) {
+          <p class="chat-empty">{{ t('chat.empty') }}</p>
+        } @else {
+          @for (m of chatMessages(); track m.id) {
+            <div class="chat-bubble" [class.mine]="isMine(m)">
+              {{ m.body }}
+            </div>
+          }
+        }
+      </div>
+
+      <!-- Emoji şeridi -->
+      <div class="chat-emojis">
+        @for (e of EMOJIS; track e) {
+          <button
+            type="button"
+            class="chat-emoji"
+            [attr.aria-label]="t('chat.emoji')"
+            (click)="onAddEmoji(e)"
+          >
+            {{ e }}
+          </button>
+        }
+      </div>
+
+      <form class="chat-input" (submit)="$event.preventDefault(); onSendChat()">
+        <input
+          type="text"
+          maxlength="500"
+          [value]="chatDraft()"
+          (input)="onChatInput($event)"
+          [placeholder]="t('chat.placeholder')"
+          [attr.aria-label]="t('chat.placeholder')"
+        />
+        <button
+          class="btn-primary chat-send"
+          type="submit"
+          [disabled]="chatSending() || !chatDraft().trim()"
+        >
+          {{ t('chat.send') }}
+        </button>
+      </form>
+    </div>
+  </div>
+}

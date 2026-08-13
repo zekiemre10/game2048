@@ -1,0 +1,425 @@
+<main class="game">
+  <header class="topbar">
+    <div class="brand-row">
+      <button
+        class="home-back"
+        type="button"
+        [attr.aria-label]="t('nav.home')"
+        [title]="t('nav.home')"
+        (click)="goHome.emit()"
+      >
+        ←
+      </button>
+      <h1 class="brand">2048</h1>
+      <div class="gold-pill" [title]="t('hud.totalGold')">
+        💰 <strong>{{ gold() }}</strong>
+      </div>
+    </div>
+    <div class="scores">
+      <div class="score-box">
+        <span>{{ t('hud.score') }}</span>
+        <strong>{{ score() }}</strong>
+      </div>
+      <div class="score-box best">
+        <span>{{ t('hud.best') }}</span>
+        <strong>{{ bestScore() }}</strong>
+      </div>
+    </div>
+  </header>
+
+  <!--
+    Oyun alanı: geniş ekranda iki sütun (solda büyük tahta, sağda bilgi
+    paneli), dar ekranda tek sütun. Yan panel `display: contents` ile
+    dağıldığından telefonda sıralama eskisi gibi kalır.
+  -->
+  <div class="play-area">
+    <aside class="side-panel">
+      <!-- Seviye modu: seviye + hedef bilgisi -->
+      @if (mode() === GameMode.Level) {
+        <div class="level-bar">
+          <span class="level-badge">{{ t('hud.level') }} {{ level() }}</span>
+          <span class="level-target">
+            {{ t('hud.target') }} <strong>{{ levelTarget() }}</strong>
+          </span>
+        </div>
+      }
+
+      <!-- Süre ve hamle sayacı (oyun alanının üstünde) -->
+      <div class="stats">
+        @if (
+          mode() === GameMode.Level || mode() === GameMode.TimeAttack || mode() === GameMode.Race
+        ) {
+          <!-- Geri sayım (seviye + zaman yarışı + çok oyunculu) -->
+          <div class="stat" [class.low]="lowTime()">
+            <span class="stat-icon" aria-hidden="true">⏳</span>
+            <span class="stat-label">{{ t('hud.remaining') }}</span>
+            <strong class="stat-value">{{ remainingLabel() }}</strong>
+          </div>
+        } @else if (mode() === GameMode.Classic) {
+          <!-- Yukarı sayan süre (klasik) -->
+          <div class="stat">
+            <span class="stat-icon" aria-hidden="true">⏱️</span>
+            <span class="stat-label">{{ t('hud.time') }}</span>
+            <strong class="stat-value">{{ elapsedLabel() }}</strong>
+          </div>
+        }
+        <!-- Zen: süre yok, sadece hamle -->
+        <div class="stat">
+          <span class="stat-icon" aria-hidden="true">🔀</span>
+          <span class="stat-label">{{ t('hud.moves') }}</span>
+          <strong class="stat-value">{{ moves() }}</strong>
+        </div>
+      </div>
+
+      <!-- Bomba hedefleme bandı -->
+      @if (bombMode()) {
+        <div class="bomb-banner">
+          {{ t('bomb.hint') }}
+          <button type="button" class="bomb-cancel" (click)="onCancelBomb()">
+            {{ t('bomb.cancel') }}
+          </button>
+        </div>
+      }
+
+      <!-- Sahip olunan güçler (kullanım çubuğu) -->
+      <!-- Güçler: günlükte KAPALI (herkes aynı koşullarda yarışsın) -->
+      @if (ownedPowers().length > 0 && mode() !== GameMode.Daily) {
+        <div class="power-group">
+          <span class="side-title">{{ t('hud.powers') }}</span>
+          <div class="power-bar">
+            @for (p of ownedPowers(); track p.id) {
+              <button
+                class="power-btn"
+                type="button"
+                [title]="L(p.desc, p.descEn)"
+                [attr.aria-label]="L(p.name, p.nameEn) + ' — ' + L(p.desc, p.descEn)"
+                (click)="onUsePower(p.id)"
+              >
+                <span class="power-icon" aria-hidden="true">{{ p.icon }}</span>
+                <span class="power-name">{{ L(p.name, p.nameEn) }}</span>
+                <span class="power-count">×{{ powers()[p.id] }}</span>
+              </button>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Yarış: canlı sıralama -->
+      @if (mode() === GameMode.Race && mpRoom(); as room) {
+        <div class="race-standings">
+          <span class="race-standings-title">{{ t('mp.leaderboard') }}</span>
+          @for (p of mpPlayers(); track p.id; let i = $index) {
+            <div class="race-row" [class.me]="isMe(p.id)">
+              <span class="race-pos">{{ i + 1 }}.</span>
+              <span class="race-name">{{ mpPlayerName(p) }}</span>
+              <span class="race-pts">{{ p.score }}</span>
+              @if (p.done) {
+                <span class="race-flag">🏁</span>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <!-- YZ: canlı pozisyon göstergesi + son hamlenin kalitesi -->
+      @if (assistantOn() && status() === GameStatus.Playing && !autoplaying()) {
+        <div class="ai-panel">
+          <span class="side-title">{{ t('ai.position') }}</span>
+          <div class="health-row">
+            <span class="health-label" [class]="'h-' + health().level">
+              {{ healthIcon() }} {{ t('ai.health.' + health().level) }}
+            </span>
+            <span class="health-pct">%{{ health().score }}</span>
+          </div>
+          <div class="mission-bar">
+            <span
+              class="mission-fill"
+              [class]="'h-' + health().level"
+              [style.width.%]="health().score"
+            ></span>
+          </div>
+
+          <!-- Son hamlenin YZ değerlendirmesi -->
+          @if (lastMoveReview(); as rev) {
+            <div class="move-review" [class]="'r-' + rev.rating">
+              <span class="review-text">{{ t('ai.rate.' + rev.rating) }}</span>
+              @if (rev.rating !== 'best') {
+                <span class="review-best">{{ arrowFor(rev.best) }}</span>
+              }
+            </div>
+          }
+
+          <!-- Oyun boyunca doğruluk -->
+          @if (ratedMoves() > 0) {
+            <div class="accuracy-row">
+              <span>{{ t('ai.accuracy') }}</span>
+              <strong>%{{ accuracy() }}</strong>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- YZ Asistanı: oyun içi öneri + uyarı -->
+      @if (
+        assistantOn() &&
+        mode() !== GameMode.Race &&
+        status() === GameStatus.Playing &&
+        !autoplaying()
+      ) {
+        <div class="assist-bar">
+          @if (assistantSuggestion(); as dir) {
+            <!-- İstenen öneri: yalnızca bu tahta için, hamle yapınca kaybolur -->
+            <span class="assist-hint">
+              💡 {{ t('assist.suggestion') }}: <strong>{{ arrowFor(dir) }}</strong>
+            </span>
+          } @else if (assistHintsLeft() > 0) {
+            <button class="assist-ask" type="button" (click)="onRequestHint()">
+              {{ t('assist.ask') }} ({{ assistHintsLeft() }}/{{ assistHintQuota }})
+            </button>
+          } @else {
+            <span class="assist-hint assist-empty">💡 {{ t('assist.none') }}</span>
+          }
+          @if (assistantWarning()) {
+            <span class="assist-warn">⚠️ {{ t('assist.warning') }}</span>
+          }
+        </div>
+      }
+
+      <!-- YZ oynarken: bunun bir gösterim olduğu bilgisi -->
+      @if (autoplaying()) {
+        <div class="assist-bar">
+          <span class="assist-hint ai-demo-note">{{ t('ai.demoNote') }}</span>
+        </div>
+      }
+
+      <!-- Gösterim bitti: kendi oyununa dönüldü + YZ'nin skoru -->
+      @if (!autoplaying() && aiDemoResult() !== null) {
+        <div class="assist-bar">
+          <span class="assist-hint ai-demo-back">
+            {{ t('ai.demoEnded') }}: <strong>{{ aiDemoResult() }}</strong>
+          </span>
+        </div>
+      }
+
+      <!-- Oyun kontrolleri (geniş ekranda panelin altında toplanır) -->
+      <div class="controls">
+        @if (mode() !== GameMode.Race) {
+          <button class="btn-primary ghost pause-toggle" type="button" (click)="onTogglePause()">
+            {{ paused() ? t('pause.resume') : t('pause.pause') }}
+          </button>
+          <button
+            class="btn-primary ghost ai-toggle"
+            type="button"
+            [class.active]="autoplaying()"
+            (click)="onToggleAutoplay()"
+          >
+            {{ autoplaying() ? t('btn.aiStop') : t('btn.aiPlay') }}
+          </button>
+        }
+        <button class="btn-primary ghost" type="button" [disabled]="!canUndo()" (click)="onUndo()">
+          {{ t('btn.undo') }}
+        </button>
+        @if (mode() === GameMode.Level) {
+          <button class="btn-primary" type="button" (click)="onStartLevelMode()">
+            {{ t('btn.restart') }}
+          </button>
+        } @else if (mode() !== GameMode.Race) {
+          <!-- Yarışta "Yeni Oyun" yok: ortak tohumlu yarış bozulur. -->
+          <button class="btn-primary" type="button" (click)="onRestart()">
+            {{ t('btn.newGame') }}
+          </button>
+        }
+      </div>
+    </aside>
+
+    <div class="board-area">
+      <div class="board-wrap" [class.bomb-active]="bombMode()">
+        <app-board />
+
+        <!-- İpucu oku -->
+        @if (hintDirection()) {
+          <div class="hint-arrow" [attr.data-dir]="hintDirection()">
+            @switch (hintDirection()) {
+              @case (Direction.Left) {
+                ←
+              }
+              @case (Direction.Right) {
+                →
+              }
+              @case (Direction.Up) {
+                ↑
+              }
+              @case (Direction.Down) {
+                ↓
+              }
+            }
+          </div>
+        }
+
+        <!-- Duraklat örtüsü (yalnızca tahtayı kaplar) -->
+        @if (paused()) {
+          <button
+            class="board-pause"
+            type="button"
+            [attr.aria-label]="t('pause.resume')"
+            (click)="onTogglePause()"
+          >
+            <span class="board-pause-icon">▶</span>
+            <span class="board-pause-title">{{ t('pause.paused') }}</span>
+            <span class="board-pause-tap">{{ t('pause.tap') }}</span>
+          </button>
+        }
+
+        @if (
+          status() === GameStatus.Won ||
+          status() === GameStatus.Lost ||
+          status() === GameStatus.LevelComplete ||
+          status() === GameStatus.Failed
+        ) {
+          <div
+            class="overlay"
+            [class.win]="status() === GameStatus.Won || status() === GameStatus.LevelComplete"
+          >
+            <div class="overlay-card">
+              <!-- Başlık + alt metin (duruma göre) -->
+              @switch (status()) {
+                @case (GameStatus.Won) {
+                  @if (mode() === GameMode.Level) {
+                    <h2 class="overlay-title">{{ t('ov.wonAllTitle') }}</h2>
+                    <p class="overlay-sub">{{ t('ov.wonAllSub') }}</p>
+                  } @else {
+                    <h2 class="overlay-title">{{ t('ov.wonTitle') }}</h2>
+                    <p class="overlay-sub">{{ t('ov.wonSub') }}</p>
+                  }
+                }
+                @case (GameStatus.LevelComplete) {
+                  <h2 class="overlay-title">{{ t('ov.levelDoneTitle', { n: level() }) }}</h2>
+                  <p class="overlay-sub">{{ t('ov.levelDoneSub', { x: levelTarget() }) }}</p>
+                }
+                @case (GameStatus.Failed) {
+                  <h2 class="overlay-title">{{ t('ov.failTitle') }}</h2>
+                  <p class="overlay-sub">
+                    {{ remainingSeconds() <= 0 ? t('ov.timeUp') : t('ov.noMoves') }}
+                  </p>
+                }
+                @default {
+                  <h2 class="overlay-title">
+                    {{ mode() === GameMode.Race ? t('mp.finished') : t('ov.gameOver') }}
+                  </h2>
+                  <p class="overlay-sub">
+                    {{
+                      (mode() === GameMode.TimeAttack || mode() === GameMode.Race) &&
+                      remainingSeconds() <= 0
+                        ? t('ov.timeUp')
+                        : t('ov.noMoves')
+                    }}
+                  </p>
+                }
+              }
+
+              <p class="overlay-score">
+                {{ t('ov.score') }} <strong>{{ score() }}</strong>
+              </p>
+              <p class="overlay-stats">
+                @if (
+                  mode() === GameMode.Level ||
+                  mode() === GameMode.TimeAttack ||
+                  mode() === GameMode.Race
+                ) {
+                  ⏳ {{ remainingLabel() }} {{ t('ov.left') }} &nbsp;·&nbsp;
+                } @else if (mode() === GameMode.Classic) {
+                  ⏱️ {{ elapsedLabel() }} &nbsp;·&nbsp;
+                }
+                🔀 {{ moves() }} {{ t('ov.movesSuffix') }}
+              </p>
+
+              <!-- Altın ödülü (seviye tamamlama / tüm oyun kazanma) -->
+              @if (
+                status() === GameStatus.LevelComplete ||
+                (status() === GameStatus.Won && mode() === GameMode.Level)
+              ) {
+                @if (lastReward() > 0) {
+                  <p class="overlay-gold">{{ t('ov.goldWon', { g: lastReward() }) }}</p>
+                } @else {
+                  <p class="overlay-gold muted">{{ t('ov.goldAlready') }}</p>
+                }
+              }
+
+              <!-- Oyun boyunca hamle doğruluğu -->
+              @if (assistantOn() && ratedMoves() > 0) {
+                <div class="overlay-accuracy">
+                  <span class="oa-main">
+                    🎯 {{ t('ai.accuracy') }}: <strong>%{{ accuracy() }}</strong>
+                  </span>
+                  <span class="oa-detail">
+                    ✨ {{ moveRatings().best }} · 👍 {{ moveRatings().good }} · ⚠️
+                    {{ moveRatings().inaccurate }}
+                  </span>
+                </div>
+              }
+
+              <!-- YZ oyun sonu analizi (algoritmik) -->
+              @if (mode() !== GameMode.Race) {
+                @if (analysisText()) {
+                  <div class="overlay-analysis">{{ analysisText() }}</div>
+                } @else {
+                  <button
+                    class="btn-primary ghost overlay-analyze"
+                    type="button"
+                    (click)="onAnalyze()"
+                  >
+                    {{ t('ov.analyze') }}
+                  </button>
+                }
+              }
+
+              <div class="overlay-actions">
+                @if (mode() === GameMode.Race) {
+                  <!-- Yarış bitti → çok oyunculu panele dön (sonuçlar orada) -->
+                  <button class="btn-primary" type="button" (click)="openMultiplayer.emit()">
+                    🏁 {{ t('mp.backToLobby') }}
+                  </button>
+                } @else {
+                  <!-- Seviye tamam → sonraki seviye -->
+                  @if (status() === GameStatus.LevelComplete) {
+                    <button class="btn-primary" type="button" (click)="onNextLevel()">
+                      {{ t('ov.nextLevel') }}
+                    </button>
+                  }
+                  <!-- Seviye başarısız → tekrar dene -->
+                  @if (status() === GameStatus.Failed) {
+                    <button class="btn-primary" type="button" (click)="onRetryLevel()">
+                      {{ t('ov.retry') }}
+                    </button>
+                  }
+                  <!-- Klasik kazanma → devam et -->
+                  @if (status() === GameStatus.Won && mode() === GameMode.Classic) {
+                    <button class="btn-primary" type="button" (click)="onContinue()">
+                      {{ t('ov.continue') }}
+                    </button>
+                  }
+                  <!-- Klasik kaybetme → geri al -->
+                  @if (status() === GameStatus.Lost && canUndo()) {
+                    <button class="btn-primary" type="button" (click)="onUndo()">
+                      {{ t('btn.undo') }}
+                    </button>
+                  }
+                  <!-- Her durumda: yeniden başla (moda uygun) -->
+                  @if (mode() === GameMode.Level) {
+                    <button class="btn-primary ghost" type="button" (click)="onStartLevelMode()">
+                      {{ t('btn.restart') }}
+                    </button>
+                  } @else {
+                    <button class="btn-primary ghost" type="button" (click)="onRestart()">
+                      {{ t('btn.newGame') }}
+                    </button>
+                  }
+                }
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+</main>

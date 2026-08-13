@@ -1,0 +1,74 @@
+@use '../../../styles/variables' as v;
+
+// Başarımlar: ilerleme çubuklu satır listesi. Panelin kendi kaydırması var.
+.profile-ach-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.9rem;
+}
+
+.ach-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: v.$radius-md;
+  background: var(--color-cell-empty);
+
+  &.locked {
+    opacity: 0.75;
+  }
+}
+
+.ach-icon {
+  font-size: 1.5rem;
+  line-height: 1.2;
+  flex: 0 0 auto;
+}
+
+.ach-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ach-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.ach-name {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--color-text);
+}
+
+.ach-badge {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--color-board);
+  color: var(--color-text-light);
+
+  &.done {
+    background: #3fa96b;
+    color: #fff;
+  }
+}
+
+.ach-desc {
+  font-size: 0.78rem;
+  opacity: 0.75;
+  margin-bottom: 0.3rem;
+}
+
+.ach-prog {
+  font-size: 0.7rem;
+  opacity: 0.7;
+  margin-top: 0.15rem;
+  font-variant-numeric: tabular-nums;
+}

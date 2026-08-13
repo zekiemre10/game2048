@@ -1,0 +1,54 @@
+<div class="settings-backdrop" (click)="close.emit()">
+  <div
+    class="settings-panel"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="t('daily.title')"
+    (click)="$event.stopPropagation()"
+  >
+    <h2 class="settings-title">{{ t('daily.title') }}</h2>
+    <p class="settings-note">{{ t('daily.note') }}</p>
+    <p class="daily-day">📅 {{ dailyToday() }}</p>
+
+    <button class="btn-primary daily-play" type="button" (click)="onPlayDaily()">
+      {{ dailyMyRow() ? t('daily.playAgain') : t('daily.play') }}
+    </button>
+
+    @if (dailyMyRow(); as mine) {
+      <div class="daily-mine">
+        {{ t('daily.yourBest') }}:
+        <strong>{{ mine.score }}</strong>
+        · {{ t('daily.rank') }} <strong>{{ mine.rank }}</strong>
+      </div>
+    }
+
+    @if (dailyError()) {
+      <p class="friend-error">{{ t(dailyError()) }}</p>
+      @if (!authUser()) {
+        <button class="btn-primary account-cta" type="button" (click)="openAuth.emit()">
+          {{ t('auth.signInCta') }}
+        </button>
+      }
+    } @else if (dailyLoading()) {
+      <p class="friend-muted">{{ t('lb.loading') }}</p>
+    } @else if (dailyRows().length === 0) {
+      <p class="friend-muted">{{ t('daily.beFirst') }}</p>
+    } @else {
+      <h3 class="settings-heading">{{ t('daily.board') }} ({{ dailyPlayers() }})</h3>
+      <div class="lb-list">
+        @for (r of dailyRows(); track r.id) {
+          <div class="lb-row" [class.me]="r.id === authUser()?.id">
+            <span class="lb-rank">{{ medalFor(r.rank) }}</span>
+            <span class="lb-name">{{ r.username }}</span>
+            <span class="lb-tile">{{ r.best }}</span>
+            <span class="lb-score">{{ r.score }}</span>
+          </div>
+        }
+      </div>
+    }
+
+    <button class="btn-primary settings-close" type="button" (click)="close.emit()">
+      {{ t('btn.close') }}
+    </button>
+  </div>
+</div>

@@ -1,0 +1,988 @@
+@use '../../../styles/variables' as v;
+
+// Oyun görünümü (üst skor çubuğu + yan panel + tahta + overlay) stilleri.
+// Monolit app.scss'ten ayrıştırıldı (bkz. components/game-view).
+
+.game {
+  width: min(100%, #{v.$board-size});
+  height: 100vh;
+  height: 100dvh; // mobil tarayıcı çubuğunu hesaba katar
+  margin: 0 auto;
+  // Üstte sabit profil/mağaza/ayar butonlarına yer bırak
+  padding: clamp(3rem, 11vw, 3.6rem) clamp(0.6rem, 3vw, 1rem) clamp(0.5rem, 2vw, 0.9rem);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+// --- Oyun alanı: tahta + yan panel --------------------------
+//
+// Dar ekran (varsayılan): tek sütun. `.side-panel` display:contents ile
+// dağılır, çocukları doğrudan `.play-area`nın flex öğesi olur; `order`
+// ile bilgi bantları tahtanın üstünde, kontroller altında kalır.
+.play-area {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.side-panel {
+  display: contents;
+}
+
+.level-bar,
+.stats,
+.bomb-banner,
+.power-group,
+.race-standings,
+.assist-bar,
+.ai-panel {
+  order: -1; // tahtanın üstü
+}
+
+.board-area {
+  order: 0;
+}
+
+.controls {
+  order: 1; // tahtanın altı
+}
+
+// Panel başlığı (yalnızca geniş ekranda görünür)
+.side-title {
+  display: none;
+}
+
+.topbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: clamp(0.4rem, 1.5vw, 0.75rem);
+  flex-wrap: wrap;
+}
+
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.brand {
+  font-size: clamp(2rem, 9vw, 3rem);
+  font-weight: 800;
+  margin: 0;
+  color: var(--color-text);
+  letter-spacing: -1px;
+}
+
+// Ana ekrana dönüş oku (2048 yazısının solunda)
+.home-back {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--color-text);
+  background: var(--color-cell-empty);
+  border-radius: 50%;
+  box-shadow: v.$shadow-soft;
+  transition:
+    background-color v.$transition-fast,
+    transform v.$transition-fast;
+
+  &:hover {
+    background: var(--color-board);
+  }
+
+  &:active {
+    transform: scale(0.92);
+  }
+}
+
+// Altın göstergesi (topbar)
+.gold-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: #f6c945;
+  color: #6b4e00;
+  font-size: clamp(0.85rem, 3.4vw, 1rem);
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  box-shadow: v.$shadow-soft;
+
+  strong {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.scores {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.score-box {
+  background: var(--color-board);
+  color: var(--color-text-light);
+  padding: 0.35rem clamp(0.6rem, 3vw, 1.1rem);
+  border-radius: v.$radius-md;
+  text-align: center;
+  min-width: clamp(64px, 20vw, 80px);
+  transition: background-color 250ms ease;
+
+  span {
+    display: block;
+    font-size: clamp(0.6rem, 2.4vw, 0.7rem);
+    letter-spacing: 1px;
+    opacity: 0.85;
+  }
+
+  strong {
+    font-size: clamp(1.1rem, 4.5vw, 1.5rem);
+  }
+
+  &.best {
+    background: var(--color-button);
+  }
+}
+
+// Seviye modu: seviye + hedef çubuğu
+.level-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: clamp(0.4rem, 1.5vw, 0.6rem);
+}
+
+.level-badge {
+  background: var(--color-button);
+  color: var(--color-text-light);
+  font-weight: 800;
+  font-size: clamp(0.85rem, 3.4vw, 1rem);
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+}
+
+.level-target {
+  font-size: clamp(0.85rem, 3.4vw, 1rem);
+  color: var(--color-text);
+  opacity: 0.9;
+
+  strong {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// Süre + hamle sayacı satırı (tahtanın hemen üstünde)
+.stats {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: clamp(0.4rem, 1.5vw, 0.7rem);
+}
+
+// Kalan süre azalınca kırmızı uyarı + nabız
+.stat.low {
+  background: #e8503a;
+  color: #fff;
+  animation: pulse-low 1s ease-in-out infinite;
+
+  .stat-label {
+    opacity: 0.9;
+  }
+}
+
+@keyframes pulse-low {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.stat {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background: var(--color-cell-empty);
+  color: var(--color-text);
+  padding: 0.4rem 0.75rem;
+  border-radius: v.$radius-md;
+  transition: background-color 250ms ease;
+}
+
+.stat-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: clamp(0.6rem, 2.4vw, 0.72rem);
+  letter-spacing: 1px;
+  opacity: 0.75;
+}
+
+.stat-value {
+  font-size: clamp(1rem, 4vw, 1.2rem);
+  font-variant-numeric: tabular-nums; // rakamlar zıplamasın
+  margin-left: 0.15rem;
+}
+
+.controls {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: clamp(0.4rem, 1.5vw, 0.75rem);
+  flex-wrap: wrap;
+}
+
+.assist-bar {
+  flex: 0 0 auto;
+  width: min(100%, 480px);
+  margin: 0 auto 0.4rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.8rem;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+// Günlük paneli stilleri components/daily-panel/'e taşındı.
+
+// --- Skor tablosu -------------------------------------------
+// Skor tablosu paneli stilleri components/leaderboard-panel/'e taşındı.
+// .lb-list/.lb-row/.lb-rank/.lb-name/.lb-tile/.lb-score → global _panels.scss
+// (skor tablosu + günlük ortak).
+
+// --- YZ paneli: pozisyon sağlığı + hamle kalitesi -----------
+
+.ai-panel {
+  flex: 0 0 auto;
+  margin-bottom: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: v.$radius-md;
+  background: var(--color-cell-empty);
+}
+
+.health-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.15rem;
+  font-size: 0.85rem;
+}
+
+.health-label {
+  font-weight: 800;
+
+  &.h-good {
+    color: #3fa96b;
+  }
+  &.h-risky {
+    color: #d99b2b;
+  }
+  &.h-danger {
+    color: #e8503a;
+  }
+}
+
+.health-pct {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+  font-size: 0.8rem;
+}
+
+// Sağlık çubuğu renkleri (.mission-fill.h-*) global src/styles/_panels.scss'e taşındı.
+
+.move-review {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  animation: review-pop 0.25s ease-out;
+
+  &.r-best {
+    background: rgba(63, 169, 107, 0.18);
+    color: #3fa96b;
+  }
+  &.r-good {
+    background: rgba(217, 155, 43, 0.16);
+    color: #b7801f;
+  }
+  &.r-inaccurate {
+    background: rgba(232, 80, 58, 0.16);
+    color: #e8503a;
+  }
+}
+
+.review-best {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+@keyframes review-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.accuracy-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  opacity: 0.85;
+
+  strong {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// Oyun sonu ekranındaki doğruluk özeti
+.overlay-accuracy {
+  margin: 0.5rem 0 0.2rem;
+  text-align: center;
+}
+
+.oa-main {
+  display: block;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.oa-detail {
+  display: block;
+  font-size: 0.82rem;
+  opacity: 0.75;
+  margin-top: 0.15rem;
+}
+
+// Gösterim bitti bildirimi — kısa süre görünür, dikkat çeksin
+.ai-demo-back {
+  background: var(--color-button);
+  color: var(--color-text-light);
+  font-weight: 700;
+  animation: demo-back-in 0.25s ease-out;
+}
+
+@keyframes demo-back-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.assist-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: var(--color-cell-empty);
+  color: var(--color-text);
+
+  strong {
+    font-size: 1.15rem;
+    line-height: 1;
+  }
+}
+
+.assist-ask {
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-button);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-cell-empty);
+  }
+}
+
+.assist-empty {
+  opacity: 0.6;
+}
+
+.assist-warn {
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(232, 80, 58, 0.16);
+  color: #e8503a;
+  font-weight: 600;
+}
+
+// --- Duraklat örtüsü (yalnızca tahtayı kaplar) --------------
+.board-pause {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: none;
+  border-radius: v.$radius-lg;
+  cursor: pointer;
+  color: var(--color-text-light);
+  background: rgba(40, 36, 32, 0.55); // color-mix desteklenmezse yedek
+  background: color-mix(in srgb, var(--color-board) 62%, transparent);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: overlay-fade 160ms ease;
+}
+
+.board-pause-icon {
+  font-size: clamp(2.6rem, 12vw, 4rem);
+  line-height: 1;
+  width: clamp(4rem, 18vw, 5.5rem);
+  height: clamp(4rem, 18vw, 5.5rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 0.35rem; // ▶ optik ortalama
+  border-radius: 50%;
+  background: var(--color-button);
+  color: var(--color-text-light);
+  box-shadow: v.$shadow-soft;
+}
+
+.board-pause-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.board-pause-tap {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+// YZ otomatik oynatma düğmesi (etkinken vurgulu)
+.ai-toggle.active {
+  background: var(--color-button);
+  color: var(--color-text-light);
+  border-color: var(--color-button);
+}
+
+// --- Oyun içi güç çubuğu ------------------------------------
+
+.power-group {
+  flex: 0 0 auto;
+  margin-bottom: clamp(0.4rem, 1.5vw, 0.6rem);
+}
+
+.power-bar {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+// Güç butonu: simge + AD + adet.
+// Eskiden yalnızca simge ve köşede kırmızı bir rozet vardı; rozet "hata /
+// bildirim" gibi okunuyor, simgenin ne işe yaradığı ise tahmin gerektiriyordu.
+.power-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background: var(--color-board);
+  color: var(--color-text);
+  box-shadow: v.$shadow-soft;
+  transition: transform v.$transition-fast;
+  white-space: nowrap;
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+.power-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.power-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+// Adet: sakin bir sayaç (uyarı kırmızısı değil)
+.power-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: var(--color-cell-empty);
+  opacity: 0.85;
+}
+
+// Çok dar ekranlarda ad gizlenir, simge + adet kalır
+@media (max-width: 400px) {
+  .power-name {
+    display: none;
+  }
+}
+
+// --- Bomba hedefleme bandı ----------------------------------
+
+.bomb-banner {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: #e8503a;
+  color: #fff;
+  font-weight: 700;
+  padding: 0.5rem 0.9rem;
+  border-radius: v.$radius-md;
+  margin-bottom: clamp(0.6rem, 2.5vw, 0.9rem);
+  animation: pulse-low 1.2s ease-in-out infinite;
+}
+
+.bomb-cancel {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  border-radius: v.$radius-sm;
+  padding: 0.2rem 0.7rem;
+  font-weight: 700;
+}
+
+.board-wrap.bomb-active {
+  outline: 3px dashed #e8503a;
+  outline-offset: 4px;
+  border-radius: v.$radius-lg;
+}
+
+// --- İpucu oku ----------------------------------------------
+
+.hint-arrow {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8rem;
+  font-weight: 900;
+  color: rgba(237, 194, 46, 0.92);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  animation: hint-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes hint-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+// --- Tahta alanı: kalan yüksekliğe otomatik sığar -----------
+// board-area kalan tüm alanı kaplar; tahta, container-query birimleriyle
+// (cqi=genişlik, cqb=yükseklik) bu alana sığan EN BÜYÜK KARE olur.
+.board-area {
+  flex: 1 1 auto;
+  min-height: 0;
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.board-wrap {
+  position: relative;
+  width: min(100cqi, 100cqb);
+  height: min(100cqi, 100cqb);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: v.$radius-lg;
+  background: var(--color-overlay);
+  animation: overlay-fade 220ms ease-in-out;
+
+  // Kazanma: altın tonlu, daha canlı
+  &.win {
+    background: var(--color-overlay-win);
+  }
+}
+
+.overlay-card {
+  text-align: center;
+  padding: clamp(0.75rem, 4vw, 1.5rem);
+  width: 100%;
+}
+
+.overlay-title {
+  font-size: clamp(1.5rem, 7vw, 2.4rem);
+  font-weight: 800;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.overlay-sub {
+  margin: 0.25rem 0 0.75rem;
+  font-size: clamp(0.85rem, 3.4vw, 1rem);
+  color: var(--color-text);
+  opacity: 0.85;
+}
+
+.overlay-score {
+  margin: 0 0 0.25rem;
+  font-size: clamp(0.95rem, 3.6vw, 1.1rem);
+  color: var(--color-text);
+
+  strong {
+    font-size: clamp(1.15rem, 4.5vw, 1.4rem);
+  }
+}
+
+.overlay-stats {
+  margin: 0 0 clamp(0.75rem, 4vw, 1.25rem);
+  font-size: clamp(0.85rem, 3.4vw, 1rem);
+  color: var(--color-text);
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+// Altın ödülü (seviye tamamlama overlay'i)
+.overlay-gold {
+  margin: 0 0 clamp(0.75rem, 4vw, 1.25rem);
+  font-size: clamp(1rem, 4vw, 1.25rem);
+  font-weight: 800;
+  color: #b8860b;
+  animation: gold-pop 350ms ease-in-out;
+
+  &.muted {
+    color: var(--color-text);
+    opacity: 0.7;
+    font-weight: 600;
+    font-size: clamp(0.85rem, 3.4vw, 1rem);
+    animation: none;
+  }
+}
+
+@keyframes gold-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.overlay-actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+@keyframes overlay-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+// --- Kısa ekran (yatay telefon) -----------------------------
+// Yükseklik azken üst boşlukları ve öğe yüksekliklerini kısarak
+// dikey taşmayı önler; tahta yine kalan alana otomatik sığar.
+@media (max-height: 520px) {
+  .game {
+    padding-top: 2.6rem;
+    padding-bottom: 0.35rem;
+  }
+
+  .topbar {
+    margin-bottom: 0.3rem;
+  }
+
+  .brand {
+    font-size: 1.5rem;
+  }
+
+  .stats,
+  .level-bar,
+  .power-bar {
+    margin-bottom: 0.3rem;
+  }
+
+  .controls {
+    margin-top: 0.3rem;
+  }
+
+  .btn-primary {
+    padding: 0.4rem 0.9rem;
+    min-height: 36px;
+  }
+
+  .profile-btn,
+  .round-btn {
+    transform: scale(0.85);
+    transform-origin: top;
+  }
+}
+// .account-cta → global _panels.scss (profil + günlük + skor tablosu ortak)
+
+// --- Hesap paneli (giriş / kayıt modalı) --------------------
+// Hesap paneli stilleri components/auth-panel/'e taşındı; .auth-error → global.
+
+// --- Oyun sonu YZ analizi ----------------------------------
+.overlay-analyze {
+  margin: 0.4rem auto 0.2rem;
+}
+
+.overlay-analysis {
+  margin: 0.5rem 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  background: var(--color-cell-empty);
+  color: var(--color-text);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  text-align: left;
+  white-space: pre-wrap;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.overlay-analysis-err {
+  margin: 0.4rem 0;
+  font-size: 0.85rem;
+  color: #e8503a;
+}
+
+.race-standings {
+  width: min(100%, 480px);
+  margin: 0 auto 0.5rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 12px;
+  background: var(--panel-bg, rgba(255, 255, 255, 0.9));
+  border: 1px solid var(--panel-border, rgba(128, 128, 128, 0.25));
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.race-standings-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+  margin-bottom: 0.15rem;
+}
+
+.race-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  padding: 0.15rem 0.25rem;
+  border-radius: 6px;
+
+  &.me {
+    background: var(--panel-input-bg, rgba(143, 122, 102, 0.16));
+    font-weight: 700;
+  }
+}
+
+.race-pos {
+  opacity: 0.6;
+  min-width: 1.3em;
+}
+
+.race-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.race-pts {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+// --- Geniş ekran: solda büyük tahta, sağda bilgi paneli ------
+//
+// Eskiden her şey tek dar sütunda üst üste diziliyor, tahta ekranın ancak
+// %37'sini kaplıyor, sağ/sol taraf boş kalıyordu. Burada bilgiler sağa
+// alınır ve tahta boşalan yüksekliğin tamamını kullanır.
+@media (min-width: 1000px) {
+  .game {
+    width: min(100%, 1200px);
+  }
+
+  .play-area {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(240px, 23vw, 310px);
+    // minmax(0,1fr): satır içeriğe göre BÜYÜMEZ. Olmazsa uzun panel
+    // satırı şişirir, panel yükseklik sınırı olmadığı için kaydırma
+    // devreye girmez ve butonlar ekranın altında kalırdı.
+    grid-template-rows: minmax(0, 1fr);
+    gap: clamp(0.9rem, 2vw, 1.6rem);
+    align-items: stretch;
+    min-height: 0;
+  }
+
+  .board-area {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  // contents'ten gerçek bir kutuya dön: panel tek sütun olarak dizilir
+  .side-panel {
+    display: flex;
+    grid-column: 2;
+    grid-row: 1;
+    flex-direction: column;
+    gap: 0.55rem;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  // Panel içindeki her blok normal akışa döner (order/margin sıfırlanır)
+  .level-bar,
+  .stats,
+  .bomb-banner,
+  .power-group,
+  .race-standings,
+  .assist-bar,
+  .ai-panel,
+  .controls {
+    order: 0;
+    margin: 0;
+    width: auto;
+  }
+
+  // Seviye + hedef tek satır (dikey yer kazanmak için)
+  .level-bar {
+    justify-content: space-between;
+    gap: 0.4rem;
+  }
+
+  // Süre ve hamle yan yana iki kutu
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.35rem;
+  }
+
+  // Güçler dikey liste: her satırda ad + adet okunur
+  .power-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+  }
+
+  .power-btn {
+    justify-content: flex-start;
+    border-radius: v.$radius-md;
+    padding: 0.5rem 0.7rem;
+  }
+
+  .power-count {
+    margin-left: auto; // adet sağa yaslanır
+  }
+
+  // Kontroller alt alta, tam genişlik → hangi butonun ne yaptığı net.
+  // Panel kaydırılsa bile butonlar altta sabit kalır (kısa ekranlarda
+  // görünmez olmasınlar).
+  // İkişerli ızgara: dört buton dikey olarak yığılınca panelin yarısını
+  // yiyor ve güçler/öneri ekranın altında kalıyordu.
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.35rem;
+    margin-top: auto;
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding: 0.5rem 0 0.2rem;
+    // Kaydırılan içerik altından geçtiği için TAM OPAK olmalı
+    background: var(--color-bg);
+    border-top: 1px solid var(--color-cell-empty);
+
+    .btn-primary {
+      width: 100%;
+      padding-inline: 0.5rem;
+      font-size: 0.92rem;
+    }
+  }
+
+  .assist-bar {
+    justify-content: flex-start;
+    // Sabit buton çubuğunun altında kalmasın
+    margin-bottom: 0.35rem;
+  }
+
+  // Panel bölüm başlıkları
+  .side-title {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.55;
+    margin-bottom: 0.3rem;
+  }
+}

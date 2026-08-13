@@ -1,0 +1,134 @@
+<div class="settings-backdrop" (click)="close.emit()">
+  <div
+    class="settings-panel friends-panel"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="t('fr.title')"
+    (click)="$event.stopPropagation()"
+  >
+    <h2 class="settings-title">{{ t('fr.title') }}</h2>
+
+    @if (!authUser()) {
+      <!-- Giriş gerekli -->
+      <p class="settings-note">{{ t('fr.loginNeeded') }}</p>
+      <button class="btn-primary" type="button" (click)="onFriendsLogin()">
+        {{ t('fr.loginCta') }}
+      </button>
+    } @else {
+      <!-- Arama -->
+      <div class="friend-search">
+        <input
+          type="text"
+          [value]="friendSearchTerm()"
+          (input)="onFriendSearch($event)"
+          [placeholder]="t('fr.searchPlaceholder')"
+          [attr.aria-label]="t('fr.searchPlaceholder')"
+        />
+      </div>
+
+      @if (friendError()) {
+        <p class="friend-error">{{ t(friendError()) }}</p>
+      }
+
+      @if (friendSearchTerm().length >= 2) {
+        <div class="friend-results">
+          @if (friendSearching()) {
+            <p class="friend-muted">{{ t('fr.searching') }}</p>
+          } @else if (friendSearchResults().length === 0) {
+            <p class="friend-muted">{{ t('fr.noResults') }}</p>
+          } @else {
+            @for (u of friendSearchResults(); track u.id) {
+              <div class="friend-row">
+                <span class="friend-avatar">👤</span>
+                <span class="friend-name">{{ u.username }}</span>
+                @if (isRequested(u.username)) {
+                  <span class="friend-tag">{{ t('fr.requested') }}</span>
+                } @else {
+                  <button class="friend-btn add" type="button" (click)="onAddFriend(u.username)">
+                    {{ t('fr.add') }}
+                  </button>
+                }
+              </div>
+            }
+          }
+        </div>
+      }
+
+      <!-- Gelen istekler -->
+      @if (friendsIncoming().length > 0) {
+        <h3 class="settings-heading">{{ t('fr.incoming') }} ({{ friendsIncoming().length }})</h3>
+        <div class="friend-list">
+          @for (f of friendsIncoming(); track f.id) {
+            <div class="friend-row">
+              <span class="friend-avatar">👤</span>
+              <span class="friend-name">{{ f.username }}</span>
+              <button
+                class="friend-btn add"
+                type="button"
+                (click)="onRespondFriend(f.reqId!, true)"
+              >
+                {{ t('fr.accept') }}
+              </button>
+              <button
+                class="friend-btn ghost"
+                type="button"
+                (click)="onRespondFriend(f.reqId!, false)"
+              >
+                {{ t('fr.decline') }}
+              </button>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Giden istekler -->
+      @if (friendsOutgoing().length > 0) {
+        <h3 class="settings-heading">{{ t('fr.outgoing') }} ({{ friendsOutgoing().length }})</h3>
+        <div class="friend-list">
+          @for (f of friendsOutgoing(); track f.id) {
+            <div class="friend-row">
+              <span class="friend-avatar">👤</span>
+              <span class="friend-name">{{ f.username }}</span>
+              <span class="friend-tag">{{ t('fr.pending') }}</span>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Arkadaş listesi -->
+      <h3 class="settings-heading">{{ t('fr.myFriends') }} ({{ friendsList().length }})</h3>
+      @if (friendsList().length === 0) {
+        <p class="friend-muted">{{ t('fr.empty') }}</p>
+      } @else {
+        <div class="friend-list">
+          @for (f of friendsList(); track f.id) {
+            <div class="friend-row friend-card">
+              <span class="friend-avatar">
+                👤
+                @if (hasUnread(f.id)) {
+                  <span class="friend-dot"></span>
+                }
+              </span>
+              <div class="friend-info">
+                <span class="friend-name">{{ f.username }}</span>
+                <span class="friend-stats">
+                  {{ t('fr.best') }} {{ f.bestScore }} · {{ t('fr.lvl') }} {{ f.bestLevel }}
+                </span>
+              </div>
+              <button class="friend-btn add" type="button" (click)="onOpenChat(f)">
+                {{ t('fr.chat') }}
+              </button>
+              <button class="friend-btn ghost" type="button" (click)="onRemoveFriend(f.id)">
+                {{ t('fr.remove') }}
+              </button>
+            </div>
+          }
+        </div>
+      }
+    }
+
+    <button class="btn-primary ghost settings-close" type="button" (click)="close.emit()">
+      {{ t('btn.close') }}
+    </button>
+  </div>
+</div>

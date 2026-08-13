@@ -57,6 +57,39 @@
   width: 100%;
 }
 
+// Bölüm aralığı: ayarlar VE çok oyunculu (kur/katıl) panelleri paylaşır.
+.settings-section {
+  margin-bottom: 1.25rem;
+}
+
+// Dil / süre seçimi düğme çifti: ayarlar VE çok oyunculu paylaşır.
+.lang-choice {
+  display: flex;
+  gap: 0.6rem;
+
+  button {
+    flex: 1;
+    padding: 0.6rem;
+    border-radius: v.$radius-md;
+    font-weight: 700;
+    background: var(--color-cell-empty);
+    color: var(--color-text);
+    transition:
+      background-color v.$transition-fast,
+      box-shadow v.$transition-fast;
+
+    &.active {
+      box-shadow: inset 0 0 0 2px var(--color-button);
+      background: color-mix(in srgb, var(--color-button) 14%, transparent);
+    }
+
+    &:focus-visible {
+      outline: 3px solid var(--color-button);
+      outline-offset: 2px;
+    }
+  }
+}
+
 // --- İlerleme çubuğu ---------------------------------------
 // Görevler, başarım ilerlemesi VE canlı pozisyon göstergesi (.h-*) paylaşır.
 .mission-bar {
@@ -105,5 +138,151 @@
   }
   50% {
     opacity: 0.6;
+  }
+}
+
+// --- Sıralama satır listesi (GLOBAL) -----------------------
+// Skor tablosu VE günlük meydan okuma panelleri aynı satır düzenini paylaşır.
+.lb-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.6rem;
+}
+
+.lb-row {
+  display: grid;
+  // sıra · isim · en iyi kare · skor
+  grid-template-columns: 2.2rem 1fr auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: v.$radius-md;
+  background: var(--color-cell-empty);
+
+  // Kendi satırım vurgulanır
+  &.me {
+    background: var(--color-button);
+    color: var(--color-text-light);
+  }
+}
+
+.lb-rank {
+  font-size: 1rem;
+  font-weight: 800;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.lb-name {
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lb-tile {
+  font-size: 0.75rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(128, 128, 128, 0.22);
+  font-variant-numeric: tabular-nums;
+}
+
+.lb-score {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  min-width: 3.5rem;
+  text-align: right;
+}
+
+// --- Panel geri bildirim metni (GLOBAL) --------------------
+// Hata / boş-durum metinleri günlük, skor tablosu ve arkadaşlar panellerinde ortak.
+.friend-muted {
+  margin: 0.2rem 0 0.6rem;
+  font-size: 0.88rem;
+  opacity: 0.65;
+  text-align: center;
+}
+
+.friend-error {
+  margin: 0.2rem 0 0.6rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: v.$radius-sm;
+  background: rgba(220, 70, 70, 0.14);
+  color: #d64545;
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+// Hata kutusu: hesap paneli VE çok oyunculu paneli (hata/uyarı) paylaşır.
+.auth-error {
+  margin: 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  background: rgba(220, 60, 60, 0.14);
+  color: #d23c3c;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+// Küçük eylem düğmesi: arkadaşlar VE çok oyunculu panelleri paylaşır.
+.friend-btn {
+  flex-shrink: 0;
+  padding: 0.35rem 0.7rem;
+  border-radius: 8px;
+  border: none;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &.add {
+    background: var(--accent, #8f7a66);
+    color: #fff;
+  }
+
+  &.ghost {
+    background: transparent;
+    border: 1px solid var(--panel-border, rgba(128, 128, 128, 0.4));
+    color: inherit;
+  }
+
+  &:hover {
+    opacity: 0.88;
+  }
+}
+
+// Giriş çağrısı düğmesi: profil, günlük ve skor tablosu panellerinde ortak.
+.account-cta {
+  width: 100%;
+}
+
+// --- Sekme şeridi (GLOBAL) ---------------------------------
+// Mağaza sekmeleri VE hesap paneli giriş/kayıt sekmeleri (.auth-tabs) paylaşır.
+.store-tabs {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  margin-bottom: 0.9rem;
+
+  button {
+    flex: 0 0 auto;
+    padding: 0.45rem 0.9rem;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    background: var(--color-cell-empty);
+    color: var(--color-text);
+    white-space: nowrap;
+    transition:
+      background-color v.$transition-fast,
+      color v.$transition-fast;
+
+    &.active {
+      background: var(--color-button);
+      color: var(--color-text-light);
+    }
   }
 }

@@ -1,0 +1,183 @@
+<div class="settings-backdrop" (click)="close.emit()">
+  <div
+    class="settings-panel profile-panel"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="t('nav.profile')"
+    (click)="$event.stopPropagation()"
+  >
+    <div class="profile-head">
+      <button
+        class="profile-head-avatar"
+        type="button"
+        [attr.aria-label]="t('prof.changeAvatar')"
+        [title]="t('prof.changeAvatar')"
+        (click)="onToggleAvatarPicker()"
+      >
+        {{ avatar() }}
+        <span class="avatar-edit" aria-hidden="true">✏️</span>
+      </button>
+      <div class="profile-head-info">
+        <span class="profile-head-name">{{ displayName() }}</span>
+        <!-- Ünvan: hesabın genel ilerlemesi (oyun içi "Seviye"den ayrı) -->
+        <span class="rank-badge">
+          {{ rankInfo().rank.icon }}
+          {{ L(rankInfo().rank.name, rankInfo().rank.nameEn) }}
+        </span>
+        <!-- Ay sonu şampiyonlukları -->
+        @if (championships() > 0) {
+          <span class="champ-badge" [title]="t('lb.champTitle')"> 🏆 ×{{ championships() }} </span>
+        }
+        @if (!authUser()) {
+          <span class="profile-head-hint">{{ t('prof.loginForName') }}</span>
+        }
+      </div>
+    </div>
+
+    <!-- Avatar seçici -->
+    @if (avatarPickerOpen()) {
+      <div class="avatar-picker">
+        @for (a of AVATARS; track a) {
+          <button
+            class="avatar-option"
+            type="button"
+            [class.selected]="avatar() === a"
+            [attr.aria-pressed]="avatar() === a"
+            [attr.aria-label]="a"
+            (click)="onSelectAvatar(a)"
+          >
+            {{ a }}
+          </button>
+        }
+      </div>
+    }
+
+    <!-- Ünvan ilerlemesi -->
+    <div class="rank-progress">
+      @if (rankInfo().next; as next) {
+        <div class="rank-row">
+          <span class="rank-now">{{ rankInfo().points }} {{ t('prof.points') }}</span>
+          <span class="rank-next">
+            {{ next.icon }} {{ L(next.name, next.nameEn) }} — {{ rankInfo().remaining }}
+            {{ t('prof.pointsLeft') }}
+          </span>
+        </div>
+        <div class="mission-bar">
+          <span class="mission-fill" [style.width.%]="rankInfo().percent"></span>
+        </div>
+      } @else {
+        <div class="rank-row">
+          <span class="rank-now">{{ rankInfo().points }} {{ t('prof.points') }}</span>
+          <span class="rank-next">{{ t('prof.maxRank') }}</span>
+        </div>
+      }
+    </div>
+
+    <!-- 7 günlük ödül takvimi -->
+    <h3 class="settings-heading">{{ t('rew.title') }}</h3>
+    <div class="reward-week">
+      @for (r of rewardCalendar; track r.day) {
+        <div
+          class="rw-day"
+          [class.claimed]="
+            r.day < rewardCycleDay() || (r.day === rewardCycleDay() && !canClaimDaily())
+          "
+          [class.today]="r.day === rewardCycleDay()"
+          [class.big]="r.day === 7"
+        >
+          <span class="rw-num">{{ t('rew.day') }} {{ r.day }}</span>
+          <span class="rw-icon">{{ r.icon }}</span>
+          <span class="rw-amount">
+            @if (r.gold > 0) {
+              {{ r.gold }}
+            }
+            @if (r.power) {
+              <span class="rw-power">×{{ r.powerCount }}</span>
+            }
+          </span>
+          @if (r.day < rewardCycleDay() || (r.day === rewardCycleDay() && !canClaimDaily())) {
+            <span class="rw-tick" aria-hidden="true">✓</span>
+          }
+        </div>
+      }
+    </div>
+
+    @if (canClaimDaily()) {
+      <button class="btn-primary daily-btn" type="button" (click)="onClaimDaily()">
+        {{ t('prof.claimDaily') }} — {{ t('rew.day') }} {{ rewardCycleDay() }}
+      </button>
+    } @else {
+      <div class="daily-done">
+        {{ t('prof.dailyDone') }}
+        @if (claimedReward(); as cr) {
+          <span class="daily-got">
+            {{ cr.icon }}
+            @if (cr.gold > 0) {
+              +{{ cr.gold }}
+            }
+            @if (cr.power) {
+              ×{{ cr.powerCount }}
+            }
+          </span>
+        }
+      </div>
+    }
+
+    <!-- İstatistikler -->
+    <div class="profile-stats">
+      <div class="pstat highlight">
+        <strong>{{ bestScore() }}</strong
+        ><span>{{ t('hud.best') }}</span>
+      </div>
+      <div class="pstat">
+        <strong>{{ bestTile() }}</strong
+        ><span>{{ t('prof.bestTile') }}</span>
+      </div>
+      <div class="pstat">
+        <strong>{{ bestLevel() }}</strong
+        ><span>{{ t('prof.bestLevel') }}</span>
+      </div>
+      <div class="pstat">
+        <strong>{{ gamesPlayed() }}</strong
+        ><span>{{ t('prof.games') }}</span>
+      </div>
+      <div class="pstat">
+        <strong>%{{ winRate() }}</strong
+        ><span>{{ t('prof.winrate') }}</span>
+      </div>
+      <div class="pstat">
+        <strong>{{ totalMoves() }}</strong
+        ><span>{{ t('prof.totalMoves') }}</span>
+      </div>
+      <div class="pstat">
+        <strong>🔥 {{ currentStreak() }}</strong
+        ><span>{{ t('prof.streak') }}</span>
+      </div>
+      <div class="pstat">
+        <strong>{{ bestStreak() }}</strong
+        ><span>{{ t('prof.bestStreak') }}</span>
+      </div>
+      <div class="pstat">
+        <strong>💰 {{ totalGoldEarned() }}</strong
+        ><span>{{ t('prof.totalGold') }}</span>
+      </div>
+    </div>
+
+    <!--
+      Giriş yapılmışsa burada bir şey gösterilmez: kullanıcı adı zaten
+      panelin başlığında yazıyor, çıkış da Ayarlar'da. Yalnızca misafire
+      giriş çağrısı gösterilir.
+    -->
+    @if (!authUser()) {
+      <div class="account-box">
+        <button class="btn-primary account-cta" type="button" (click)="openAuth.emit()">
+          {{ t('auth.signInCta') }}
+        </button>
+      </div>
+    }
+
+    <button class="btn-primary settings-close" type="button" (click)="close.emit()">
+      {{ t('btn.close') }}
+    </button>
+  </div>
+</div>

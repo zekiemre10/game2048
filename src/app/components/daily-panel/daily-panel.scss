@@ -1,0 +1,27 @@
+@use '../../../styles/variables' as v;
+
+// Panel chrome + sıralama satırları (.lb-*) + geri bildirim metni (.friend-*)
+// + giriş çağrısı (.account-cta) global _panels.scss'ten gelir. Buradakiler günlüğe özel.
+
+.daily-day {
+  margin: 0 0 0.7rem;
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.daily-play {
+  width: 100%;
+  margin-bottom: 0.6rem;
+}
+
+.daily-mine {
+  margin-bottom: 0.8rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: v.$radius-md;
+  background: var(--color-button);
+  color: var(--color-text-light);
+  text-align: center;
+  font-size: 0.9rem;
+}

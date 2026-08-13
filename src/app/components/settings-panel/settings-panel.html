@@ -1,0 +1,148 @@
+<div class="settings-backdrop" (click)="close.emit()">
+  <div
+    class="settings-panel"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="t('nav.settings')"
+    (click)="$event.stopPropagation()"
+  >
+    <h2 class="settings-title">{{ t('set.title') }}</h2>
+    <p class="settings-note">{{ t('set.note') }}</p>
+
+    <!-- SES -->
+    <section class="settings-section">
+      <h3 class="settings-heading">{{ t('set.sound') }}</h3>
+      <div class="settings-row">
+        <span>{{ t('set.music') }}</span>
+        <button
+          class="switch"
+          type="button"
+          role="switch"
+          [attr.aria-label]="t('set.music')"
+          [attr.aria-checked]="musicOn()"
+          [class.on]="musicOn()"
+          (click)="onToggleMusic()"
+        >
+          <span class="switch-knob"></span>
+        </button>
+      </div>
+      <div class="settings-row">
+        <span>{{ t('set.musicVol') }}</span>
+        <div class="volume">
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            [value]="volumePercent()"
+            [disabled]="!musicOn()"
+            (input)="onVolumeInput($event)"
+            [attr.aria-label]="t('set.musicVol')"
+          />
+          <span class="volume-val">{{ volumePercent() }}</span>
+        </div>
+      </div>
+      <div class="settings-row">
+        <span>{{ t('set.sfxVol') }}</span>
+        <div class="volume">
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            [value]="sfxPercent()"
+            (input)="onSfxInput($event)"
+            [attr.aria-label]="t('set.sfxVol')"
+          />
+          <span class="volume-val">{{ sfxPercent() }}</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- DİL / LANGUAGE -->
+    <section class="settings-section">
+      <h3 class="settings-heading">{{ t('set.lang') }}</h3>
+      <div class="lang-choice">
+        <button type="button" [class.active]="lang() === 'tr'" (click)="onSetLang('tr')">
+          🇹🇷 Türkçe
+        </button>
+        <button type="button" [class.active]="lang() === 'en'" (click)="onSetLang('en')">
+          🇬🇧 English
+        </button>
+      </div>
+    </section>
+
+    <!-- YZ ASİSTANI -->
+    <section class="settings-section">
+      <h3 class="settings-heading">{{ t('set.assistant') }}</h3>
+      <div class="settings-row">
+        <span>{{ t('set.assistantLabel') }}</span>
+        <button
+          class="switch"
+          type="button"
+          role="switch"
+          [attr.aria-label]="t('set.assistantLabel')"
+          [attr.aria-checked]="assistantOn()"
+          [class.on]="assistantOn()"
+          (click)="onToggleAssistant()"
+        >
+          <span class="switch-knob"></span>
+        </button>
+      </div>
+      <p class="settings-note assist-desc">{{ t('set.assistantDesc') }}</p>
+    </section>
+
+    <!-- TEMA -->
+    <section class="settings-section">
+      <h3 class="settings-heading">{{ t('set.theme') }}</h3>
+      <div class="theme-swatches">
+        @for (th of THEMES; track th.id) {
+          @if (isThemeOwned(th.id)) {
+            <button
+              type="button"
+              class="theme-swatch"
+              [class.active]="theme() === th.id"
+              [title]="L(th.name, th.nameEn)"
+              (click)="onSelectTheme(th.id)"
+            >
+              <span class="swatch-colors">
+                <span [style.background]="th.swatch[0]"></span>
+                <span [style.background]="th.swatch[1]"></span>
+                <span [style.background]="th.swatch[2]"></span>
+              </span>
+              <span class="swatch-name">{{ L(th.name, th.nameEn) }}</span>
+            </button>
+          }
+        }
+      </div>
+      <p class="theme-hint">{{ t('set.moreThemes') }}</p>
+    </section>
+
+    <!-- REHBER -->
+    <section class="settings-section">
+      <h3 class="settings-heading">{{ t('set.tutorial') }}</h3>
+      <button class="btn-primary ghost tut-again" type="button" (click)="showTutorial.emit()">
+        {{ t('set.showTutorial') }}
+      </button>
+    </section>
+
+    <!-- HESAP: çıkış YALNIZCA burada -->
+    @if (authUser(); as u) {
+      <section class="settings-section">
+        <h3 class="settings-heading">{{ t('set.account') }}</h3>
+        <div class="settings-row">
+          <span class="account-user">👤 {{ u.username }}</span>
+          <button class="btn-primary ghost logout-btn" type="button" (click)="logout.emit()">
+            {{ t('auth.logout') }}
+          </button>
+        </div>
+      </section>
+    }
+
+    <p class="settings-credit">{{ t('set.credit') }}</p>
+
+    <button class="btn-primary settings-close" type="button" (click)="close.emit()">
+      {{ t('btn.close') }}
+    </button>
+  </div>
+</div>

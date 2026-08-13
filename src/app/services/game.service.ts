@@ -40,6 +40,47 @@ import {
   missionDef,
 } from '../models/mission.model';
 import { pickMissions, weekKey } from '../logic/missions';
+import {
+  AVATARS,
+  DAILY_MISSIONS_KEY,
+  WEEKLY_MISSIONS_KEY,
+  loadAchievements,
+  loadAssistant,
+  loadAvatar,
+  loadBestLevel,
+  loadBestScore,
+  loadChampionships,
+  loadDailyDay,
+  loadGold,
+  loadMissions,
+  loadName,
+  loadPowers,
+  loadPrefsAt,
+  loadRewardedLevels,
+  loadStat,
+  loadStreak,
+  loadStreakDay,
+  loadTotalEarned,
+  saveAchievements,
+  saveAssistant,
+  saveAvatar,
+  saveBestLevel,
+  saveBestScore,
+  saveChampionships,
+  saveDailyDay,
+  saveGold,
+  saveMissions,
+  saveName,
+  savePowers,
+  savePrefsAt,
+  saveRewardedLevels,
+  saveStats,
+  saveStreak,
+  saveTotalEarned,
+} from './game-storage';
+
+/** Avatar listesi kalıcılık katmanında; eski içe aktarımlar için yeniden dışa aç. */
+export { AVATARS } from './game-storage';
 
 // ============================================================
 //  2048 — Oyun servisi
@@ -54,59 +95,8 @@ const CHANCE_OF_FOUR = 0.1;
 /** Kazanma değeri. */
 const WIN_VALUE = 2048;
 
-/** En yüksek skorun localStorage anahtarı. */
-const BEST_SCORE_KEY = 'game2048.bestScore';
-
-/** Ulaşılan en yüksek seviyenin localStorage anahtarı. */
-const BEST_LEVEL_KEY = 'game2048.bestLevel';
-
-/** Toplam altının localStorage anahtarı. */
-const GOLD_KEY = 'game2048.gold';
-
-/** Bugüne kadar kazanılan toplam altının anahtarı. */
-const TOTAL_EARNED_KEY = 'game2048.totalGoldEarned';
-const PREFS_AT_KEY = 'game2048.prefsAt'; // ad/avatar en son ne zaman değişti (bulut birleştirmede LWW)
-
-/** Ödülü alınmış seviyelerin localStorage anahtarı. */
-const REWARDED_LEVELS_KEY = 'game2048.rewardedLevels';
-
-/** Güç envanterinin localStorage anahtarı. */
-const POWERS_KEY = 'game2048.powers';
-
 /** +30 saniye gücünün eklediği süre. */
 const TIME_POWER_SECONDS = 30;
-
-/** Profil/meta localStorage anahtarları. */
-const NAME_KEY = 'game2048.name';
-const AVATAR_KEY = 'game2048.avatar';
-const ASSISTANT_KEY = 'game2048.assistant';
-const CHAMPION_KEY = 'game2048.championships';
-
-/** Seçilebilir profil avatarları (ilk sıradaki varsayılan). */
-export const AVATARS = [
-  '👤',
-  '😎',
-  '🤖',
-  '🐱',
-  '🐉',
-  '🌟',
-  '🦊',
-  '🐼',
-  '👾',
-  '🦁',
-  '🐧',
-  '🦄',
-  '🍀',
-  '🔥',
-  '⚡',
-  '🎩',
-];
-const STATS_KEY = 'game2048.stats';
-const STREAK_KEY = 'game2048.streak';
-const DAILY_KEY = 'game2048.dailyDay';
-const ACHIEVEMENTS_KEY = 'game2048.achievements';
-const DAILY_MISSIONS_KEY = 'game2048.dailyMissions';
-const WEEKLY_MISSIONS_KEY = 'game2048.weeklyMissions';
 
 /** Geri al için saklanan tek adımlık oyun durumu. */
 interface GameSnapshot {
@@ -1784,365 +1774,5 @@ export class GameService {
       this.bestScore.set(this.score());
       saveBestScore(this.bestScore());
     }
-  }
-}
-
-// ============================================================
-//  En yüksek skor kalıcılığı (localStorage)
-// ============================================================
-
-/** localStorage'dan en yüksek skoru okur (yoksa/hatalıysa 0). */
-function loadBestScore(): number {
-  try {
-    if (typeof localStorage === 'undefined') return 0;
-    const raw = localStorage.getItem(BEST_SCORE_KEY);
-    const n = raw ? parseInt(raw, 10) : 0;
-    return Number.isFinite(n) && n > 0 ? n : 0;
-  } catch {
-    return 0;
-  }
-}
-
-/** En yüksek skoru localStorage'a yazar (hata olursa sessizce geçer). */
-function saveBestScore(best: number): void {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(BEST_SCORE_KEY, String(best));
-  } catch {
-    // Depolama kullanılamıyorsa (gizli mod, kota vb.) oyunu bozma
-  }
-}
-
-/** localStorage'dan ulaşılan en yüksek seviyeyi okur (yoksa 0). */
-function loadBestLevel(): number {
-  try {
-    if (typeof localStorage === 'undefined') return 0;
-    const raw = localStorage.getItem(BEST_LEVEL_KEY);
-    const n = raw ? parseInt(raw, 10) : 0;
-    return Number.isFinite(n) && n > 0 ? n : 0;
-  } catch {
-    return 0;
-  }
-}
-
-/** Ulaşılan en yüksek seviyeyi localStorage'a yazar. */
-function saveBestLevel(level: number): void {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(BEST_LEVEL_KEY, String(level));
-  } catch {
-    /* yoksay */
-  }
-}
-
-/** localStorage'dan toplam altını okur (yoksa 0). */
-function loadGold(): number {
-  try {
-    if (typeof localStorage === 'undefined') return 0;
-    const raw = localStorage.getItem(GOLD_KEY);
-    const n = raw ? parseInt(raw, 10) : 0;
-    return Number.isFinite(n) && n >= 0 ? n : 0;
-  } catch {
-    return 0;
-  }
-}
-
-/** Toplam altını localStorage'a yazar. */
-function saveGold(gold: number): void {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(GOLD_KEY, String(gold));
-  } catch {
-    /* yoksay */
-  }
-}
-
-/** Bugüne kadar kazanılan toplam altını okur. */
-function loadTotalEarned(): number {
-  try {
-    if (typeof localStorage === 'undefined') return 0;
-    const raw = localStorage.getItem(TOTAL_EARNED_KEY);
-    const n = raw ? parseInt(raw, 10) : 0;
-    return Number.isFinite(n) && n >= 0 ? n : 0;
-  } catch {
-    return 0;
-  }
-}
-
-/** Toplam kazanılan altını yazar. */
-function saveTotalEarned(total: number): void {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(TOTAL_EARNED_KEY, String(total));
-  } catch {
-    /* yoksay */
-  }
-}
-
-/** Tercih (ad/avatar) son değişiklik zaman damgasını okur. */
-function loadPrefsAt(): number {
-  try {
-    if (typeof localStorage === 'undefined') return 0;
-    const n = parseInt(localStorage.getItem(PREFS_AT_KEY) || '0', 10);
-    return Number.isFinite(n) && n >= 0 ? n : 0;
-  } catch {
-    return 0;
-  }
-}
-
-/** Tercih son değişiklik zaman damgasını yazar. */
-function savePrefsAt(ts: number): void {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(PREFS_AT_KEY, String(ts));
-  } catch {
-    /* yoksay */
-  }
-}
-
-/** Ödülü alınmış seviyelerin listesini localStorage'dan okur. */
-function loadRewardedLevels(): number[] {
-  try {
-    if (typeof localStorage === 'undefined') return [];
-    const raw = localStorage.getItem(REWARDED_LEVELS_KEY);
-    if (!raw) return [];
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr.filter((x) => typeof x === 'number') : [];
-  } catch {
-    return [];
-  }
-}
-
-/** Ödülü alınmış seviyeleri localStorage'a yazar. */
-function saveRewardedLevels(levels: Set<number>): void {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(REWARDED_LEVELS_KEY, JSON.stringify([...levels]));
-  } catch {
-    /* yoksay */
-  }
-}
-
-/** Güç envanterini localStorage'dan okur (yoksa boş). */
-function loadPowers(): PowerInventory {
-  const base = emptyInventory();
-  try {
-    if (typeof localStorage === 'undefined') return base;
-    const raw = localStorage.getItem(POWERS_KEY);
-    if (!raw) return base;
-    const obj = JSON.parse(raw);
-    for (const key of Object.keys(base) as (keyof PowerInventory)[]) {
-      const n = obj?.[key];
-      if (typeof n === 'number' && n >= 0) base[key] = Math.floor(n);
-    }
-    return base;
-  } catch {
-    return base;
-  }
-}
-
-/** Güç envanterini localStorage'a yazar. */
-function savePowers(inv: PowerInventory): void {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(POWERS_KEY, JSON.stringify(inv));
-  } catch {
-    /* yoksay */
-  }
-}
-
-// --- Profil / istatistik / seri / günlük / başarım kalıcılık ---
-
-function loadName(): string {
-  try {
-    return localStorage?.getItem(NAME_KEY) || 'Oyuncu';
-  } catch {
-    return 'Oyuncu';
-  }
-}
-
-function saveName(name: string): void {
-  try {
-    localStorage?.setItem(NAME_KEY, name);
-  } catch {
-    /* yoksay */
-  }
-}
-
-function loadAssistant(): boolean {
-  try {
-    return localStorage?.getItem(ASSISTANT_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function saveAssistant(on: boolean): void {
-  try {
-    localStorage?.setItem(ASSISTANT_KEY, on ? '1' : '0');
-  } catch {
-    /* yoksay */
-  }
-}
-
-function loadChampionships(): number {
-  try {
-    const n = Number(localStorage?.getItem(CHAMPION_KEY) || 0);
-    return Number.isFinite(n) && n >= 0 ? n : 0;
-  } catch {
-    return 0;
-  }
-}
-
-function saveChampionships(n: number): void {
-  try {
-    localStorage?.setItem(CHAMPION_KEY, String(n));
-  } catch {
-    /* yoksay */
-  }
-}
-
-function loadAvatar(): string {
-  try {
-    const v = localStorage?.getItem(AVATAR_KEY);
-    return v && AVATARS.includes(v) ? v : AVATARS[0];
-  } catch {
-    return AVATARS[0];
-  }
-}
-
-function saveAvatar(a: string): void {
-  try {
-    localStorage?.setItem(AVATAR_KEY, a);
-  } catch {
-    /* yoksay */
-  }
-}
-
-interface StatsBlob {
-  gamesPlayed: number;
-  gamesWon: number;
-  bestTile: number;
-  totalMoves: number;
-  bombUsed: number;
-}
-
-function readStats(): Partial<StatsBlob> {
-  try {
-    if (typeof localStorage === 'undefined') return {};
-    const raw = localStorage.getItem(STATS_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function loadStat(key: keyof StatsBlob): number {
-  const v = readStats()[key];
-  return typeof v === 'number' && v >= 0 ? v : 0;
-}
-
-function saveStats(blob: StatsBlob): void {
-  try {
-    localStorage?.setItem(STATS_KEY, JSON.stringify(blob));
-  } catch {
-    /* yoksay */
-  }
-}
-
-function readStreak(): { current?: number; best?: number; day?: string } {
-  try {
-    if (typeof localStorage === 'undefined') return {};
-    const raw = localStorage.getItem(STREAK_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function loadStreak(key: 'current' | 'best'): number {
-  const v = readStreak()[key];
-  return typeof v === 'number' && v >= 0 ? v : 0;
-}
-
-function loadStreakDay(): string | null {
-  return readStreak().day ?? null;
-}
-
-function saveStreak(current: number, best: number, day: string): void {
-  try {
-    localStorage?.setItem(STREAK_KEY, JSON.stringify({ current, best, day }));
-  } catch {
-    /* yoksay */
-  }
-}
-
-function loadDailyDay(): string | null {
-  try {
-    return localStorage?.getItem(DAILY_KEY) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function saveDailyDay(day: string): void {
-  try {
-    localStorage?.setItem(DAILY_KEY, day);
-  } catch {
-    /* yoksay */
-  }
-}
-
-function loadAchievements(): Set<string> {
-  const set = new Set<string>();
-  try {
-    if (typeof localStorage === 'undefined') return set;
-    const raw = localStorage.getItem(ACHIEVEMENTS_KEY);
-    if (raw) {
-      const arr = JSON.parse(raw);
-      if (Array.isArray(arr)) for (const id of arr) if (typeof id === 'string') set.add(id);
-    }
-  } catch {
-    /* yoksay */
-  }
-  return set;
-}
-
-function saveAchievements(set: Set<string>): void {
-  try {
-    localStorage?.setItem(ACHIEVEMENTS_KEY, JSON.stringify([...set]));
-  } catch {
-    /* yoksay */
-  }
-}
-
-/** Görevleri okur: { period, list }. */
-function loadMissions(key: string): {
-  period: string | null;
-  list: MissionProgress[];
-} {
-  try {
-    if (typeof localStorage === 'undefined') return { period: null, list: [] };
-    const raw = localStorage.getItem(key);
-    if (!raw) return { period: null, list: [] };
-    const obj = JSON.parse(raw);
-    const list = Array.isArray(obj?.list)
-      ? obj.list.filter(
-          (m: unknown): m is MissionProgress =>
-            !!m && typeof (m as MissionProgress).id === 'string',
-        )
-      : [];
-    return { period: typeof obj?.period === 'string' ? obj.period : null, list };
-  } catch {
-    return { period: null, list: [] };
-  }
-}
-
-/** Görevleri yazar. */
-function saveMissions(key: string, period: string | null, list: MissionProgress[]): void {
-  try {
-    localStorage?.setItem(key, JSON.stringify({ period, list }));
-  } catch {
-    /* yoksay */
   }
 }

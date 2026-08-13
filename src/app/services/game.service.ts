@@ -5,6 +5,7 @@ import { ProfileService } from './profile.service';
 import { AchievementsService, AchievementStats } from './achievements.service';
 import { RewardsService } from './rewards.service';
 import { PowersService } from './powers.service';
+import { BoardStore, GameSnapshot } from './board-store';
 import {
   BOARD_SIZE,
   Cell,
@@ -15,17 +16,8 @@ import {
   TIME_ATTACK_SECONDS,
   Tile,
 } from '../models/tile.model';
-import { MOVE_CHAR, applyMove, hasAnyMove } from '../logic/board-logic';
-import {
-  AiLevel,
-  MoveReview,
-  ValueGrid,
-  bestMove,
-  emptyGrid,
-  mulberry32,
-  positionHealth,
-  reviewMove,
-} from '../logic/ai';
+import { applyMove, hasAnyMove } from '../logic/board-logic';
+import { AiLevel, MoveReview, ValueGrid, bestMove, positionHealth, reviewMove } from '../logic/ai';
 import { rankFor, rankPoints } from '../logic/rank';
 import { DAILY_DURATION, dailySeed, utcDayKey } from '../logic/daily-challenge';
 
@@ -52,23 +44,11 @@ export { AVATARS } from './game-storage';
 //  listesi. `grid` bu listeden türetilen 2B görünümdür.
 // ============================================================
 
-/** Yeni taşın 4 gelme olasılığı (kalan %90 → 2). */
-const CHANCE_OF_FOUR = 0.1;
-
 /** Kazanma değeri. */
 const WIN_VALUE = 2048;
 
 /** +30 saniye gücünün eklediği süre. */
 const TIME_POWER_SECONDS = 30;
-
-/** Geri al için saklanan tek adımlık oyun durumu. */
-interface GameSnapshot {
-  tiles: Tile[];
-  score: number;
-  moves: number;
-  status: GameStatus;
-  keepPlayingAfterWin: boolean;
-}
 
 /**
  * YZ gösterimi öncesi tam oyun durumu.
@@ -103,11 +83,8 @@ export class GameService {
   /** Güç envanteri + durumu ayrı serviste; efektler çekirdekte (façade). */
   private readonly powersSvc = inject(PowersService);
 
-  /** Taşlara benzersiz id vermek için artan sayaç. */
-  private nextId = 1;
-
-  /** 2048'e ulaşıp "Devam Et" denildi mi? (kazanma tekrar tetiklenmesin) */
-  private keepPlayingAfterWin = false;
+  /** Tahta durumu deposu (kernel): ham per-oyun durum + primitifler. */
+  private readonly board = inject(BoardStore);
 
   /** Süre sayacının setInterval kimliği (çalışmıyorsa null). */
   private timerId: ReturnType<typeof setInterval> | null = null;
@@ -115,16 +92,14 @@ export class GameService {
   /** Süre sayacının başladığı an (epoch ms). */
   private startTimestamp = 0;
 
-  // --- Durum sinyalleri ---------------------------------------
+  // --- Durum sinyalleri (BoardStore'da; buradan delege) -------
 
   /** Tahtadaki taşların listesi (kaynak gerçeği). */
-  readonly tiles = signal<Tile[]>([]);
-
+  readonly tiles = this.board.tiles;
   /** Anlık skor. */
-  readonly score = signal<number>(0);
-
+  readonly score = this.board.score;
   /** Bu oyunda yapılan geçerli hamle sayısı. */
-  readonly moves = signal<number>(0);
+  readonly moves = this.board.moves;
 
   /** Bu oyunda geçen süre (saniye). */
   readonly elapsedSeconds = signal<number>(0);
@@ -136,16 +111,13 @@ export class GameService {
   readonly bestScore = this.profile.bestScore;
 
   /** Oyunun anlık durumu. */
-  readonly status = signal<GameStatus>(GameStatus.Idle);
-
+  readonly status = this.board.status;
   /** Oyun modu (klasik / seviye / zen / zaman yarışı). */
-  readonly mode = signal<GameMode>(GameMode.Classic);
-
+  readonly mode = this.board.mode;
   /** Anlık tahta boyutu (NxN). Seviye modu her zaman 4. */
-  readonly boardSize = signal<number>(BOARD_SIZE);
-
+  readonly boardSize = this.board.boardSize;
   /** (Seviye modu) anlık seviye. */
-  readonly level = signal<number>(1);
+  readonly level = this.board.level;
 
   /** Ulaşılan en yüksek seviye (ProfileService'te). */
   readonly bestLevel = this.profile.bestLevel;
@@ -217,60 +189,26 @@ export class GameService {
   /** Bugün günlük ödül alınabilir mi? (RewardsService'te) */
   readonly canClaimDaily = this.rewards.canClaimDaily;
 
-  /** (Seviye modu) anlık seviyenin hedef karesi. */
-  readonly levelTarget = computed<number>(() => levelConfig(this.level()).target);
+  /** (Seviye modu) anlık seviyenin hedef karesi (BoardStore'da). */
+  readonly levelTarget = this.board.levelTarget;
 
-  /** Son hamleden ÖNCEKİ durum (tek adımlık geçmiş). */
-  private readonly history = signal<GameSnapshot | null>(null);
+  /** Son hamleden ÖNCEKİ durum (tek adımlık geçmiş; BoardStore'da). */
+  private readonly history = this.board.history;
 
-  /**
-   * Geri alınabilecek bir hamle var mı?
-   * Tohumlu modlarda (yarış + günlük) geri alma yasak olduğundan buton da
-   * pasif olmalı; yoksa aktif görünüp tıklayınca hiçbir şey yapmıyordu.
-   */
-  readonly canUndo = computed<boolean>(
-    () =>
-      this.history() !== null && this.mode() !== GameMode.Race && this.mode() !== GameMode.Daily,
-  );
+  /** Geri alınabilecek bir hamle var mı? (BoardStore'da) */
+  readonly canUndo = this.board.canUndo;
 
-  // --- Türetilmiş sinyaller -----------------------------------
+  // --- Türetilmiş sinyaller (BoardStore'da; delege) -----------
 
   /** `tiles` listesinden üretilen NxN ızgara (okumak/çizmek için). */
-  readonly grid = computed<Grid>(() => {
-    const g = this.createEmptyGrid();
-    for (const tile of this.tiles()) {
-      g[tile.row][tile.col] = tile;
-    }
-    return g;
-  });
-
-  /**
-   * ŞU ANKİ tahtadaki en yüksek kare. `bestTile` tüm zamanların
-   * istatistiğidir; yarış tablosunda o gösterilirse oyuncunun geçmiş
-   * rekoru o yarışta yapmış gibi görünür.
-   */
-  readonly currentBestTile = computed<number>(() =>
-    this.tiles().reduce((max, t) => (t.value > max ? t.value : max), 0),
-  );
-
+  readonly grid = this.board.grid;
+  /** ŞU ANKİ tahtadaki en yüksek kare (tüm zamanların rekoru değil). */
+  readonly currentBestTile = this.board.currentBestTile;
   /** Boştaki hücre sayısı (hamle üretmek/oyun sonu için). */
-  readonly emptyCount = computed<number>(
-    () => this.boardSize() * this.boardSize() - this.tiles().length,
-  );
+  readonly emptyCount = this.board.emptyCount;
 
-  /**
-   * Aktif oyunun tohumlu RNG'si. ARTIK HER OYUN TOHUMLUDUR — böylece
-   * sunucu, tohum + hamle dizisinden oyunu birebir yeniden oynatıp skoru
-   * kendisi hesaplayabilir (skor tablosu hile yapılamaz olur).
-   * null yalnızca oyun yokken (başlık ekranı) olur.
-   */
-  private gameRng: (() => number) | null = null;
-
-  /** Aktif oyunun tohumu (doğrulama transkriptinde gönderilir). */
-  readonly gameSeed = signal<number>(0);
-
-  /** Bu oyunda uygulanan hamlelerin dizisi ("U/D/L/R"). */
-  private recordedMoves = '';
+  /** Aktif oyunun tohumu (doğrulama transkriptinde gönderilir; BoardStore'da). */
+  readonly gameSeed = this.board.gameSeed;
 
   /**
    * Bu oyunda GÜÇ kullanıldı mı? Kullanıldıysa oyun şampiyonluk
@@ -279,38 +217,18 @@ export class GameService {
    */
   readonly powerUsedThisGame = this.powersSvc.usedThisGame;
 
-  /** Aktif rastgelelik kaynağı (her oyun tohumlu; oyun yoksa Math.random). */
-  private rand(): number {
-    return this.gameRng ? this.gameRng() : Math.random();
-  }
-
   /**
-   * Yeni bir doğrulanabilir oyun kaydı başlatır: tohumu ayarlar, hamle
-   * kaydını ve güç bayrağını sıfırlar. Tüm start* fonksiyonları çağırır.
+   * Yeni bir doğrulanabilir oyun kaydı başlatır: tohum + hamle kaydını
+   * BoardStore'a, güç bayrağını PowersService'e sıfırlatır.
    */
   private beginRecordedGame(seed: number): void {
-    const s = seed >>> 0;
-    this.gameSeed.set(s);
-    this.gameRng = mulberry32(s);
-    this.recordedMoves = '';
+    this.board.beginRecordedGame(seed);
     this.powerUsedThisGame.set(false);
   }
 
-  /** Rastgele 32-bit tohum (tohumsuz modlar için). */
-  private randomSeed(): number {
-    return Math.floor(Math.random() * 0x100000000) >>> 0;
-  }
-
-  /**
-   * Sunucuya gönderilecek doğrulama transkripti.
-   * Sunucu bunu yeniden oynatıp skoru KENDİSİ hesaplar.
-   */
+  /** Sunucuya gönderilecek doğrulama transkripti (BoardStore'dan). */
   gameTranscript(): { seed: number; moves: string; size: number } {
-    return {
-      seed: this.gameSeed(),
-      moves: this.recordedMoves,
-      size: this.boardSize(),
-    };
+    return this.board.gameTranscript();
   }
 
   constructor() {
@@ -319,10 +237,9 @@ export class GameService {
 
   // --- Fabrika / kurulum fonksiyonları ------------------------
 
-  /** NxN boş ızgara üretir (tüm hücreler null). */
+  /** NxN boş ızgara üretir (BoardStore'dan). */
   createEmptyGrid(): Grid {
-    const n = this.boardSize();
-    return Array.from({ length: n }, () => Array.from({ length: n }, () => null));
+    return this.board.createEmptyGrid();
   }
 
   /** Klasik (sonsuz) oyunu başlatır (geriye dönük uyumluluk). */
@@ -337,7 +254,7 @@ export class GameService {
    * - TimeAttack: sabit geri sayım, en yüksek skor.
    */
   startMode(mode: GameMode, size: number = BOARD_SIZE): void {
-    this.beginRecordedGame(this.randomSeed()); // her oyun tohumlu → doğrulanabilir
+    this.beginRecordedGame(this.board.randomSeed()); // her oyun tohumlu → doğrulanabilir
     this.cancelAutoplay(); // sürüyorsa gösterimi bitir, eski durumu ATMA
     this.paused.set(false);
     this.aiAssisted.set(false); // yeni oyun → temiz sayfa
@@ -348,7 +265,7 @@ export class GameService {
     this.tiles.set([]);
     this.score.set(0);
     this.moves.set(0);
-    this.keepPlayingAfterWin = false;
+    this.board.keepPlaying.set(false);
     this.history.set(null);
     this.clearPowerFx();
     this.status.set(GameStatus.Playing);
@@ -390,7 +307,7 @@ export class GameService {
     this.tiles.set([]);
     this.score.set(0);
     this.moves.set(0);
-    this.keepPlayingAfterWin = true; // 2048'de durma, süre bitene dek oyna
+    this.board.keepPlaying.set(true); // 2048'de durma, süre bitene dek oyna
     this.history.set(null);
     this.clearPowerFx();
     this.status.set(GameStatus.Playing);
@@ -415,7 +332,7 @@ export class GameService {
     this.tiles.set([]);
     this.score.set(0);
     this.moves.set(0);
-    this.keepPlayingAfterWin = true; // 2048'de durma; süre bitene dek yarış
+    this.board.keepPlaying.set(true); // 2048'de durma; süre bitene dek yarış
     this.history.set(null);
     this.clearPowerFx();
     this.status.set(GameStatus.Playing);
@@ -534,10 +451,7 @@ export class GameService {
 
   /** Mevcut taşları YZ için değer ızgarasına (number[][]) çevirir. */
   toValueGrid(): ValueGrid {
-    const n = this.boardSize();
-    const g = emptyGrid(n);
-    for (const t of this.tiles()) g[t.row][t.col] = t.value;
-    return g;
+    return this.board.toValueGrid();
   }
 
   /**
@@ -568,7 +482,7 @@ export class GameService {
       score: this.score(),
       moves: this.moves(),
       status: this.status(),
-      keepPlayingAfterWin: this.keepPlayingAfterWin,
+      keepPlayingAfterWin: this.board.keepPlaying(),
       history: this.history(),
       elapsedSeconds: this.elapsedSeconds(),
       remainingSeconds: this.remainingSeconds(),
@@ -626,7 +540,7 @@ export class GameService {
     this.tiles.set(snap.tiles.map((t) => ({ id: t.id, value: t.value, row: t.row, col: t.col })));
     this.score.set(snap.score);
     this.moves.set(snap.moves);
-    this.keepPlayingAfterWin = snap.keepPlayingAfterWin;
+    this.board.keepPlaying.set(snap.keepPlayingAfterWin);
     this.history.set(snap.history);
     this.status.set(snap.status);
     this.assistHintsLeft.set(snap.assistHintsLeft);
@@ -704,7 +618,7 @@ export class GameService {
 
   /** Anlık seviyeyi (yeniden) başlatır: boş tahta + geri sayım. */
   private startLevel(): void {
-    this.beginRecordedGame(this.randomSeed());
+    this.beginRecordedGame(this.board.randomSeed());
     this.cancelAutoplay(); // sürüyorsa gösterimi bitir, eski durumu ATMA
     this.paused.set(false);
     this.aiAssisted.set(false); // yeni seviye → temiz sayfa
@@ -716,7 +630,7 @@ export class GameService {
     this.score.set(0);
     this.moves.set(0);
     this.lastReward.set(0);
-    this.keepPlayingAfterWin = false;
+    this.board.keepPlaying.set(false);
     this.history.set(null);
     this.clearPowerFx();
     this.status.set(GameStatus.Playing);
@@ -736,7 +650,7 @@ export class GameService {
     this.cancelAutoplay(); // ana ekrana dönerken geri yüklenecek bir şey yok
     this.stopTimer();
     this.paused.set(false);
-    this.gameRng = null;
+    this.board.clearRng();
     this.status.set(GameStatus.Idle);
   }
 
@@ -776,7 +690,7 @@ export class GameService {
     this.tiles.set([]);
     this.score.set(0);
     this.moves.set(0);
-    this.keepPlayingAfterWin = false;
+    this.board.keepPlaying.set(false);
     this.history.set(null);
     this.status.set(GameStatus.Idle);
     this.mode.set(GameMode.Classic);
@@ -816,7 +730,7 @@ export class GameService {
     );
     this.score.set(snapshot.score);
     this.moves.set(snapshot.moves);
-    this.keepPlayingAfterWin = snapshot.keepPlayingAfterWin;
+    this.board.keepPlaying.set(snapshot.keepPlayingAfterWin);
     this.status.set(snapshot.status);
 
     // Tek adımlık geçmiş: geri aldıktan sonra tekrar geri alınamaz
@@ -847,7 +761,7 @@ export class GameService {
   /** Kazandıktan sonra "Devam Et": oyuna geri dön, kazanmayı bir daha tetikleme. */
   continueAfterWin(): void {
     if (this.status() !== GameStatus.Won) return;
-    this.keepPlayingAfterWin = true;
+    this.board.keepPlaying.set(true);
     this.status.set(GameStatus.Playing);
     // Süre kaldığı yerden devam etsin (donmuş değerden ileri)
     this.startTimer(this.elapsedSeconds());
@@ -1253,7 +1167,7 @@ export class GameService {
 
     // Doğrulama transkriptine ekle (yalnızca UYGULANAN hamleler).
     // Sunucu bu diziyi yeniden oynatıp skoru kendisi hesaplar.
-    this.recordedMoves += MOVE_CHAR[direction];
+    this.board.recordMove(direction);
 
     // Hamle kalitesi: YALNIZCA insan hamleleri, asistan açıkken ve tahta
     // henüz DEĞİŞMEDEN değerlendirilir (kıyas hamle öncesi pozisyona göre).
@@ -1279,7 +1193,7 @@ export class GameService {
       score: this.score(),
       moves: this.moves(),
       status: this.status(),
-      keepPlayingAfterWin: this.keepPlayingAfterWin,
+      keepPlayingAfterWin: this.board.keepPlaying(),
     });
 
     // Geçerli hamle → hamle sayısını artır.
@@ -1326,7 +1240,7 @@ export class GameService {
 
   /** Klasik mod: 2048'e ulaşınca kazanma, hamle kalmayınca kaybetme. */
   private checkClassicEnd(): void {
-    if (!this.keepPlayingAfterWin && this.tiles().some((t) => t.value >= WIN_VALUE)) {
+    if (!this.board.keepPlaying() && this.tiles().some((t) => t.value >= WIN_VALUE)) {
       this.stopTimer(); // süre "tamamlama" anında donar
       this.status.set(GameStatus.Won);
       this.recordGameEnd(true);
@@ -1489,37 +1403,16 @@ export class GameService {
     }
   }
 
-  // --- Yardımcılar --------------------------------------------
+  // --- Yardımcılar (BoardStore'a delege) ----------------------
 
   /** Boş hücrelerin konum listesini döndürür. */
   emptyCells(): Cell[] {
-    const n = this.boardSize();
-    const occupied = new Set(this.tiles().map((t) => t.row * n + t.col));
-    const cells: Cell[] = [];
-    for (let row = 0; row < n; row++) {
-      for (let col = 0; col < n; col++) {
-        if (!occupied.has(row * n + col)) {
-          cells.push({ row, col });
-        }
-      }
-    }
-    return cells;
+    return this.board.emptyCells();
   }
 
-  /**
-   * Rastgele boş bir hücreye yeni bir taş (2 veya 4) ekler.
-   * Boş hücre yoksa null döner.
-   */
+  /** Rastgele boş bir hücreye yeni bir taş ekler. Boş hücre yoksa null döner. */
   spawnRandomTile(): Tile | null {
-    const cells = this.emptyCells();
-    if (cells.length === 0) return null;
-
-    const { row, col } = cells[Math.floor(this.rand() * cells.length)];
-    const value = this.rand() < CHANCE_OF_FOUR ? 4 : 2;
-    const tile: Tile = { id: this.nextId++, value, row, col, isNew: true };
-
-    this.tiles.update((list) => [...list, tile]);
-    return tile;
+    return this.board.spawnRandomTile();
   }
 
   /** Anlık skor en yüksek skoru geçtiyse güncelle (ProfileService). */

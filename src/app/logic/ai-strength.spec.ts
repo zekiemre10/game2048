@@ -1,11 +1,4 @@
-import {
-  AiLevel,
-  bestMove,
-  emptyCells,
-  mulberry32,
-  placeTile,
-  simulateMove,
-} from './ai';
+import { AiLevel, bestMove, emptyCells, mulberry32, placeTile, simulateMove } from './ai';
 
 // ============================================================
 //  YZ GÜÇ MERDİVENİ REGRESYONU

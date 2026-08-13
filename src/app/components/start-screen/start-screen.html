@@ -19,77 +19,73 @@
     </div>
 
     <div class="hero-actions">
-    <!-- Tahta boyutu (Seviye modu hariç) -->
-    <div class="size-row">
-      <span class="size-label">{{ t('start.sizeLabel') }}</span>
-      <div class="size-choice">
-        @for (n of BOARD_SIZES; track n) {
-          <button
-            type="button"
-            [class.active]="selectedSize() === n"
-            (click)="onSelectSize(n)"
-          >
-            {{ n }}×{{ n }}
-          </button>
-        }
+      <!-- Tahta boyutu (Seviye modu hariç) -->
+      <div class="size-row">
+        <span class="size-label">{{ t('start.sizeLabel') }}</span>
+        <div class="size-choice">
+          @for (n of BOARD_SIZES; track n) {
+            <button type="button" [class.active]="selectedSize() === n" (click)="onSelectSize(n)">
+              {{ n }}×{{ n }}
+            </button>
+          }
+        </div>
       </div>
-    </div>
 
-    <!-- Mod seçimi -->
-    <div class="mode-grid">
-      <button class="mode-card" type="button" (click)="onStartMode(GameMode.Classic)">
-        <span class="mode-icon">🎮</span>
-        <span class="mode-name">{{ t('mode.classic') }}</span>
-        <span class="mode-desc">{{ t('mode.classicDesc') }}</span>
-      </button>
-      <button class="mode-card" type="button" (click)="onStartMode(GameMode.Zen)">
-        <span class="mode-icon">🧘</span>
-        <span class="mode-name">{{ t('mode.zen') }}</span>
-        <span class="mode-desc">{{ t('mode.zenDesc') }}</span>
-      </button>
-      <button class="mode-card" type="button" (click)="onStartMode(GameMode.TimeAttack)">
-        <span class="mode-icon">⚡</span>
-        <span class="mode-name">{{ t('mode.timeAttack') }}</span>
-        <span class="mode-desc">{{ t('mode.timeAttackDesc') }}</span>
-      </button>
-      <button class="mode-card level" type="button" (click)="onStartLevel()">
-        <span class="mode-icon">🎯</span>
-        <span class="mode-name">{{ t('mode.level') }}</span>
-        <span class="mode-desc">{{ t('mode.levelDesc') }}</span>
-      </button>
-    </div>
+      <!-- Mod seçimi -->
+      <div class="mode-grid">
+        <button class="mode-card" type="button" (click)="onStartMode(GameMode.Classic)">
+          <span class="mode-icon">🎮</span>
+          <span class="mode-name">{{ t('mode.classic') }}</span>
+          <span class="mode-desc">{{ t('mode.classicDesc') }}</span>
+        </button>
+        <button class="mode-card" type="button" (click)="onStartMode(GameMode.Zen)">
+          <span class="mode-icon">🧘</span>
+          <span class="mode-name">{{ t('mode.zen') }}</span>
+          <span class="mode-desc">{{ t('mode.zenDesc') }}</span>
+        </button>
+        <button class="mode-card" type="button" (click)="onStartMode(GameMode.TimeAttack)">
+          <span class="mode-icon">⚡</span>
+          <span class="mode-name">{{ t('mode.timeAttack') }}</span>
+          <span class="mode-desc">{{ t('mode.timeAttackDesc') }}</span>
+        </button>
+        <button class="mode-card level" type="button" (click)="onStartLevel()">
+          <span class="mode-icon">🎯</span>
+          <span class="mode-name">{{ t('mode.level') }}</span>
+          <span class="mode-desc">{{ t('mode.levelDesc') }}</span>
+        </button>
+      </div>
 
-    <!-- Günlük meydan okuma: herkes aynı tahtayı oynar -->
-    <button class="daily-card" type="button" (click)="openDaily.emit()">
-      <span class="daily-icon" aria-hidden="true">📅</span>
-      <span class="daily-info">
-        <span class="daily-name">{{ t('daily.title') }}</span>
-        <span class="daily-desc">{{ t('daily.cardDesc') }}</span>
-      </span>
-      <span class="daily-go" aria-hidden="true">→</span>
-    </button>
+      <!-- Günlük meydan okuma: herkes aynı tahtayı oynar -->
+      <button class="daily-card" type="button" (click)="openDaily.emit()">
+        <span class="daily-icon" aria-hidden="true">📅</span>
+        <span class="daily-info">
+          <span class="daily-name">{{ t('daily.title') }}</span>
+          <span class="daily-desc">{{ t('daily.cardDesc') }}</span>
+        </span>
+        <span class="daily-go" aria-hidden="true">→</span>
+      </button>
 
-    <!-- Başarımlar: ana ekranda özet şerit, tıklayınca tam liste -->
-    <button class="ach-strip" type="button" (click)="openAchievements.emit()">
-      <span class="ach-strip-top">
-        <!-- Çeviri metni zaten 🏅 ile başlıyor, ayrıca simge eklenmez -->
-        <span class="ach-strip-title">{{ t('prof.achievements') }}</span>
-        <span class="ach-strip-count">{{ unlockedCount() }}/{{ totalCount }}</span>
-      </span>
-      <span class="ach-strip-icons">
-        @for (a of ACHIEVEMENTS; track a.id) {
-          <span
-            class="ach-strip-icon"
-            [class.locked]="!isUnlocked(a.id)"
-            [title]="L(a.name, a.nameEn)"
-            >{{ a.icon }}</span
-          >
-        }
-      </span>
-      <span class="mission-bar">
-        <span class="mission-fill" [style.width.%]="percent()"></span>
-      </span>
-    </button>
+      <!-- Başarımlar: ana ekranda özet şerit, tıklayınca tam liste -->
+      <button class="ach-strip" type="button" (click)="openAchievements.emit()">
+        <span class="ach-strip-top">
+          <!-- Çeviri metni zaten 🏅 ile başlıyor, ayrıca simge eklenmez -->
+          <span class="ach-strip-title">{{ t('prof.achievements') }}</span>
+          <span class="ach-strip-count">{{ unlockedCount() }}/{{ totalCount }}</span>
+        </span>
+        <span class="ach-strip-icons">
+          @for (a of ACHIEVEMENTS; track a.id) {
+            <span
+              class="ach-strip-icon"
+              [class.locked]="!isUnlocked(a.id)"
+              [title]="L(a.name, a.nameEn)"
+              >{{ a.icon }}</span
+            >
+          }
+        </span>
+        <span class="mission-bar">
+          <span class="mission-fill" [style.width.%]="percent()"></span>
+        </span>
+      </button>
     </div>
   </div>
 </section>

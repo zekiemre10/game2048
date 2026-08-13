@@ -14,8 +14,12 @@ describe('görev seçimi (pickMissions)', () => {
   });
 
   it('farklı tohum genelde farklı seçim verir', () => {
-    const a = pickMissions(DAILY_POOL, 3, '2026-01-05').map((m) => m.id).join();
-    const b = pickMissions(DAILY_POOL, 3, '2026-01-06').map((m) => m.id).join();
+    const a = pickMissions(DAILY_POOL, 3, '2026-01-05')
+      .map((m) => m.id)
+      .join();
+    const b = pickMissions(DAILY_POOL, 3, '2026-01-06')
+      .map((m) => m.id)
+      .join();
     // Küçük havuzda çakışma olabilir ama çoğu gün farklıdır
     expect(a === b).toBe(false);
   });

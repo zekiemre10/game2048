@@ -91,8 +91,7 @@ export function simulateMove(
   let work = clone(g);
 
   const reverse = (m: ValueGrid) => m.map((row) => row.slice().reverse());
-  const transpose = (m: ValueGrid) =>
-    m[0].map((_, c) => m.map((row) => row[c]));
+  const transpose = (m: ValueGrid) => m[0].map((_, c) => m.map((row) => row[c]));
 
   if (dir === Direction.Up) work = transpose(work);
   else if (dir === Direction.Down) work = reverse(transpose(work));
@@ -113,7 +112,11 @@ export function simulateMove(
   // Değişti mi?
   let moved = false;
   for (let r = 0; r < n && !moved; r++)
-    for (let c = 0; c < n; c++) if (result[r][c] !== g[r][c]) { moved = true; break; }
+    for (let c = 0; c < n; c++)
+      if (result[r][c] !== g[r][c]) {
+        moved = true;
+        break;
+      }
 
   return { grid: result, moved, gained };
 }
@@ -199,7 +202,10 @@ export function evaluate(g: ValueGrid): number {
   for (let r = 0; r < n; r++)
     for (let c = 0; c < n; c++) {
       const v = g[r][c];
-      if (v === 0) { empties++; continue; }
+      if (v === 0) {
+        empties++;
+        continue;
+      }
       weighted += v * w[r][c];
       if (v > maxVal) maxVal = v;
     }
@@ -210,12 +216,7 @@ export function evaluate(g: ValueGrid): number {
 // --- Expectimax ---------------------------------------------
 
 const NO_MOVE_PENALTY = -1e15;
-const DIRECTIONS: Direction[] = [
-  Direction.Up,
-  Direction.Down,
-  Direction.Left,
-  Direction.Right,
-];
+const DIRECTIONS: Direction[] = [Direction.Up, Direction.Down, Direction.Left, Direction.Right];
 
 /** Yüksek çözünürlüklü saat (tarayıcı/Node/test hepsinde çalışır). */
 function now(): number {
@@ -290,11 +291,7 @@ function chanceNode(g: ValueGrid, depth: number): number {
  * (bestMove ve reviewMove ortak kullanır — tutarlı karşılaştırma.)
  * Süre dolarsa TIMEOUT fırlatır (çağıran yakalar).
  */
-function scoreDirections(
-  g: ValueGrid,
-  legal: Direction[],
-  depth: number,
-): Map<Direction, number> {
+function scoreDirections(g: ValueGrid, legal: Direction[], depth: number): Map<Direction, number> {
   const out = new Map<Direction, number>();
   for (const dir of legal) {
     const { grid } = simulateMove(g, dir);
@@ -328,18 +325,50 @@ export interface LevelCfg {
 const LEVEL_CFG: Record<AiLevel, LevelCfg> = {
   // Kolay: SIĞ (d1) — sadece tek hamle ileri bakar, taş üretimini planlayamaz →
   // ~512'de tıkanır. Rastgele değil, sadece kısa görüşlü. Orta bir insan yener.
-  easy: { minDepth: 1, maxDepth: 1, timeCapMs: 8, sampleK: 2, expandFour: true, snakePow: 1, emptyMul: 4 },
+  easy: {
+    minDepth: 1,
+    maxDepth: 1,
+    timeCapMs: 8,
+    sampleK: 2,
+    expandFour: true,
+    snakePow: 1,
+    emptyMul: 4,
+  },
   // Orta: iki hamle ileri (d2) ama KABA — tek şans hücresi örnekler (sampleK 1),
   // 4-taşını yok sayar ve DÜZLEŞMİŞ gradyanla (snakePow 0.3) oynar. Mantıklı
   // ama isabetsiz → ~1024-2048 civarı. Bu, d1 ile tam-d2 arasındaki boşluğu doldurur.
-  medium: { minDepth: 2, maxDepth: 2, timeCapMs: 12, sampleK: 1, expandFour: false, snakePow: 0.3, emptyMul: 1 },
+  medium: {
+    minDepth: 2,
+    maxDepth: 2,
+    timeCapMs: 12,
+    sampleK: 1,
+    expandFour: false,
+    snakePow: 0.3,
+    emptyMul: 1,
+  },
   // Zor: iki hamle ileri + TAM sezgisel + isabetli beklenen değer → güçlü, çoğu insanı yener.
-  hard: { minDepth: 2, maxDepth: 2, timeCapMs: 16, sampleK: 2, expandFour: true, snakePow: 1, emptyMul: 4 },
+  hard: {
+    minDepth: 2,
+    maxDepth: 2,
+    timeCapMs: 16,
+    sampleK: 2,
+    expandFour: true,
+    snakePow: 1,
+    emptyMul: 4,
+  },
   // Uzman: yinelemeli derinleşme 3→4. minDepth 3 KRİTİK: derinlik 3 hızlıca
   // tamamlanıp bir YEDEK sağlar; sonra derinlik 4 denenir. (minDepth'i 4
   // yaparsak derinlik 4 zaman aşımına uğradığında hiç tamamlanmış derinlik
   // kalmaz ve hamle rastgele ilk yöne düşerdi.)
-  expert: { minDepth: 3, maxDepth: 4, timeCapMs: 26, sampleK: 2, expandFour: true, snakePow: 1, emptyMul: 4 },
+  expert: {
+    minDepth: 3,
+    maxDepth: 4,
+    timeCapMs: 26,
+    sampleK: 2,
+    expandFour: true,
+    snakePow: 1,
+    emptyMul: 4,
+  },
 };
 
 /**
@@ -397,11 +426,22 @@ export function describeGame(
   const en: string[] = [];
 
   // Genel değerlendirme (en büyük kareye göre)
-  if (bestTile >= 2048) { tr.push('🏆 Muhteşem! 2048’e ulaştın.'); en.push('🏆 Amazing! You reached 2048.'); }
-  else if (bestTile >= 1024) { tr.push('🔥 Çok iyi — 1024 karesini yaptın, 2048 çok yakın.'); en.push('🔥 Great — you made 1024, 2048 is close.'); }
-  else if (bestTile >= 512) { tr.push('👍 İyi oyun — 512’ye ulaştın.'); en.push('👍 Good game — you reached 512.'); }
-  else if (bestTile >= 256) { tr.push('🙂 Fena değil — 256 karesini yaptın.'); en.push('🙂 Not bad — you made 256.'); }
-  else { tr.push('💪 Isınma turu — biraz daha pratikle daha yükseğe çıkarsın.'); en.push('💪 Warm-up round — a little more practice and you’ll climb higher.'); }
+  if (bestTile >= 2048) {
+    tr.push('🏆 Muhteşem! 2048’e ulaştın.');
+    en.push('🏆 Amazing! You reached 2048.');
+  } else if (bestTile >= 1024) {
+    tr.push('🔥 Çok iyi — 1024 karesini yaptın, 2048 çok yakın.');
+    en.push('🔥 Great — you made 1024, 2048 is close.');
+  } else if (bestTile >= 512) {
+    tr.push('👍 İyi oyun — 512’ye ulaştın.');
+    en.push('👍 Good game — you reached 512.');
+  } else if (bestTile >= 256) {
+    tr.push('🙂 Fena değil — 256 karesini yaptın.');
+    en.push('🙂 Not bad — you made 256.');
+  } else {
+    tr.push('💪 Isınma turu — biraz daha pratikle daha yükseğe çıkarsın.');
+    en.push('💪 Warm-up round — a little more practice and you’ll climb higher.');
+  }
 
   // Köşe stratejisi
   if (inCorner) {

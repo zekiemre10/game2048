@@ -65,9 +65,7 @@ describe('GameService — seviye modu', () => {
 
   it('süre azaldıkça artar → sonraki seviye daha kısa', () => {
     for (let i = 1; i < MAX_LEVEL; i++) {
-      expect(levelConfig(i + 1).seconds).toBeLessThanOrEqual(
-        levelConfig(i).seconds,
-      );
+      expect(levelConfig(i + 1).seconds).toBeLessThanOrEqual(levelConfig(i).seconds);
       expect(levelConfig(i + 1).target).toBeGreaterThan(levelConfig(i).target);
     }
   });

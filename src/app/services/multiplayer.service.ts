@@ -51,9 +51,7 @@ export class MultiplayerService {
 
   readonly inRoom = computed(() => this.room() !== null);
   readonly status = computed(() => this.room()?.status ?? null);
-  readonly isHost = computed(
-    () => this.room()?.hostId === this.auth.user()?.id,
-  );
+  readonly isHost = computed(() => this.room()?.hostId === this.auth.user()?.id);
   readonly players = computed(() => this.room()?.players ?? []);
 
   private loopOn = false;
@@ -221,10 +219,7 @@ export class MultiplayerService {
         });
         if (res.ok) updated = (await res.json()).room;
       } else {
-        const res = await fetch(
-          `${API_BASE}/rooms/state?code=${room.code}`,
-          { headers },
-        );
+        const res = await fetch(`${API_BASE}/rooms/state?code=${room.code}`, { headers });
         if (res.status === 404) {
           // Oda kapandı (host ayrıldı)
           this.loopOn = false;

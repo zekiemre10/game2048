@@ -130,12 +130,9 @@ describe('GameService — mağaza ve güçler', () => {
 
     expect(service.usePower('hint')).toBe(true);
     expect(service.hintDirection()).not.toBeNull();
-    expect([
-      Direction.Left,
-      Direction.Right,
-      Direction.Up,
-      Direction.Down,
-    ]).toContain(service.hintDirection());
+    expect([Direction.Left, Direction.Right, Direction.Up, Direction.Down]).toContain(
+      service.hintDirection(),
+    );
     expect(service.powers().hint).toBe(0);
   });
 

@@ -1,11 +1,4 @@
-import {
-  Component,
-  ElementRef,
-  computed,
-  effect,
-  inject,
-  input,
-} from '@angular/core';
+import { Component, ElementRef, computed, effect, inject, input } from '@angular/core';
 import { Tile } from '../../models/tile.model';
 
 @Component({
@@ -37,9 +30,9 @@ export class TileComponent {
     // çalışmaz. Bu yüzden sınıfı kaldırıp reflow tetikleyerek yeniden ekliyoruz.
     effect(() => {
       const merged = this.tile().merged === true;
-      const inner: HTMLElement | null = (
-        this.host.nativeElement as HTMLElement
-      ).querySelector('.tile');
+      const inner: HTMLElement | null = (this.host.nativeElement as HTMLElement).querySelector(
+        '.tile',
+      );
       if (!inner) return;
 
       inner.classList.remove('is-merged');

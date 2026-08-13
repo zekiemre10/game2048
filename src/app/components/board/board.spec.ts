@@ -21,9 +21,7 @@ describe('BoardComponent', () => {
 
   it('16 adet boş zemin hücresi çizmeli', () => {
     const fixture = render();
-    const cells = (fixture.nativeElement as HTMLElement).querySelectorAll(
-      '.cell-bg',
-    );
+    const cells = (fixture.nativeElement as HTMLElement).querySelectorAll('.cell-bg');
     expect(cells.length).toBe(16);
   });
 
@@ -45,9 +43,7 @@ describe('BoardComponent', () => {
     game.tiles.set([{ id: 1, value: 2, row: 2, col: 3 }]);
 
     const fixture = render();
-    const host = (fixture.nativeElement as HTMLElement).querySelector(
-      'app-tile',
-    ) as HTMLElement;
+    const host = (fixture.nativeElement as HTMLElement).querySelector('app-tile') as HTMLElement;
 
     expect(host.style.getPropertyValue('--row').trim()).toBe('2');
     expect(host.style.getPropertyValue('--col').trim()).toBe('3');
@@ -65,12 +61,8 @@ describe('BoardComponent', () => {
     expect(el.querySelector('.tile[data-value="2"]')).toBeTruthy();
     expect(el.querySelector('.tile[data-value="4"]')).toBeTruthy();
     // Değerler ekranda görünüyor
-    expect(el.querySelector('.tile[data-value="2"]')?.textContent?.trim()).toBe(
-      '2',
-    );
-    expect(el.querySelector('.tile[data-value="4"]')?.textContent?.trim()).toBe(
-      '4',
-    );
+    expect(el.querySelector('.tile[data-value="2"]')?.textContent?.trim()).toBe('2');
+    expect(el.querySelector('.tile[data-value="4"]')?.textContent?.trim()).toBe('4');
   });
 
   it('yeni kare "is-new" (pop-in) sınıfı almalı', () => {

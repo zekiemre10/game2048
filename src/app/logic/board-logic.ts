@@ -105,20 +105,16 @@ export function applyMove(
   direction: Direction,
   size: number = BOARD_SIZE,
 ): MoveResult {
-  const horizontal =
-    direction === Direction.Left || direction === Direction.Right;
+  const horizontal = direction === Direction.Left || direction === Direction.Right;
   // İtilen kenar index 0 mı? (sol/yukarı → evet)
-  const towardStart =
-    direction === Direction.Left || direction === Direction.Up;
+  const towardStart = direction === Direction.Left || direction === Direction.Up;
 
   const result: Tile[] = [];
   let gained = 0;
 
   for (let line = 0; line < size; line++) {
     // Bu satır/sütundaki kareler
-    const inLine = tiles.filter(
-      (t) => (horizontal ? t.row : t.col) === line,
-    );
+    const inLine = tiles.filter((t) => (horizontal ? t.row : t.col) === line);
 
     // İtilen kenardan uzaklığa göre sırala
     inLine.sort((a, b) => {

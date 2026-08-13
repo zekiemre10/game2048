@@ -8,8 +8,7 @@
   height: 100dvh; // mobil tarayıcı çubuğunu hesaba katar
   margin: 0 auto;
   // Üstte sabit profil/mağaza/ayar butonlarına yer bırak
-  padding: clamp(3rem, 11vw, 3.6rem) clamp(0.6rem, 3vw, 1rem)
-    clamp(0.5rem, 2vw, 0.9rem);
+  padding: clamp(3rem, 11vw, 3.6rem) clamp(0.6rem, 3vw, 1rem) clamp(0.5rem, 2vw, 0.9rem);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -54,7 +53,6 @@
 .side-title {
   display: none;
 }
-
 
 .topbar {
   flex: 0 0 auto;
@@ -2646,16 +2644,26 @@
   cursor: pointer;
   text-align: left;
   border-left-width: 4px;
-  transition: transform 0.08s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.15s ease;
 }
 .mp-botlevel:hover {
   transform: translateY(-1px);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
 }
-.mp-botlevel.lvl-easy { border-left-color: #3fb950; }
-.mp-botlevel.lvl-medium { border-left-color: #d29922; }
-.mp-botlevel.lvl-hard { border-left-color: #db6d28; }
-.mp-botlevel.lvl-expert { border-left-color: #f85149; }
+.mp-botlevel.lvl-easy {
+  border-left-color: #3fb950;
+}
+.mp-botlevel.lvl-medium {
+  border-left-color: #d29922;
+}
+.mp-botlevel.lvl-hard {
+  border-left-color: #db6d28;
+}
+.mp-botlevel.lvl-expert {
+  border-left-color: #f85149;
+}
 
 .mp-botlevel-name {
   font-size: 0.9rem;
@@ -2680,10 +2688,18 @@
   border-radius: 3px;
   background: currentColor;
 }
-.mp-botlevel.lvl-easy .mp-botlevel-bar i { background: #3fb950; }
-.mp-botlevel.lvl-medium .mp-botlevel-bar i { background: #d29922; }
-.mp-botlevel.lvl-hard .mp-botlevel-bar i { background: #db6d28; }
-.mp-botlevel.lvl-expert .mp-botlevel-bar i { background: #f85149; }
+.mp-botlevel.lvl-easy .mp-botlevel-bar i {
+  background: #3fb950;
+}
+.mp-botlevel.lvl-medium .mp-botlevel-bar i {
+  background: #d29922;
+}
+.mp-botlevel.lvl-hard .mp-botlevel-bar i {
+  background: #db6d28;
+}
+.mp-botlevel.lvl-expert .mp-botlevel-bar i {
+  background: #f85149;
+}
 
 .mp-botstrength-hint {
   font-size: 0.72rem;

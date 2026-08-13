@@ -1,5 +1,7 @@
 # 2048 — Sayı Birleştirme Bulmacası
 
+[![game2048 CI](https://github.com/aicirkit1/emre/actions/workflows/game2048-ci.yml/badge.svg)](https://github.com/aicirkit1/emre/actions/workflows/game2048-ci.yml)
+
 Klasik **2048** oyununun Angular ile sıfırdan yeniden yazımı. Standalone bileşen
 mimarisi, signal tabanlı durum yönetimi, saf ve test edilebilir oyun mantığı.
 

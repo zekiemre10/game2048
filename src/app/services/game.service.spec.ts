@@ -569,12 +569,7 @@ describe('GameService — uçtan uca oyun akışı', () => {
   it('gerçek bir oyun: rastgele hamleler oyunu asla tutarsız bırakmaz', () => {
     service.startGame();
 
-    const dirs = [
-      Direction.Left,
-      Direction.Right,
-      Direction.Up,
-      Direction.Down,
-    ];
+    const dirs = [Direction.Left, Direction.Right, Direction.Up, Direction.Down];
 
     // 300 rastgele hamle: hiçbir noktada değişmezler bozulmamalı
     for (let i = 0; i < 300; i++) {
@@ -619,12 +614,7 @@ describe('GameService — uçtan uca oyun akışı', () => {
 
   it('oyun bittiğinde ya kazanılmış ya kaybedilmiş olur (asılı kalmaz)', () => {
     service.startGame();
-    const dirs = [
-      Direction.Left,
-      Direction.Up,
-      Direction.Right,
-      Direction.Down,
-    ];
+    const dirs = [Direction.Left, Direction.Up, Direction.Right, Direction.Down];
 
     let moves = 0;
     while (service.status() === GameStatus.Playing && moves < 2000) {

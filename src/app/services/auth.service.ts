@@ -124,7 +124,8 @@ export class AuthService {
 
       this.setToken(json.token);
       this.user.set(json.user);
-      if (endpoint === 'login') await this.refresh(); // hesaptaki veriyi uygula
+      if (endpoint === 'login')
+        await this.refresh(); // hesaptaki veriyi uygula
       else this.syncReady = true; // kayıtta yerel ilerleme zaten yüklendi
       return { ok: true };
     } catch {

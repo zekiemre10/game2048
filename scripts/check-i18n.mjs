@@ -36,7 +36,10 @@ let corpus = '';
 for (const f of walk(SRC)) {
   let text = readFileSync(f, 'utf8');
   if (f === I18N) {
-    text = text.split('\n').filter((l) => !/^\s*'[^']+':\s*\{/.test(l)).join('\n');
+    text = text
+      .split('\n')
+      .filter((l) => !/^\s*'[^']+':\s*\{/.test(l))
+      .join('\n');
   }
   corpus += '\n' + text;
 }
@@ -47,7 +50,11 @@ for (const m of corpus.matchAll(/`([\w.]+)\$\{/g)) prefixes.add(m[1]);
 for (const m of corpus.matchAll(/['"]([\w.]+)['"]\s*\+/g)) prefixes.add(m[1]);
 
 function isUsed(key) {
-  if (corpus.includes(`'${key}'`) || corpus.includes(`"${key}"`) || corpus.includes('`' + key + '`')) {
+  if (
+    corpus.includes(`'${key}'`) ||
+    corpus.includes(`"${key}"`) ||
+    corpus.includes('`' + key + '`')
+  ) {
     return true;
   }
   for (const p of prefixes) if (key.startsWith(p)) return true;

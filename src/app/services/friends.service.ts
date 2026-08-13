@@ -81,10 +81,9 @@ export class FriendsService {
     }
     this.searching.set(true);
     try {
-      const res = await fetch(
-        `${API_BASE}/users/search?q=${encodeURIComponent(term)}`,
-        { headers },
-      );
+      const res = await fetch(`${API_BASE}/users/search?q=${encodeURIComponent(term)}`, {
+        headers,
+      });
       const j = await res.json().catch(() => ({}));
       if (seq !== this.searchSeq) return; // daha yeni bir arama var
       this.searchResults.set(res.ok ? (j.users ?? []) : []);
@@ -130,9 +129,7 @@ export class FriendsService {
         body: JSON.stringify(body),
       });
       const j = await res.json().catch(() => ({}));
-      return res.ok
-        ? { ok: true, status: j.status }
-        : { ok: false, error: j.error || 'error' };
+      return res.ok ? { ok: true, status: j.status } : { ok: false, error: j.error || 'error' };
     } catch {
       return { ok: false, error: 'network' };
     }

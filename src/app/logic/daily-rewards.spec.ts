@@ -1,9 +1,4 @@
-import {
-  DAILY_REWARDS,
-  REWARD_CYCLE,
-  cycleDay,
-  rewardForStreak,
-} from './daily-rewards';
+import { DAILY_REWARDS, REWARD_CYCLE, cycleDay, rewardForStreak } from './daily-rewards';
 
 describe('7 günlük ödül takvimi', () => {
   it('tam 7 gün vardır ve günler 1..7 sırasıyla numaralı', () => {

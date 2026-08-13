@@ -31,11 +31,7 @@ function mulberry32(seed: number): () => number {
  * Havuzdan `count` tane görevi tohuma göre DETERMİNİSTİK seçer.
  * Aynı seed → aynı görevler.
  */
-export function pickMissions(
-  pool: MissionDef[],
-  count: number,
-  seed: string,
-): MissionDef[] {
+export function pickMissions(pool: MissionDef[], count: number, seed: string): MissionDef[] {
   const rng = mulberry32(hashStr(seed));
   const arr = [...pool];
   // Fisher-Yates (tohumlu)

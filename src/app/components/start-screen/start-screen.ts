@@ -34,9 +34,7 @@ export class StartScreen {
 
   protected readonly ACHIEVEMENTS = ACHIEVEMENTS;
   protected readonly totalCount = ACHIEVEMENTS.length;
-  protected readonly unlockedCount = computed(
-    () => this.game.unlockedAchievements().size,
-  );
+  protected readonly unlockedCount = computed(() => this.game.unlockedAchievements().size);
   protected readonly percent = computed(() =>
     Math.round((this.unlockedCount() / ACHIEVEMENTS.length) * 100),
   );

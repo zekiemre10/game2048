@@ -1,11 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { GameService } from './game.service';
-import {
-  Direction,
-  GameMode,
-  GameStatus,
-  TIME_ATTACK_SECONDS,
-} from '../models/tile.model';
+import { Direction, GameMode, GameStatus, TIME_ATTACK_SECONDS } from '../models/tile.model';
 
 describe('GameService — mod sistemi', () => {
   let service: GameService;

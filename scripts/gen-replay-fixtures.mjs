@@ -81,7 +81,10 @@ function moveGrid(grid, dir) {
   let moved = false;
   for (let r = 0; r < n && !moved; r++)
     for (let c = 0; c < n; c++)
-      if (grid[r][c] !== next[r][c]) { moved = true; break; }
+      if (grid[r][c] !== next[r][c]) {
+        moved = true;
+        break;
+      }
   return { grid: next, gained, moved };
 }
 
@@ -123,10 +126,7 @@ for (let i = 0; i < 150; i++) {
 const long = fixtures.filter((f) => f.score > 1000).length;
 if (long < 3) throw new Error('Yeterli uzun oyun yok — üreteç bozuk olabilir');
 
-writeFileSync(
-  resolve(__dirname, '../server/replay_fixtures.json'),
-  JSON.stringify(fixtures),
-);
+writeFileSync(resolve(__dirname, '../server/replay_fixtures.json'), JSON.stringify(fixtures));
 writeFileSync(
   resolve(__dirname, '../src/app/logic/replay.fixtures.generated.ts'),
   '// OTOMATİK ÜRETİLDİ — scripts/gen-replay-fixtures.mjs. Elle düzenleme.\n' +
@@ -136,4 +136,6 @@ writeFileSync(
     ';\n',
 );
 
-console.log(`${fixtures.length} fixture yazildi (${long} uzun oyun, en yuksek skor ${Math.max(...fixtures.map((f) => f.score))})`);
+console.log(
+  `${fixtures.length} fixture yazildi (${long} uzun oyun, en yuksek skor ${Math.max(...fixtures.map((f) => f.score))})`,
+);

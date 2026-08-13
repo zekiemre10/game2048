@@ -68,10 +68,7 @@ export class ChatService {
     if (!friend || !headers) return;
     const after = fresh ? 0 : lastId(this.messages());
     try {
-      const res = await fetch(
-        `${API_BASE}/messages?with=${friend.id}&after=${after}`,
-        { headers },
-      );
+      const res = await fetch(`${API_BASE}/messages?with=${friend.id}&after=${after}`, { headers });
       if (!res.ok) return;
       const j = await res.json();
       // Yanıt beklenirken başka bir arkadaşa geçilmiş olabilir: A'nın
@@ -107,9 +104,7 @@ export class ChatService {
       // Aynı mesaj yoklama yanıtıyla da gelebilir → id'ye göre tekilleştir
       // (yoksa @for track m.id çift anahtar hatası verir ve balon iki kez çizilir).
       if (j.message && this.activeFriend()?.id === friend.id) {
-        this.messages.update((cur) =>
-          mergeMessages(cur, [j.message as ChatMessage]),
-        );
+        this.messages.update((cur) => mergeMessages(cur, [j.message as ChatMessage]));
         this.markSeen();
       }
       return true;
@@ -212,10 +207,7 @@ function lastId(msgs: ChatMessage[]): number {
  * Gönderme yanıtı ile yoklama yanıtı aynı mesajı taşıyabilir; düz ekleme
  * yapılırsa şablondaki `track m.id` çift anahtar hatası verir.
  */
-function mergeMessages(
-  current: ChatMessage[],
-  incoming: ChatMessage[],
-): ChatMessage[] {
+function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
   const known = new Set(current.map((m) => m.id));
   const fresh = incoming.filter((m) => !known.has(m.id));
   if (!fresh.length) return current;

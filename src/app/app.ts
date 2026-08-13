@@ -1,4 +1,12 @@
-import { Component, HostListener, computed, effect, inject, signal, untracked } from '@angular/core';
+import {
+  Component,
+  HostListener,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { StartScreen } from './components/start-screen/start-screen';
 import { BoardComponent } from './components/board/board';
 import { Confetti } from './components/confetti/confetti';
@@ -311,11 +319,7 @@ export class App {
     const now = new Date();
     // Ayın son gününü UTC'de bul (sunucu ay anahtarı UTC)
     const end = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1);
-    const today = Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate(),
-    );
+    const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
     return Math.max(0, Math.round((end - today) / 86400000));
   }
 
@@ -323,9 +327,36 @@ export class App {
   protected monthLabel(key: string): string {
     if (!key) return '';
     const [y, m] = key.split('-').map(Number);
-    const names = this.i18n.lang() === 'en'
-      ? ['January','February','March','April','May','June','July','August','September','October','November','December']
-      : ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+    const names =
+      this.i18n.lang() === 'en'
+        ? [
+            'January',
+            'February',
+            'March',
+            'April',
+            'May',
+            'June',
+            'July',
+            'August',
+            'September',
+            'October',
+            'November',
+            'December',
+          ]
+        : [
+            'Ocak',
+            'Şubat',
+            'Mart',
+            'Nisan',
+            'Mayıs',
+            'Haziran',
+            'Temmuz',
+            'Ağustos',
+            'Eylül',
+            'Ekim',
+            'Kasım',
+            'Aralık',
+          ];
     return `${names[(m || 1) - 1]} ${y}`;
   }
 
@@ -335,9 +366,7 @@ export class App {
   }
 
   /** Açılan başarım sayısı / toplam — ana ekran şeridi için. */
-  protected readonly achUnlockedCount = computed(
-    () => this.unlockedAchievements().size,
-  );
+  protected readonly achUnlockedCount = computed(() => this.unlockedAchievements().size);
   protected readonly achTotalCount = ACHIEVEMENTS.length;
   protected readonly achOverallPercent = computed(() =>
     Math.round((this.unlockedAchievements().size / ACHIEVEMENTS.length) * 100),
@@ -431,9 +460,36 @@ export class App {
   );
   /** Sık kullanılan emojiler (basit seçici). */
   protected readonly EMOJIS = [
-    '😀', '😄', '😅', '😂', '😉', '😍', '😎', '🤔', '😴', '😢',
-    '👍', '👎', '👏', '🙌', '👋', '🔥', '💪', '🎉', '🎮', '🏆',
-    '❤️', '💯', '⭐', '✨', '🤝', '😱', '🙃', '😜', '🥳', '👀',
+    '😀',
+    '😄',
+    '😅',
+    '😂',
+    '😉',
+    '😍',
+    '😎',
+    '🤔',
+    '😴',
+    '😢',
+    '👍',
+    '👎',
+    '👏',
+    '🙌',
+    '👋',
+    '🔥',
+    '💪',
+    '🎉',
+    '🎮',
+    '🏆',
+    '❤️',
+    '💯',
+    '⭐',
+    '✨',
+    '🤝',
+    '😱',
+    '🙃',
+    '😜',
+    '🥳',
+    '👀',
   ];
 
   // --- Çok oyunculu ------------------------------------------
@@ -468,17 +524,13 @@ export class App {
   }
 
   /** Envanterde en az 1 tane olan güçler (oyun içi güç çubuğu için). */
-  protected readonly ownedPowers = computed(() =>
-    POWERS.filter((p) => this.powers()[p.id] > 0),
-  );
+  protected readonly ownedPowers = computed(() => POWERS.filter((p) => this.powers()[p.id] > 0));
 
   /** Geçen süreyi mm:ss biçiminde döndürür (şablonda gösterim için). */
   protected readonly elapsedLabel = computed(() => formatTime(this.elapsedSeconds()));
 
   /** Kalan süreyi mm:ss biçiminde döndürür (seviye modu). */
-  protected readonly remainingLabel = computed(() =>
-    formatTime(this.remainingSeconds()),
-  );
+  protected readonly remainingLabel = computed(() => formatTime(this.remainingSeconds()));
 
   /** Kalan süre azaldı mı? (geri sayımlı modlarda görsel uyarı). */
   protected readonly lowTime = computed(

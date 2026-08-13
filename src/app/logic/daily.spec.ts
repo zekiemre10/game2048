@@ -1,9 +1,4 @@
-import {
-  dailyRewardAmount,
-  dayKey,
-  streakAfterActivity,
-  yesterdayKey,
-} from './daily';
+import { dailyRewardAmount, dayKey, streakAfterActivity, yesterdayKey } from './daily';
 
 describe('daily yardımcıları', () => {
   it('dayKey yerel YYYY-MM-DD verir', () => {

@@ -38,8 +38,7 @@ export interface ReplayResult {
 function emptyCells(grid: number[][]): Array<[number, number]> {
   const n = grid.length;
   const out: Array<[number, number]> = [];
-  for (let r = 0; r < n; r++)
-    for (let c = 0; c < n; c++) if (grid[r][c] === 0) out.push([r, c]);
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (grid[r][c] === 0) out.push([r, c]);
   return out;
 }
 
@@ -78,11 +77,7 @@ export function moveGrid(
     const merged: number[] = [];
     let mergedFlag = false;
     for (let i = 0; i < vals.length; i++) {
-      if (
-        merged.length > 0 &&
-        !mergedFlag &&
-        merged[merged.length - 1] === vals[i]
-      ) {
+      if (merged.length > 0 && !mergedFlag && merged[merged.length - 1] === vals[i]) {
         merged[merged.length - 1] *= 2;
         gained += merged[merged.length - 1];
         mergedFlag = true;
@@ -115,11 +110,7 @@ export function moveGrid(
  * Tohum + hamle dizisini yeniden oynatıp skoru hesaplar.
  * `moves`: "U/D/L/R" karakter dizisi (yalnızca geçerli hamleler).
  */
-export function replayGame(
-  seed: number,
-  moves: string,
-  size: number,
-): ReplayResult {
+export function replayGame(seed: number, moves: string, size: number): ReplayResult {
   const rand = mulberry32(seed >>> 0);
   let grid = Array.from({ length: size }, () => new Array(size).fill(0));
 
@@ -144,11 +135,7 @@ export function replayGame(
   return { score, maxTile: maxOf(grid), moves: count, valid: true };
 }
 
-function invalid(
-  grid: number[][],
-  score: number,
-  moves: number,
-): ReplayResult {
+function invalid(grid: number[][], score: number, moves: number): ReplayResult {
   return { score, maxTile: maxOf(grid), moves, valid: false };
 }
 

@@ -75,8 +75,7 @@ export class Confetti implements AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     if (typeof window === 'undefined') return;
-    this.reduced =
-      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    this.reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     const cv = this.canvasRef.nativeElement;
     // jsdom gibi ortamlarda 2D bağlam olmayabilir → sessizce devre dışı kal
     try {
@@ -156,9 +155,7 @@ export class Confetti implements AfterViewInit, OnDestroy {
         ctx.restore();
       }
       // Ölmüş/ekran dışı parçacıkları at
-      this.particles = this.particles.filter(
-        (p) => p.life > 0 && p.y < h + 40,
-      );
+      this.particles = this.particles.filter((p) => p.life > 0 && p.y < h + 40);
     } else {
       // Çizim bağlamı yoksa simülasyonu boşa çalıştırma
       this.particles = [];

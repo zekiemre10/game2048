@@ -237,9 +237,9 @@ describe('Regresyon — denetimde bulunan hatalar', () => {
       service.usePower('shuffle');
       const stuck =
         service.status() === GameStatus.Playing &&
-        !([Direction.Up, Direction.Down, Direction.Left, Direction.Right].some(
+        ![Direction.Up, Direction.Down, Direction.Left, Direction.Right].some(
           (d) => simulateMove(service.toValueGrid(), d).moved,
-        ));
+        );
       expect(stuck).toBe(false); // "Playing ama hiç hamle yok" olamaz
     }
   });

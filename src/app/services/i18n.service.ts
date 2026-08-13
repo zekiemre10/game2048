@@ -119,7 +119,10 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'assist.suggestion': { tr: 'Önerilen hamle', en: 'Suggested move' },
   'assist.ask': { tr: '💡 Öneri', en: '💡 Hint' },
   'assist.none': { tr: 'Öneri hakkın bitti', en: 'No hints left' },
-  'assist.warning': { tr: 'Tahta doluyor, dikkatli oyna!', en: 'Board is filling up, play carefully!' },
+  'assist.warning': {
+    tr: 'Tahta doluyor, dikkatli oyna!',
+    en: 'Board is filling up, play carefully!',
+  },
   'set.theme': { tr: '🎨 TEMA', en: '🎨 THEME' },
   'set.account': { tr: '👤 HESAP', en: '👤 ACCOUNT' },
   'set.tutorial': { tr: '🎓 REHBER', en: '🎓 GUIDE' },
@@ -309,7 +312,10 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'auth.login': { tr: 'Giriş Yap', en: 'Log In' },
   'auth.register': { tr: 'Kayıt Ol', en: 'Sign Up' },
   'auth.logout': { tr: 'Çıkış Yap', en: 'Log Out' },
-  'auth.haveAccount': { tr: 'Zaten hesabın var mı? Giriş yap', en: 'Already have an account? Log in' },
+  'auth.haveAccount': {
+    tr: 'Zaten hesabın var mı? Giriş yap',
+    en: 'Already have an account? Log in',
+  },
   'auth.noAccount': { tr: 'Hesabın yok mu? Kayıt ol', en: "Don't have an account? Sign up" },
   'auth.signInCta': { tr: '☁️ Giriş yap / Kayıt ol', en: '☁️ Log in / Sign up' },
   'auth.working': { tr: 'Lütfen bekle…', en: 'Please wait…' },
@@ -318,17 +324,26 @@ const DICT: Record<string, { tr: string; en: string }> = {
     tr: 'Kullanıcı adı 2-20 karakter olmalı (harf, rakam, . _ -).',
     en: 'Username must be 2-20 characters (letters, digits, . _ -).',
   },
-  'auth.err.weak_password': { tr: 'Şifre en az 6 karakter olmalı.', en: 'Password must be at least 6 characters.' },
+  'auth.err.weak_password': {
+    tr: 'Şifre en az 6 karakter olmalı.',
+    en: 'Password must be at least 6 characters.',
+  },
   'auth.err.invalid_email': { tr: 'Geçerli bir e-posta gir.', en: 'Enter a valid email.' },
   'auth.err.username_taken': { tr: 'Bu kullanıcı adı alınmış.', en: 'That username is taken.' },
-  'auth.err.bad_credentials': { tr: 'Kullanıcı adı veya şifre hatalı.', en: 'Wrong username or password.' },
+  'auth.err.bad_credentials': {
+    tr: 'Kullanıcı adı veya şifre hatalı.',
+    en: 'Wrong username or password.',
+  },
   'auth.err.network': { tr: 'Bağlantı hatası. Tekrar dene.', en: 'Connection error. Try again.' },
   'auth.err.too_many_attempts': {
     tr: 'Çok fazla deneme yapıldı. Birkaç dakika sonra tekrar dene.',
     en: 'Too many attempts. Please try again in a few minutes.',
   },
   'auth.err.invalid_data': { tr: 'Kayıt verisi geçersiz.', en: 'Invalid save data.' },
-  'auth.err.payload_too_large': { tr: 'Gönderilen veri çok büyük.', en: 'The data sent is too large.' },
+  'auth.err.payload_too_large': {
+    tr: 'Gönderilen veri çok büyük.',
+    en: 'The data sent is too large.',
+  },
   'auth.err.server_error': { tr: 'Sunucu hatası. Tekrar dene.', en: 'Server error. Try again.' },
   'auth.err.busy': { tr: 'Sunucu meşgul. Tekrar dene.', en: 'Server busy. Try again.' },
   'auth.err.error': { tr: 'Bir hata oluştu.', en: 'Something went wrong.' },
@@ -448,7 +463,10 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'mp.err.room_full': { tr: 'Oda dolu.', en: 'The room is full.' },
   'mp.err.invalid_score': { tr: 'Geçersiz skor.', en: 'Invalid score.' },
   'mp.err.invalid_level': { tr: 'Geçersiz zorluk seviyesi.', en: 'Invalid difficulty level.' },
-  'mp.err.too_many_bots': { tr: 'Bu odada en fazla 5 bot olabilir.', en: 'This room allows at most 5 bots.' },
+  'mp.err.too_many_bots': {
+    tr: 'Bu odada en fazla 5 bot olabilir.',
+    en: 'This room allows at most 5 bots.',
+  },
   'mp.err.error': { tr: 'Bir hata oluştu.', en: 'Something went wrong.' },
 
   // Yapay zekâ (koç + analiz)

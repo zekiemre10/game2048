@@ -20,7 +20,11 @@ const ROOT = resolve(__dirname, '..');
 
 const out = await build({
   entryPoints: [resolve(ROOT, 'src/app/logic/ai.ts')],
-  bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'error',
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  write: false,
+  logLevel: 'error',
 });
 const dir = mkdtempSync(join(tmpdir(), 'botfix-'));
 const file = join(dir, 'ai.mjs');
@@ -50,8 +54,13 @@ for (const level of LEVELS) {
 }
 
 const path = resolve(ROOT, 'server/bot_fixtures.json');
-writeFileSync(path, JSON.stringify({ generated: 'gen-bot-fixtures.mjs', maxMoves: MAX_MOVES, fixtures }, null, 0));
+writeFileSync(
+  path,
+  JSON.stringify({ generated: 'gen-bot-fixtures.mjs', maxMoves: MAX_MOVES, fixtures }, null, 0),
+);
 console.log(`Yazıldı: ${path}`);
 console.log(`${fixtures.length} fixture (${LEVELS.length} seviye × ${SEEDS.length} tohum)`);
 for (const f of fixtures)
-  console.log(`  ${f.level.padEnd(7)} tohum ${String(f.seed).padStart(6)}: ${f.moves.length} hamle, skor ${f.finalScore}, en büyük ${f.maxTile}`);
+  console.log(
+    `  ${f.level.padEnd(7)} tohum ${String(f.seed).padStart(6)}: ${f.moves.length} hamle, skor ${f.finalScore}, en büyük ${f.maxTile}`,
+  );

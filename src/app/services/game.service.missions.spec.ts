@@ -46,9 +46,7 @@ describe('GameService — görevler', () => {
   });
 
   it('512 karesi yapınca "reach512" görevi tamamlanır', () => {
-    service.dailyMissions.set([
-      { id: 'd-512', progress: 0, claimed: false },
-    ]);
+    service.dailyMissions.set([{ id: 'd-512', progress: 0, claimed: false }]);
     service.status.set(GameStatus.Playing);
     service.tiles.set([
       { id: 1, value: 256, row: 0, col: 0 },
@@ -61,9 +59,7 @@ describe('GameService — görevler', () => {
   });
 
   it('tamamlanan görevin ödülü alınır, altın artar, tekrar alınamaz', () => {
-    service.dailyMissions.set([
-      { id: 'd-move60', progress: 60, claimed: false },
-    ]);
+    service.dailyMissions.set([{ id: 'd-move60', progress: 60, claimed: false }]);
     const goldBefore = service.gold();
     const reward = missionDef('d-move60')!.gold;
 
@@ -76,9 +72,7 @@ describe('GameService — görevler', () => {
   });
 
   it('tamamlanmamış görev alınamaz', () => {
-    service.dailyMissions.set([
-      { id: 'd-move60', progress: 10, claimed: false },
-    ]);
+    service.dailyMissions.set([{ id: 'd-move60', progress: 10, claimed: false }]);
     expect(service.claimMission('d-move60', 'daily')).toBe(false);
   });
 
@@ -94,9 +88,7 @@ describe('GameService — görevler', () => {
   });
 
   it('görevler localStorage’da kalıcı', () => {
-    service.dailyMissions.set([
-      { id: 'd-move60', progress: 60, claimed: false },
-    ]);
+    service.dailyMissions.set([{ id: 'd-move60', progress: 60, claimed: false }]);
     service.claimMission('d-move60', 'daily');
 
     const raw = localStorage.getItem('game2048.dailyMissions');

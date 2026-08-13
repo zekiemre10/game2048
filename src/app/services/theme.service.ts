@@ -70,10 +70,7 @@ function loadTheme(): string {
       const saved = localStorage.getItem(THEME_KEY);
       if (saved) return saved;
     }
-    if (
-      typeof matchMedia !== 'undefined' &&
-      matchMedia('(prefers-color-scheme: dark)').matches
-    ) {
+    if (typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches) {
       return 'dark';
     }
   } catch {

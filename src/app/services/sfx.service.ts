@@ -72,10 +72,8 @@ export class SfxService {
   private ensureCtx(): AudioContext | null {
     if (typeof window === 'undefined') return null;
     const Ctor =
-      (window as unknown as { AudioContext?: typeof AudioContext })
-        .AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
+      (window as unknown as { AudioContext?: typeof AudioContext }).AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null; // Web Audio yoksa (SSR/test) sessizce geç
 
     if (!this.ctx) this.ctx = new Ctor();

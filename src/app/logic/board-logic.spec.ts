@@ -70,23 +70,16 @@ describe('applyMove — 4 yön', () => {
   it('YUKARI: bir sütun yukarı sıkışır', () => {
     // sütun 0: satır1=2, satır3=2 → satır0=4
     const grid = moveToGrid([t(2, 1, 0), t(2, 3, 0)], Direction.Up);
-    expect([grid[0][0], grid[1][0], grid[2][0], grid[3][0]]).toEqual([
-      4, 0, 0, 0,
-    ]);
+    expect([grid[0][0], grid[1][0], grid[2][0], grid[3][0]]).toEqual([4, 0, 0, 0]);
   });
 
   it('AŞAĞI: bir sütun aşağı sıkışır', () => {
     const grid = moveToGrid([t(2, 0, 0), t(2, 2, 0)], Direction.Down);
-    expect([grid[0][0], grid[1][0], grid[2][0], grid[3][0]]).toEqual([
-      0, 0, 0, 4,
-    ]);
+    expect([grid[0][0], grid[1][0], grid[2][0], grid[3][0]]).toEqual([0, 0, 0, 4]);
   });
 
   it('SOL: 2 2 4 satırı → 4 4 (bir hamlede çift birleşme yok)', () => {
-    const grid = moveToGrid(
-      [t(2, 0, 0), t(2, 0, 1), t(4, 0, 2)],
-      Direction.Left,
-    );
+    const grid = moveToGrid([t(2, 0, 0), t(2, 0, 1), t(4, 0, 2)], Direction.Left);
     expect(grid[0]).toEqual([4, 4, 0, 0]);
   });
 });
@@ -100,10 +93,7 @@ describe('applyMove — skor ve geçerlilik', () => {
 
   it('birden fazla birleşmenin skorunu toplar', () => {
     // satır: 2 2 4 4 → 4 8 ; kazanç = 4 + 8 = 12
-    const res = applyMove(
-      [t(2, 0, 0), t(2, 0, 1), t(4, 0, 2), t(4, 0, 3)],
-      Direction.Left,
-    );
+    const res = applyMove([t(2, 0, 0), t(2, 0, 1), t(4, 0, 2), t(4, 0, 3)], Direction.Left);
     expect(res.gained).toBe(12);
   });
 
@@ -124,10 +114,7 @@ describe('applyMove — skor ve geçerlilik', () => {
 
 describe('applyMove — birleşme kenar durumları', () => {
   it('4 4 4 4 → 8 8 (iki ayrı birleşme, zincirleme değil)', () => {
-    const res = applyMove(
-      [t(4, 0, 0), t(4, 0, 1), t(4, 0, 2), t(4, 0, 3)],
-      Direction.Left,
-    );
+    const res = applyMove([t(4, 0, 0), t(4, 0, 1), t(4, 0, 2), t(4, 0, 3)], Direction.Left);
     expect(toValueGrid(res.tiles)[0]).toEqual([8, 8, 0, 0]);
     expect(res.gained).toBe(16); // 8 + 8
   });
@@ -135,44 +122,29 @@ describe('applyMove — birleşme kenar durumları', () => {
   // Üç eşit karede HANGİ çiftin birleştiği yöne bağlıdır —
   // itilen kenara EN YAKIN çift birleşir.
   it('SOL: 2 2 2 → 4 2 (soldaki çift birleşir)', () => {
-    const res = applyMove(
-      [t(2, 0, 0), t(2, 0, 1), t(2, 0, 2)],
-      Direction.Left,
-    );
+    const res = applyMove([t(2, 0, 0), t(2, 0, 1), t(2, 0, 2)], Direction.Left);
     expect(toValueGrid(res.tiles)[0]).toEqual([4, 2, 0, 0]);
   });
 
   it('SAĞ: 2 2 2 → 2 4 (sağdaki çift birleşir)', () => {
-    const res = applyMove(
-      [t(2, 0, 1), t(2, 0, 2), t(2, 0, 3)],
-      Direction.Right,
-    );
+    const res = applyMove([t(2, 0, 1), t(2, 0, 2), t(2, 0, 3)], Direction.Right);
     expect(toValueGrid(res.tiles)[0]).toEqual([0, 0, 2, 4]);
   });
 
   it('YUKARI: 2 2 2 → 4 2 (üstteki çift birleşir)', () => {
-    const res = applyMove(
-      [t(2, 0, 0), t(2, 1, 0), t(2, 2, 0)],
-      Direction.Up,
-    );
+    const res = applyMove([t(2, 0, 0), t(2, 1, 0), t(2, 2, 0)], Direction.Up);
     const g = toValueGrid(res.tiles);
     expect([g[0][0], g[1][0], g[2][0], g[3][0]]).toEqual([4, 2, 0, 0]);
   });
 
   it('AŞAĞI: 2 2 2 → 2 4 (alttaki çift birleşir)', () => {
-    const res = applyMove(
-      [t(2, 1, 0), t(2, 2, 0), t(2, 3, 0)],
-      Direction.Down,
-    );
+    const res = applyMove([t(2, 1, 0), t(2, 2, 0), t(2, 3, 0)], Direction.Down);
     const g = toValueGrid(res.tiles);
     expect([g[0][0], g[1][0], g[2][0], g[3][0]]).toEqual([0, 0, 2, 4]);
   });
 
   it('birleşme olmayan dolu satır sola hamlede değişmez', () => {
-    const res = applyMove(
-      [t(2, 0, 0), t(4, 0, 1), t(8, 0, 2), t(16, 0, 3)],
-      Direction.Left,
-    );
+    const res = applyMove([t(2, 0, 0), t(4, 0, 1), t(8, 0, 2), t(16, 0, 3)], Direction.Left);
     expect(res.moved).toBe(false);
     expect(res.gained).toBe(0);
   });
@@ -201,10 +173,7 @@ describe('applyMove — birleşme kenar durumları', () => {
 
   it('birleşen kareler `merged`, diğerleri işaretsiz olmalı', () => {
     // satır: 2 2 8 → 4(merged) 8(merged değil)
-    const res = applyMove(
-      [t(2, 0, 0), t(2, 0, 1), t(8, 0, 2)],
-      Direction.Left,
-    );
+    const res = applyMove([t(2, 0, 0), t(2, 0, 1), t(8, 0, 2)], Direction.Left);
     const four = res.tiles.find((x) => x.value === 4);
     const eight = res.tiles.find((x) => x.value === 8);
 

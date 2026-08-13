@@ -26,24 +26,10 @@ import { DAILY_DURATION, dailySeed, utcDayKey } from '../logic/daily-challenge';
 /** Kutlama türü — arayüz hangi sesi/mesajı göstereceğini seçer. */
 export type CelebrationKind = 'win' | 'level' | 'achievement';
 import { MAX_LEVEL, levelConfig } from '../models/level.model';
-import {
-  PowerId,
-  PowerInventory,
-  emptyInventory,
-  powerDef,
-} from '../models/power.model';
+import { PowerId, PowerInventory, emptyInventory, powerDef } from '../models/power.model';
 import { ACHIEVEMENTS } from '../models/achievement.model';
-import {
-  dayKey,
-  streakAfterActivity,
-  yesterdayKey,
-} from '../logic/daily';
-import {
-  DAILY_REWARDS,
-  DailyReward,
-  cycleDay,
-  rewardForStreak,
-} from '../logic/daily-rewards';
+import { dayKey, streakAfterActivity, yesterdayKey } from '../logic/daily';
+import { DAILY_REWARDS, DailyReward, cycleDay, rewardForStreak } from '../logic/daily-rewards';
 import {
   DAILY_COUNT,
   DAILY_POOL,
@@ -98,8 +84,22 @@ const CHAMPION_KEY = 'game2048.championships';
 
 /** Seçilebilir profil avatarları (ilk sıradaki varsayılan). */
 export const AVATARS = [
-  '👤', '😎', '🤖', '🐱', '🐉', '🌟', '🦊', '🐼',
-  '👾', '🦁', '🐧', '🦄', '🍀', '🔥', '⚡', '🎩',
+  '👤',
+  '😎',
+  '🤖',
+  '🐱',
+  '🐉',
+  '🌟',
+  '🦊',
+  '🐼',
+  '👾',
+  '🦁',
+  '🐧',
+  '🦄',
+  '🍀',
+  '🔥',
+  '⚡',
+  '🎩',
 ];
 const STATS_KEY = 'game2048.stats';
 const STREAK_KEY = 'game2048.streak';
@@ -264,9 +264,7 @@ export class GameService {
   });
 
   /** Bugün günlük ödül alınabilir mi? */
-  readonly canClaimDaily = computed<boolean>(
-    () => this.lastRewardDay() !== dayKey(new Date()),
-  );
+  readonly canClaimDaily = computed<boolean>(() => this.lastRewardDay() !== dayKey(new Date()));
 
   /** (Seviye modu) anlık seviyenin hedef karesi. */
   readonly levelTarget = computed<number>(() => levelConfig(this.level()).target);
@@ -281,9 +279,7 @@ export class GameService {
    */
   readonly canUndo = computed<boolean>(
     () =>
-      this.history() !== null &&
-      this.mode() !== GameMode.Race &&
-      this.mode() !== GameMode.Daily,
+      this.history() !== null && this.mode() !== GameMode.Race && this.mode() !== GameMode.Daily,
   );
 
   // --- Türetilmiş sinyaller -----------------------------------
@@ -375,9 +371,7 @@ export class GameService {
   /** NxN boş ızgara üretir (tüm hücreler null). */
   createEmptyGrid(): Grid {
     const n = this.boardSize();
-    return Array.from({ length: n }, () =>
-      Array.from({ length: n }, () => null),
-    );
+    return Array.from({ length: n }, () => Array.from({ length: n }, () => null));
   }
 
   /** Klasik (sonsuz) oyunu başlatır (geriye dönük uyumluluk). */
@@ -576,9 +570,7 @@ export class GameService {
    * Kutlama olayı: her yeni başarı anında `id` artar; arayüz bunu izleyip
    * konfeti + ses oynatır. YZ oynadıysa kutlama YOK (gerçek başarı değil).
    */
-  readonly celebration = signal<{ id: number; kind: CelebrationKind } | null>(
-    null,
-  );
+  readonly celebration = signal<{ id: number; kind: CelebrationKind } | null>(null);
   private celebrationId = 0;
 
   private celebrate(kind: CelebrationKind): void {
@@ -680,9 +672,7 @@ export class GameService {
 
     // Animasyon bayraklarını temizleyerek geri yükle (geri-al ile aynı):
     // yoksa gösterim öncesi taşlar tekrar pop/bump oynatırdı.
-    this.tiles.set(
-      snap.tiles.map((t) => ({ id: t.id, value: t.value, row: t.row, col: t.col })),
-    );
+    this.tiles.set(snap.tiles.map((t) => ({ id: t.id, value: t.value, row: t.row, col: t.col })));
     this.score.set(snap.score);
     this.moves.set(snap.moves);
     this.keepPlayingAfterWin = snap.keepPlayingAfterWin;
@@ -986,9 +976,7 @@ export class GameService {
     const exists = this.tiles().some((t) => t.row === row && t.col === col);
     if (!exists) return false;
 
-    this.tiles.update((list) =>
-      list.filter((t) => !(t.row === row && t.col === col)),
-    );
+    this.tiles.update((list) => list.filter((t) => !(t.row === row && t.col === col)));
     this.consumePower('bomb');
     this.bombMode.set(false);
     // Geri alma bombalanan kareyi geri getirip gücü boşa harcatırdı.
@@ -1211,12 +1199,7 @@ export class GameService {
     const now = new Date();
     const today = dayKey(now);
     const yesterday = yesterdayKey(now);
-    const next = streakAfterActivity(
-      this.currentStreak(),
-      this.lastActiveDay(),
-      today,
-      yesterday,
-    );
+    const next = streakAfterActivity(this.currentStreak(), this.lastActiveDay(), today, yesterday);
     this.currentStreak.set(next);
     if (next > this.bestStreak()) this.bestStreak.set(next);
     this.lastActiveDay.set(today);
@@ -1289,12 +1272,7 @@ export class GameService {
     const now = new Date();
     const today = dayKey(now);
     const streak = this.canClaimDaily()
-      ? streakAfterActivity(
-          this.currentStreak(),
-          this.lastActiveDay(),
-          today,
-          yesterdayKey(now),
-        )
+      ? streakAfterActivity(this.currentStreak(), this.lastActiveDay(), today, yesterdayKey(now))
       : this.currentStreak();
     return cycleDay(Math.max(1, streak));
   });
@@ -1603,10 +1581,7 @@ export class GameService {
 
   /** Klasik mod: 2048'e ulaşınca kazanma, hamle kalmayınca kaybetme. */
   private checkClassicEnd(): void {
-    if (
-      !this.keepPlayingAfterWin &&
-      this.tiles().some((t) => t.value >= WIN_VALUE)
-    ) {
+    if (!this.keepPlayingAfterWin && this.tiles().some((t) => t.value >= WIN_VALUE)) {
       this.stopTimer(); // süre "tamamlama" anında donar
       this.status.set(GameStatus.Won);
       this.recordGameEnd(true);
@@ -1692,9 +1667,7 @@ export class GameService {
     // Tarayıcı dışı ortamda (SSR/test) setInterval yoksa sessizce geç.
     if (typeof setInterval === 'undefined') return;
     this.timerId = setInterval(() => {
-      this.elapsedSeconds.set(
-        Math.floor((Date.now() - this.startTimestamp) / 1000),
-      );
+      this.elapsedSeconds.set(Math.floor((Date.now() - this.startTimestamp) / 1000));
     }, 250);
   }
 
@@ -2127,8 +2100,7 @@ function loadAchievements(): Set<string> {
     const raw = localStorage.getItem(ACHIEVEMENTS_KEY);
     if (raw) {
       const arr = JSON.parse(raw);
-      if (Array.isArray(arr))
-        for (const id of arr) if (typeof id === 'string') set.add(id);
+      if (Array.isArray(arr)) for (const id of arr) if (typeof id === 'string') set.add(id);
     }
   } catch {
     /* yoksay */
@@ -2167,11 +2139,7 @@ function loadMissions(key: string): {
 }
 
 /** Görevleri yazar. */
-function saveMissions(
-  key: string,
-  period: string | null,
-  list: MissionProgress[],
-): void {
+function saveMissions(key: string, period: string | null, list: MissionProgress[]): void {
   try {
     localStorage?.setItem(key, JSON.stringify({ period, list }));
   } catch {

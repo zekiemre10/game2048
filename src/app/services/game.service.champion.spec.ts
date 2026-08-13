@@ -17,7 +17,11 @@ describe('GameService — ay sonu şampiyonluk ödülü', () => {
     const goldBefore = service.gold();
     const bombBefore = service.powers().bomb;
     service.grantChampionPrize(2000, {
-      time: 3, bomb: 3, shuffle: 3, undo: 3, hint: 3,
+      time: 3,
+      bomb: 3,
+      shuffle: 3,
+      undo: 3,
+      hint: 3,
     });
     expect(service.gold()).toBe(goldBefore + 2000);
     expect(service.powers().bomb).toBe(bombBefore + 3);

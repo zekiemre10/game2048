@@ -20,7 +20,11 @@ const ROOT = resolve(__dirname, '..');
 async function loadEngine() {
   const out = await build({
     entryPoints: [resolve(ROOT, 'src/app/logic/ai.ts')],
-    bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'error',
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    write: false,
+    logLevel: 'error',
   });
   const dir = mkdtempSync(join(tmpdir(), 'aical-'));
   const file = join(dir, 'ai.mjs');
@@ -39,14 +43,18 @@ function playGame(engine, level, rng) {
     const [r, c] = cells[Math.floor(rng() * cells.length)];
     g = placeTile(g, r, c, rng() < 0.1 ? 4 : 2);
   };
-  spawn(); spawn();
-  let score = 0, maxTile = 0;
+  spawn();
+  spawn();
+  let score = 0,
+    maxTile = 0;
   for (let step = 0; step < 20000; step++) {
     const dir = bestMove(g, level);
     if (!dir) break;
     const res = simulateMove(g, dir);
     if (!res.moved) break;
-    g = res.grid; score += res.gained; spawn();
+    g = res.grid;
+    score += res.gained;
+    spawn();
   }
   for (const row of g) for (const v of row) if (v > maxTile) maxTile = v;
   return { score, maxTile };
@@ -57,10 +65,12 @@ const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
 async function measure(engine, patch, N, seeds) {
   // 'hard' slotunu geçici ayar taşıyıcısı olarak kullan (d2 tabanlı taramalar).
   engine.configureLevel('hard', patch);
-  const scores = [], tiles = [];
+  const scores = [],
+    tiles = [];
   for (let i = 0; i < N; i++) {
     const r = playGame(engine, 'hard', engine.mulberry32(seeds[i]));
-    scores.push(r.score); tiles.push(r.maxTile);
+    scores.push(r.score);
+    tiles.push(r.maxTile);
   }
   const reach = (tiles.filter((t) => t >= 2048).length / N) * 100;
   return { avg: Math.round(mean(scores)), reach };
@@ -104,4 +114,7 @@ async function main() {
   }
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

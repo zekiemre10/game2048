@@ -139,6 +139,8 @@ async function main() {
   }
 
   // --- Merdiven kontrolü: her kademe bir öncekinden güçlü + ardışık ≤5× ---
+  // Bozulursa çıkış kodu 1 → CI motor gücü REGRESYONUNU yakalar.
+  let ladderOk = true;
   const order = ['easy', 'medium', 'hard', 'expert'].filter((l) => results[l]);
   if (order.length >= 2) {
     console.log('\n' + '-'.repeat(60));
@@ -152,6 +154,11 @@ async function main() {
       const up = cur > prev;
       if (!up) monotonic = false;
       if (ratio > 5) within5x = false;
+      // CI regresyon guard'ı YALNIZCA sıralamaya bakar (bir kademe öncekinden
+      // zayıfsa = asıl güç regresyonu; ör. eski "Uzman < Orta" hatası). ≤5×
+      // "kademeli geçiş" kalite ölçütüdür; rastgele tohumlu kısa ölçümde
+      // varyanstan flaky olabilir → onu deterministik ai-strength.spec korur.
+      if (!up) ladderOk = false;
       console.log(
         `  ${order[i - 1].padEnd(6)} → ${order[i].padEnd(6)}: ` +
           `${Math.round(prev)} → ${Math.round(cur)}  (${ratio.toFixed(2)}×) ` +
@@ -170,6 +177,11 @@ async function main() {
     );
   }
   void perGame;
+
+  if (!ladderOk) {
+    console.error('\n✗ YZ GÜÇ SIRALAMASI BOZULDU (bir kademe öncekinden zayıf) — CI düşer.');
+    process.exit(1);
+  }
 }
 
 main().catch((e) => {

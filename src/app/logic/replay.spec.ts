@@ -21,12 +21,11 @@ function tilesFrom(grid: number[][]): Tile[] {
   let id = 1;
   for (let r = 0; r < grid.length; r++)
     for (let c = 0; c < grid.length; c++)
-      if (grid[r][c] !== 0)
-        tiles.push({ id: id++, value: grid[r][c], row: r, col: c });
+      if (grid[r][c] !== 0) tiles.push({ id: id++, value: grid[r][c], row: r, col: c });
   return tiles;
 }
 
-describe('replay — moveGrid, oyunun applyMove\'u ile BİREBİR aynı', () => {
+describe("replay — moveGrid, oyunun applyMove'u ile BİREBİR aynı", () => {
   const DIRS = [Direction.Up, Direction.Down, Direction.Left, Direction.Right];
 
   it('rastgele 2000 tahtada değer sonucu ve kazanç birebir eşleşir', () => {

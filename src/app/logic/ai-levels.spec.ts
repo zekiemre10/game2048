@@ -54,5 +54,7 @@ describe('playBotGame (deterministik sunucu botu)', () => {
     expect(avg('medium')).toBeGreaterThan(0);
     expect(avg('hard')).toBeGreaterThan(0);
     expect(avg('expert')).toBeGreaterThan(0);
-  });
+    // 9 expectimax bot oyunu: paralel test yükü altında 5sn varsayılanı aşıp
+    // zaman aşımıyla düşebiliyordu (değerlendirme değil, süre). Cömert süre ver.
+  }, 30000);
 });

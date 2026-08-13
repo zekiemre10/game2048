@@ -6,6 +6,7 @@ import { AchievementsService, AchievementStats } from './achievements.service';
 import { RewardsService } from './rewards.service';
 import { PowersService } from './powers.service';
 import { BoardStore, GameSnapshot } from './board-store';
+import { TimerService } from './timer.service';
 import {
   BOARD_SIZE,
   Cell,
@@ -86,11 +87,8 @@ export class GameService {
   /** Tahta durumu deposu (kernel): ham per-oyun durum + primitifler. */
   private readonly board = inject(BoardStore);
 
-  /** Süre sayacının setInterval kimliği (çalışmıyorsa null). */
-  private timerId: ReturnType<typeof setInterval> | null = null;
-
-  /** Süre sayacının başladığı an (epoch ms). */
-  private startTimestamp = 0;
+  /** Süre yönetimi ayrı serviste (yukarı sayan / geri sayım / duraklat). */
+  private readonly timer = inject(TimerService);
 
   // --- Durum sinyalleri (BoardStore'da; buradan delege) -------
 
@@ -101,11 +99,11 @@ export class GameService {
   /** Bu oyunda yapılan geçerli hamle sayısı. */
   readonly moves = this.board.moves;
 
-  /** Bu oyunda geçen süre (saniye). */
-  readonly elapsedSeconds = signal<number>(0);
+  /** Bu oyunda geçen süre (saniye) — TimerService'te. */
+  readonly elapsedSeconds = this.timer.elapsedSeconds;
 
-  /** (Seviye modu) kalan süre (saniye). */
-  readonly remainingSeconds = signal<number>(0);
+  /** (Geri sayımlı modlar) kalan süre (saniye) — TimerService'te. */
+  readonly remainingSeconds = this.timer.remainingSeconds;
 
   /** En yüksek skor (localStorage'dan yüklenir, değişince kaydedilir). */
   readonly bestScore = this.profile.bestScore;
@@ -142,12 +140,6 @@ export class GameService {
 
   /** İpucu yönü (PowersService'te). */
   readonly hintDirection = this.powersSvc.hintDirection;
-
-  /** (Seviye modu) geri sayımın toplam süresi (saniye) — +30 gücü bunu artırır. */
-  private countdownTotal = 0;
-
-  /** Geri sayım yeniden başlatılırken korunan "geçen süre" birikimi (saniye). */
-  private elapsedOffset = 0;
 
   /** İpucu temizleme zamanlayıcısı. */
   private hintTimer: ReturnType<typeof setTimeout> | null = null;
@@ -233,6 +225,8 @@ export class GameService {
 
   constructor() {
     this.missions.ensureFresh();
+    // Geri sayım bitince oyun-sonu kararını çekirdek verir (döngüsüz geri çağrı).
+    this.timer.onExpire = () => this.onCountdownExpire();
   }
 
   // --- Fabrika / kurulum fonksiyonları ------------------------
@@ -486,7 +480,7 @@ export class GameService {
       history: this.history(),
       elapsedSeconds: this.elapsedSeconds(),
       remainingSeconds: this.remainingSeconds(),
-      countdownTotal: this.countdownTotal,
+      countdownTotal: this.timer.countdownTotal,
       assistHintsLeft: this.assistHintsLeft(),
     };
 
@@ -548,9 +542,7 @@ export class GameService {
     this.clearPowerFx();
 
     // Süre de geri gelir: gösterim oyuncunun süresini yemez.
-    this.countdownTotal = snap.countdownTotal;
-    this.elapsedSeconds.set(snap.elapsedSeconds);
-    this.remainingSeconds.set(snap.remainingSeconds);
+    this.timer.restore(snap.elapsedSeconds, snap.remainingSeconds, snap.countdownTotal);
     if (snap.status === GameStatus.Playing && !this.paused()) {
       this.resumeTimerForMode();
     }
@@ -743,19 +735,9 @@ export class GameService {
     return true;
   }
 
-  /** Mevcut moda uygun sayacı kaldığı yerden sürdürür. */
+  /** Mevcut moda uygun sayacı kaldığı yerden sürdürür (TimerService). */
   private resumeTimerForMode(): void {
-    const m = this.mode();
-    if (m === GameMode.Zen) {
-      this.stopTimer(); // süresiz mod
-      return;
-    }
-    if (m === GameMode.Classic) {
-      this.startTimer(this.elapsedSeconds()); // yukarı sayan
-      return;
-    }
-    // Level / TimeAttack / Race / Daily → kalan süreden geri sayım
-    this.startCountdown(this.remainingSeconds(), this.elapsedSeconds());
+    this.timer.resumeForMode();
   }
 
   /** Kazandıktan sonra "Devam Et": oyuna geri dön, kazanmayı bir daha tetikleme. */
@@ -857,8 +839,7 @@ export class GameService {
   /** +30 saniye: yalnızca seviye modunda ve oynanırken. */
   private applyAddTime(): boolean {
     if (this.mode() !== GameMode.Level) return false;
-    this.countdownTotal += TIME_POWER_SECONDS;
-    this.remainingSeconds.update((r) => r + TIME_POWER_SECONDS);
+    this.timer.addTime(TIME_POWER_SECONDS);
     return true;
   }
 
@@ -1315,92 +1296,47 @@ export class GameService {
     return true;
   }
 
-  // --- Süre sayacı --------------------------------------------
+  // --- Süre sayacı (TimerService'e delege) --------------------
 
-  /** Süre sayacını başlatır (belirtilen saniyeden ileri sayar). */
   private startTimer(fromSeconds: number): void {
-    this.stopTimer();
-    this.elapsedSeconds.set(fromSeconds);
-    this.startTimestamp = Date.now() - fromSeconds * 1000;
-
-    // Tarayıcı dışı ortamda (SSR/test) setInterval yoksa sessizce geç.
-    if (typeof setInterval === 'undefined') return;
-    this.timerId = setInterval(() => {
-      this.elapsedSeconds.set(Math.floor((Date.now() - this.startTimestamp) / 1000));
-    }, 250);
+    this.timer.startUp(fromSeconds);
   }
 
-  /**
-   * (Seviye modu) geri sayım: belirtilen saniyeden 0'a sayar.
-   * 0'a ulaşınca — hâlâ oynanıyorsa — seviye başarısız olur.
-   */
   private startCountdown(seconds: number, fromElapsed = 0): void {
-    this.stopTimer();
-    this.startTimestamp = Date.now();
-    this.countdownTotal = seconds; // +30 gücü bunu artırabilir
-    // Duraklat/devam ve geri alma sonrasında geçen süre sıfırlanmaz:
-    // geri sayım kalan süreden, "geçen süre" göstergesi ise birikimden sürer.
-    this.elapsedOffset = fromElapsed;
-    this.elapsedSeconds.set(fromElapsed);
-    this.remainingSeconds.set(seconds);
-
-    if (typeof setInterval === 'undefined') return;
-    this.timerId = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - this.startTimestamp) / 1000);
-      this.elapsedSeconds.set(this.elapsedOffset + elapsed);
-      const remaining = Math.max(0, this.countdownTotal - elapsed);
-      this.remainingSeconds.set(remaining);
-
-      if (remaining <= 0) {
-        this.stopTimer();
-        if (this.status() === GameStatus.Playing) {
-          // Seviye modunda başarısız; Zaman Yarışı'nda oyun biter (skor kalır).
-          if (this.mode() === GameMode.Level) {
-            this.status.set(GameStatus.Failed);
-            // Süreden kaybetmek de oynanmış bir oyundur: hamle kalmayınca
-            // olduğu gibi burada da istatistik/görev sayılmalı.
-            this.recordGameEnd(false);
-          } else {
-            this.status.set(GameStatus.Lost);
-            this.recordGameEnd(false);
-          }
-        }
-      }
-    }, 250);
+    this.timer.startCountdown(seconds, fromElapsed);
   }
 
-  // --- Duraklat / Devam --------------------------------------
-
-  /** Oyun duraklatıldı mı? (sayaç durur, giriş kilitlenir, tahta örtülür) */
-  readonly paused = signal(false);
-
-  /** Duraklat/Devam arasında geçiş (yalnızca oynanırken). */
-  togglePause(): void {
-    if (this.status() !== GameStatus.Playing) return;
-    if (this.paused()) this.resumeGame();
-    else this.pauseGame();
-  }
-
-  /** Oyunu duraklat: sayacı dondur. */
-  pauseGame(): void {
-    if (this.paused() || this.status() !== GameStatus.Playing) return;
-    this.paused.set(true);
-    this.stopTimer();
-  }
-
-  /** Oyuna devam et: sayacı kaldığı yerden sürdür. */
-  resumeGame(): void {
-    if (!this.paused()) return;
-    this.paused.set(false);
-    this.resumeTimerForMode();
-  }
-
-  /** Süre sayacını durdurur. */
   private stopTimer(): void {
-    if (this.timerId !== null) {
-      clearInterval(this.timerId);
-      this.timerId = null;
+    this.timer.stopTimer();
+  }
+
+  /** Geri sayım bittiğinde (TimerService çağırır): moda göre oyun-sonu. */
+  private onCountdownExpire(): void {
+    // Seviye modunda başarısız; Zaman Yarışı'nda oyun biter (skor kalır).
+    if (this.mode() === GameMode.Level) {
+      this.status.set(GameStatus.Failed);
+    } else {
+      this.status.set(GameStatus.Lost);
     }
+    // Süreden kaybetmek de oynanmış bir oyundur: istatistik/görev sayılır.
+    this.recordGameEnd(false);
+  }
+
+  // --- Duraklat / Devam (TimerService'e delege) ---------------
+
+  /** Oyun duraklatıldı mı? (TimerService'te) */
+  readonly paused = this.timer.paused;
+
+  togglePause(): void {
+    this.timer.togglePause();
+  }
+
+  pauseGame(): void {
+    this.timer.pauseGame();
+  }
+
+  resumeGame(): void {
+    this.timer.resumeGame();
   }
 
   // --- Yardımcılar (BoardStore'a delege) ----------------------

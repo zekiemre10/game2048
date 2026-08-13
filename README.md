@@ -383,7 +383,9 @@ Kare **id'leri** hamleler arasında korunur; kayma animasyonu bunun üzerine kur
 
 ## Kurulum ve geliştirme
 
-Gereksinim: [Node.js](https://nodejs.org/) 20+
+**Gereksinim:** [Node.js](https://nodejs.org/) **22.22.3+** (veya 24.15.0+ / 26.0.0+)
+— Angular 22 CLI'nin istediği asgari sürüm. `package.json` `engines` ve depodaki
+`.nvmrc` bununla tutarlıdır; `nvm` kullanıyorsan `nvm use` doğru sürümü seçer.
 
 ```bash
 # Bağımlılıkları kur

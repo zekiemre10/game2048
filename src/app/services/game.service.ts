@@ -1,4 +1,5 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { EconomyService } from './economy.service';
 import {
   BOARD_SIZE,
   Cell,
@@ -51,7 +52,6 @@ import {
   loadBestScore,
   loadChampionships,
   loadDailyDay,
-  loadGold,
   loadMissions,
   loadName,
   loadPowers,
@@ -60,7 +60,6 @@ import {
   loadStat,
   loadStreak,
   loadStreakDay,
-  loadTotalEarned,
   saveAchievements,
   saveAssistant,
   saveAvatar,
@@ -68,7 +67,6 @@ import {
   saveBestScore,
   saveChampionships,
   saveDailyDay,
-  saveGold,
   saveMissions,
   saveName,
   savePowers,
@@ -76,7 +74,6 @@ import {
   saveRewardedLevels,
   saveStats,
   saveStreak,
-  saveTotalEarned,
 } from './game-storage';
 
 /** Avatar listesi kalıcılık katmanında; eski içe aktarımlar için yeniden dışa aç. */
@@ -122,6 +119,9 @@ interface AiDemoSnapshot extends GameSnapshot {
 
 @Injectable({ providedIn: 'root' })
 export class GameService {
+  /** Altın ekonomisi ayrı serviste; buradan yalnız delege edilir (façade). */
+  private readonly economy = inject(EconomyService);
+
   /** Taşlara benzersiz id vermek için artan sayaç. */
   private nextId = 1;
 
@@ -169,11 +169,11 @@ export class GameService {
   /** Ulaşılan en yüksek seviye (localStorage'da kalıcı). */
   readonly bestLevel = signal<number>(loadBestLevel());
 
-  /** Toplam altın (hesapta kalıcı). */
-  readonly gold = signal<number>(loadGold());
+  /** Toplam altın (EconomyService'te; API sabit kalsın diye delege edilir). */
+  readonly gold = this.economy.gold;
 
-  /** Bugüne kadar kazanılan toplam altın (başarım için). */
-  readonly totalGoldEarned = signal<number>(loadTotalEarned());
+  /** Bugüne kadar kazanılan toplam altın (EconomyService'te). */
+  readonly totalGoldEarned = this.economy.totalGoldEarned;
   /** Ad/avatar en son ne zaman değişti (bulut birleştirmede tercih LWW'si için). */
   private readonly prefsUpdatedAt = signal<number>(loadPrefsAt());
 
@@ -897,22 +897,16 @@ export class GameService {
 
   // --- Altın ekonomisi ----------------------------------------
 
-  /** Altın ekler (kazanç sayılır → toplam kazanç + başarım + görev). */
+  /** Altın ekler (kazanç sayılır → toplam kazanç + görev). Altın durumu EconomyService'te. */
   addGold(amount: number): void {
     if (amount <= 0) return;
-    this.gold.update((g) => g + amount);
-    this.totalGoldEarned.update((t) => t + amount);
-    saveGold(this.gold());
-    saveTotalEarned(this.totalGoldEarned());
-    this.trackMission('gold', amount); // görev: altın kazan
+    this.economy.add(amount);
+    this.trackMission('gold', amount); // görev: altın kazan (orkestrasyon çekirdekte)
   }
 
   /** Altın harcar. Yeterli değilse harcamaz. @returns başarılıysa true. */
   spendGold(amount: number): boolean {
-    if (this.gold() < amount) return false;
-    this.gold.update((g) => g - amount);
-    saveGold(this.gold());
-    return true;
+    return this.economy.spend(amount);
   }
 
   // --- Güçler (mağaza + kullanım) -----------------------------
@@ -1175,8 +1169,7 @@ export class GameService {
       savePrefsAt(pa);
     }
     // Kalıcı kaydet
-    saveGold(this.gold());
-    saveTotalEarned(this.totalGoldEarned());
+    this.economy.save();
     saveBestScore(this.bestScore());
     saveBestLevel(this.bestLevel());
     saveName(this.playerName());

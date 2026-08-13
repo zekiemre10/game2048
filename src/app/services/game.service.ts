@@ -4,6 +4,7 @@ import { MissionsService } from './missions.service';
 import { ProfileService } from './profile.service';
 import { AchievementsService, AchievementStats } from './achievements.service';
 import { RewardsService } from './rewards.service';
+import { PowersService } from './powers.service';
 import {
   BOARD_SIZE,
   Cell,
@@ -31,15 +32,13 @@ import { DAILY_DURATION, dailySeed, utcDayKey } from '../logic/daily-challenge';
 /** Kutlama türü — arayüz hangi sesi/mesajı göstereceğini seçer. */
 export type CelebrationKind = 'win' | 'level' | 'achievement';
 import { MAX_LEVEL, levelConfig } from '../models/level.model';
-import { PowerId, PowerInventory, emptyInventory, powerDef } from '../models/power.model';
+import { PowerId } from '../models/power.model';
 import { MissionMetric, MissionProgress } from '../models/mission.model';
 import {
   AVATARS,
   loadAssistant,
-  loadPowers,
   loadRewardedLevels,
   saveAssistant,
-  savePowers,
   saveRewardedLevels,
 } from './game-storage';
 
@@ -101,6 +100,9 @@ export class GameService {
   /** Gün serisi + günlük ödül durumu ayrı serviste (façade). */
   private readonly rewards = inject(RewardsService);
 
+  /** Güç envanteri + durumu ayrı serviste; efektler çekirdekte (façade). */
+  private readonly powersSvc = inject(PowersService);
+
   /** Taşlara benzersiz id vermek için artan sayaç. */
   private nextId = 1;
 
@@ -160,14 +162,14 @@ export class GameService {
   /** Son seviye tamamlamada kazanılan altın (0 → zaten alınmıştı). */
   readonly lastReward = signal<number>(0);
 
-  /** Güç envanteri (her güçten kaç adet). */
-  readonly powers = signal<PowerInventory>(loadPowers());
+  /** Güç envanteri (PowersService'te; API sabit kalsın diye delege). */
+  readonly powers = this.powersSvc.inventory;
 
-  /** Bomba hedefleme modu açık mı? (bir kareye dokununca silinir) */
-  readonly bombMode = signal<boolean>(false);
+  /** Bomba hedefleme modu açık mı? (PowersService'te) */
+  readonly bombMode = this.powersSvc.bombMode;
 
-  /** İpucu yönü (kısa süre gösterilir, sonra temizlenir). */
-  readonly hintDirection = signal<Direction | null>(null);
+  /** İpucu yönü (PowersService'te). */
+  readonly hintDirection = this.powersSvc.hintDirection;
 
   /** (Seviye modu) geri sayımın toplam süresi (saniye) — +30 gücü bunu artırır. */
   private countdownTotal = 0;
@@ -275,7 +277,7 @@ export class GameService {
    * sıralamasına GİRMEZ (bomba/karıştır/geri al hamle dizisinden
    * türetilemez; ayrıca herkesin eşit şartlarda yarışması için).
    */
-  readonly powerUsedThisGame = signal<boolean>(false);
+  readonly powerUsedThisGame = this.powersSvc.usedThisGame;
 
   /** Aktif rastgelelik kaynağı (her oyun tohumlu; oyun yoksa Math.random). */
   private rand(): number {
@@ -872,10 +874,7 @@ export class GameService {
    * @returns satın alma başarılıysa true (yeterli altın vs.).
    */
   buyPower(id: PowerId): boolean {
-    if (!this.spendGold(powerDef(id).price)) return false;
-    this.powers.update((inv) => ({ ...inv, [id]: inv[id] + 1 }));
-    savePowers(this.powers());
-    return true;
+    return this.powersSvc.buy(id);
   }
 
   /**
@@ -934,8 +933,7 @@ export class GameService {
   }
 
   private consumePower(id: PowerId): void {
-    this.powers.update((inv) => ({ ...inv, [id]: Math.max(0, inv[id] - 1) }));
-    savePowers(this.powers());
+    this.powersSvc.decrement(id);
     this.trackMission('powers', 1); // görev: güç kullan
     // Güç kullanılan oyun şampiyonluk sıralamasına GİRMEZ (doğrulanamaz +
     // eşit şartlar). Yalnızca sıralama dışı bırakır; oyun normal devam eder.
@@ -1127,13 +1125,7 @@ export class GameService {
 
     this.checkAchievements(); // seri güncellendi → seri başarımları
     if (reward.gold > 0) this.addGold(reward.gold);
-    if (reward.power) {
-      this.powers.update((inv) => ({
-        ...inv,
-        [reward.power!]: inv[reward.power!] + reward.powerCount,
-      }));
-      savePowers(this.powers());
-    }
+    if (reward.power) this.powersSvc.add(reward.power, reward.powerCount);
     this.celebrate('achievement'); // ödül alındı 🎉
     return true;
   }
@@ -1148,17 +1140,11 @@ export class GameService {
    */
   grantChampionPrize(gold: number, powers: Record<string, number>): void {
     if (gold > 0) this.addGold(gold);
-    const inv = { ...this.powers() };
-    let changed = false;
+    const inv = this.powers();
     for (const [id, count] of Object.entries(powers ?? {})) {
       if (id in inv && typeof count === 'number' && count > 0) {
-        inv[id as PowerId] += count;
-        changed = true;
+        this.powersSvc.add(id as PowerId, count);
       }
-    }
-    if (changed) {
-      this.powers.set(inv);
-      savePowers(inv);
     }
     this.profile.addChampionship();
   }

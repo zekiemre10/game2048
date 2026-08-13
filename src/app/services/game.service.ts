@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { EconomyService } from './economy.service';
 import { MissionsService } from './missions.service';
 import { ProfileService } from './profile.service';
+import { AchievementsService, AchievementStats } from './achievements.service';
 import {
   BOARD_SIZE,
   Cell,
@@ -30,20 +31,17 @@ import { DAILY_DURATION, dailySeed, utcDayKey } from '../logic/daily-challenge';
 export type CelebrationKind = 'win' | 'level' | 'achievement';
 import { MAX_LEVEL, levelConfig } from '../models/level.model';
 import { PowerId, PowerInventory, emptyInventory, powerDef } from '../models/power.model';
-import { ACHIEVEMENTS } from '../models/achievement.model';
 import { dayKey, streakAfterActivity, yesterdayKey } from '../logic/daily';
 import { DAILY_REWARDS, DailyReward, cycleDay, rewardForStreak } from '../logic/daily-rewards';
 import { MissionMetric, MissionProgress } from '../models/mission.model';
 import {
   AVATARS,
-  loadAchievements,
   loadAssistant,
   loadDailyDay,
   loadPowers,
   loadRewardedLevels,
   loadStreak,
   loadStreakDay,
-  saveAchievements,
   saveAssistant,
   saveDailyDay,
   savePowers,
@@ -102,6 +100,9 @@ export class GameService {
 
   /** Profil/istatistik/rekorlar ayrı serviste; buradan delege edilir (façade). */
   private readonly profile = inject(ProfileService);
+
+  /** Başarımlar ayrı serviste; koşul verisi çekirdekten geçer (façade). */
+  private readonly achievements = inject(AchievementsService);
 
   /** Taşlara benzersiz id vermek için artan sayaç. */
   private nextId = 1;
@@ -205,7 +206,7 @@ export class GameService {
   readonly lastDailyReward = signal<number>(0);
 
   /** Açılmış başarım id'leri. */
-  readonly unlockedAchievements = signal<Set<string>>(loadAchievements());
+  readonly unlockedAchievements = this.achievements.unlocked;
 
   /** Günlük görevler (MissionsService'te; API sabit kalsın diye delege). */
   readonly dailyMissions = this.missions.daily;
@@ -1102,17 +1103,16 @@ export class GameService {
     const tm = num(d['totalMoves']);
     if (tm !== null) this.totalMoves.set(tm);
     if (Array.isArray(d['achievements'])) {
-      this.unlockedAchievements.set(
-        new Set((d['achievements'] as unknown[]).filter((x) => typeof x === 'string') as string[]),
+      this.achievements.restore(
+        (d['achievements'] as unknown[]).filter((x) => typeof x === 'string') as string[],
       );
     }
     // Tercih zaman damgası (birleşmiş değer sunucudan) — LWW tutarlılığı için.
     const pa = num(d['prefsAt']);
     if (pa !== null) this.profile.prefsUpdatedAt.set(pa);
-    // Kalıcı kaydet (ekonomi + profil kendi durumunu yazar)
+    // Kalıcı kaydet (ekonomi + profil kendi durumunu yazar; başarımları restore kaydetti)
     this.economy.save();
     this.profile.persist();
-    saveAchievements(this.unlockedAchievements());
   }
 
   /** Oyun başlangıcında günün aktivitesini kaydeder (seri). */
@@ -1223,32 +1223,19 @@ export class GameService {
    * kilitli başarımlar artık sadece gri bir kutu değil.
    */
   achievementProgress(id: string): { current: number; target: number } {
-    const clamp = (cur: number, target: number) => ({
-      current: Math.min(cur, target),
-      target,
-    });
-    switch (id) {
-      case 'tile-512':
-        return clamp(this.bestTile(), 512);
-      case 'tile-1024':
-        return clamp(this.bestTile(), 1024);
-      case 'first-win':
-        return clamp(this.bestTile(), WIN_VALUE);
-      case 'level-3':
-        return clamp(this.bestLevel(), 3);
-      case 'games-10':
-        return clamp(this.gamesPlayed(), 10);
-      case 'streak-3':
-        return clamp(this.bestStreak(), 3);
-      case 'streak-7':
-        return clamp(this.bestStreak(), 7);
-      case 'bomb-use':
-        return clamp(this.profile.bombUsed() ? 1 : 0, 1);
-      case 'rich':
-        return clamp(this.totalGoldEarned(), 1000);
-      default:
-        return { current: 0, target: 1 };
-    }
+    return this.achievements.progress(id, this.achStats());
+  }
+
+  /** Başarım koşullarının okuduğu anlık ilerleme görüntüsü (profil+ekonomi+seri). */
+  private achStats(): AchievementStats {
+    return {
+      bestTile: this.bestTile(),
+      bestLevel: this.bestLevel(),
+      gamesPlayed: this.gamesPlayed(),
+      bestStreak: this.bestStreak(),
+      bombUsed: this.profile.bombUsed(),
+      totalGoldEarned: this.totalGoldEarned(),
+    };
   }
 
   /** Oyuncu ünvanı: toplam ilerlemeyi tek bir rütbeye indirger. */
@@ -1263,46 +1250,16 @@ export class GameService {
     ),
   );
 
-  /** Koşulu sağlanan yeni başarımları açar ve altın verir. */
+  /**
+   * Koşulu sağlanan yeni başarımları açar (AchievementsService) ve ödül altınını
+   * verip kutlamayı tetikler (orkestrasyon çekirdekte). Altın ödülü ayrıca "altın
+   * kazan" görevini de ilerletir (addGold davranışı korunur).
+   */
   private checkAchievements(): void {
-    let changed = false;
-    for (const a of ACHIEVEMENTS) {
-      if (this.unlockedAchievements().has(a.id)) continue;
-      if (this.achievementMet(a.id)) {
-        this.unlockedAchievements.update((s) => new Set(s).add(a.id));
-        this.addGold(a.gold); // ödül (tekrar checkAchievements tetikler ama yakınsar)
-        changed = true;
-      }
-    }
-    if (changed) {
-      saveAchievements(this.unlockedAchievements());
-      this.celebrate('achievement'); // yeni başarım açıldı 🎉
-    }
-  }
-
-  private achievementMet(id: string): boolean {
-    switch (id) {
-      case 'tile-512':
-        return this.bestTile() >= 512;
-      case 'tile-1024':
-        return this.bestTile() >= 1024;
-      case 'first-win':
-        return this.bestTile() >= WIN_VALUE;
-      case 'level-3':
-        return this.bestLevel() >= 3;
-      case 'games-10':
-        return this.gamesPlayed() >= 10;
-      case 'streak-3':
-        return this.bestStreak() >= 3;
-      case 'streak-7':
-        return this.bestStreak() >= 7;
-      case 'bomb-use':
-        return this.profile.bombUsed();
-      case 'rich':
-        return this.totalGoldEarned() >= 1000;
-      default:
-        return false;
-    }
+    const newly = this.achievements.unlockNew(this.achStats());
+    if (newly.length === 0) return;
+    for (const a of newly) this.addGold(a.gold);
+    this.celebrate('achievement'); // yeni başarım açıldı 🎉
   }
 
   // --- Görevler (façade → MissionsService) --------------------

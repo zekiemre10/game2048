@@ -1,5 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { EconomyService } from './economy.service';
+import { MissionsService } from './missions.service';
 import {
   BOARD_SIZE,
   Cell,
@@ -31,20 +32,9 @@ import { PowerId, PowerInventory, emptyInventory, powerDef } from '../models/pow
 import { ACHIEVEMENTS } from '../models/achievement.model';
 import { dayKey, streakAfterActivity, yesterdayKey } from '../logic/daily';
 import { DAILY_REWARDS, DailyReward, cycleDay, rewardForStreak } from '../logic/daily-rewards';
-import {
-  DAILY_COUNT,
-  DAILY_POOL,
-  MissionMetric,
-  MissionProgress,
-  WEEKLY_COUNT,
-  WEEKLY_POOL,
-  missionDef,
-} from '../models/mission.model';
-import { pickMissions, weekKey } from '../logic/missions';
+import { MissionMetric, MissionProgress } from '../models/mission.model';
 import {
   AVATARS,
-  DAILY_MISSIONS_KEY,
-  WEEKLY_MISSIONS_KEY,
   loadAchievements,
   loadAssistant,
   loadAvatar,
@@ -52,7 +42,6 @@ import {
   loadBestScore,
   loadChampionships,
   loadDailyDay,
-  loadMissions,
   loadName,
   loadPowers,
   loadPrefsAt,
@@ -67,7 +56,6 @@ import {
   saveBestScore,
   saveChampionships,
   saveDailyDay,
-  saveMissions,
   saveName,
   savePowers,
   savePrefsAt,
@@ -121,6 +109,9 @@ interface AiDemoSnapshot extends GameSnapshot {
 export class GameService {
   /** Altın ekonomisi ayrı serviste; buradan yalnız delege edilir (façade). */
   private readonly economy = inject(EconomyService);
+
+  /** Görevler ayrı serviste; buradan delege edilir (façade). */
+  private readonly missions = inject(MissionsService);
 
   /** Taşlara benzersiz id vermek için artan sayaç. */
   private nextId = 1;
@@ -231,21 +222,14 @@ export class GameService {
   /** Açılmış başarım id'leri. */
   readonly unlockedAchievements = signal<Set<string>>(loadAchievements());
 
-  /** Günlük görevler (id, ilerleme, alındı). */
-  readonly dailyMissions = signal<MissionProgress[]>([]);
+  /** Günlük görevler (MissionsService'te; API sabit kalsın diye delege). */
+  readonly dailyMissions = this.missions.daily;
 
-  /** Haftalık görevler. */
-  readonly weeklyMissions = signal<MissionProgress[]>([]);
+  /** Haftalık görevler (MissionsService'te). */
+  readonly weeklyMissions = this.missions.weekly;
 
   /** Alınmayı bekleyen (tamamlanmış ama alınmamış) görev sayısı. */
-  readonly claimableMissions = computed<number>(() => {
-    const count = (list: MissionProgress[]) =>
-      list.filter((m) => {
-        const def = missionDef(m.id);
-        return def && !m.claimed && m.progress >= def.target;
-      }).length;
-    return count(this.dailyMissions()) + count(this.weeklyMissions());
-  });
+  readonly claimableMissions = this.missions.claimable;
 
   /** Kazanma yüzdesi (0-100). */
   readonly winRate = computed<number>(() => {
@@ -353,7 +337,7 @@ export class GameService {
   }
 
   constructor() {
-    this.ensureMissionsFresh();
+    this.missions.ensureFresh();
   }
 
   // --- Fabrika / kurulum fonksiyonları ------------------------
@@ -1385,96 +1369,19 @@ export class GameService {
     });
   }
 
-  // --- Görevler (günlük + haftalık) ---------------------------
+  // --- Görevler (façade → MissionsService) --------------------
 
-  /** En son tazelenen dönem — her çağrıda diskten okumayı önler. */
-  private missionPeriod = { day: '', week: '' };
-
-  /** Gün/hafta değiştiyse görevleri yeniden üretir (tohumlu, deterministik). */
-  private ensureMissionsFresh(): void {
-    const now = new Date();
-    const today = dayKey(now);
-    const week = weekKey(now);
-
-    // Dönem değişmediyse iş yok (sık çağrılır: her hamlede).
-    if (this.missionPeriod.day === today && this.missionPeriod.week === week) {
-      return;
-    }
-    this.missionPeriod = { day: today, week };
-
-    const daily = loadMissions(DAILY_MISSIONS_KEY);
-    if (daily.period !== today) {
-      const defs = pickMissions(DAILY_POOL, DAILY_COUNT, today);
-      const list = defs.map((d) => ({ id: d.id, progress: 0, claimed: false }));
-      this.dailyMissions.set(list);
-      saveMissions(DAILY_MISSIONS_KEY, today, list);
-    } else {
-      this.dailyMissions.set(daily.list);
-    }
-
-    const weekly = loadMissions(WEEKLY_MISSIONS_KEY);
-    if (weekly.period !== week) {
-      const defs = pickMissions(WEEKLY_POOL, WEEKLY_COUNT, week);
-      const list = defs.map((d) => ({ id: d.id, progress: 0, claimed: false }));
-      this.weeklyMissions.set(list);
-      saveMissions(WEEKLY_MISSIONS_KEY, week, list);
-    } else {
-      this.weeklyMissions.set(weekly.list);
-    }
-  }
-
-  /** Bir metrik için görev ilerlemesini artırır (günlük + haftalık). */
+  /**
+   * Bir metrik için görev ilerlemesini bildirir. YZ oynadıysa (`aiPlayed`)
+   * ilerleme sayılmaz — bu bayrağı MissionsService'e çekirdek geçer.
+   */
   private trackMission(metric: MissionMetric, amount: number): void {
-    if (amount <= 0) return;
-    // Sekme gece yarısını aşarak açık kalmış olabilir: ilerlemeden önce
-    // dönemi tazele, yoksa dünün görevleri ilerlemeye devam ederdi.
-    this.ensureMissionsFresh();
-    if (this.aiPlayed()) return; // YZ oynadıysa görevler ilerlemez
-    this.bumpMissions(this.dailyMissions, DAILY_MISSIONS_KEY, metric, amount);
-    this.bumpMissions(this.weeklyMissions, WEEKLY_MISSIONS_KEY, metric, amount);
-  }
-
-  private bumpMissions(
-    sig: typeof this.dailyMissions,
-    key: string,
-    metric: MissionMetric,
-    amount: number,
-  ): void {
-    let changed = false;
-    const next = sig().map((m) => {
-      const def = missionDef(m.id);
-      if (!def || def.metric !== metric || m.claimed) return m;
-      const progress = Math.min(def.target, m.progress + amount);
-      if (progress !== m.progress) changed = true;
-      return { ...m, progress };
-    });
-    if (changed) {
-      sig.set(next);
-      // period'u koru (bu gün/hafta)
-      const stored = loadMissions(key);
-      saveMissions(key, stored.period, next);
-    }
+    this.missions.track(metric, amount, this.aiPlayed());
   }
 
   /** Tamamlanmış bir görevin ödülünü alır. */
   claimMission(id: string, type: 'daily' | 'weekly'): boolean {
-    this.ensureMissionsFresh(); // dün açık kalan sekmeden ödül alınmasın
-    const sig = type === 'daily' ? this.dailyMissions : this.weeklyMissions;
-    const key = type === 'daily' ? DAILY_MISSIONS_KEY : WEEKLY_MISSIONS_KEY;
-    const def = missionDef(id);
-    if (!def) return false;
-
-    const mission = sig().find((m) => m.id === id);
-    if (!mission || mission.claimed || mission.progress < def.target) {
-      return false;
-    }
-
-    this.addGold(def.gold);
-    const next = sig().map((m) => (m.id === id ? { ...m, claimed: true } : m));
-    sig.set(next);
-    const stored = loadMissions(key);
-    saveMissions(key, stored.period, next);
-    return true;
+    return this.missions.claim(id, type, this.aiPlayed());
   }
 
   /**

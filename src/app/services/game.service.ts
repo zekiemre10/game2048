@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { EconomyService } from './economy.service';
 import { MissionsService } from './missions.service';
+import { ProfileService } from './profile.service';
 import {
   BOARD_SIZE,
   Cell,
@@ -37,30 +38,16 @@ import {
   AVATARS,
   loadAchievements,
   loadAssistant,
-  loadAvatar,
-  loadBestLevel,
-  loadBestScore,
-  loadChampionships,
   loadDailyDay,
-  loadName,
   loadPowers,
-  loadPrefsAt,
   loadRewardedLevels,
-  loadStat,
   loadStreak,
   loadStreakDay,
   saveAchievements,
   saveAssistant,
-  saveAvatar,
-  saveBestLevel,
-  saveBestScore,
-  saveChampionships,
   saveDailyDay,
-  saveName,
   savePowers,
-  savePrefsAt,
   saveRewardedLevels,
-  saveStats,
   saveStreak,
 } from './game-storage';
 
@@ -113,6 +100,9 @@ export class GameService {
   /** Görevler ayrı serviste; buradan delege edilir (façade). */
   private readonly missions = inject(MissionsService);
 
+  /** Profil/istatistik/rekorlar ayrı serviste; buradan delege edilir (façade). */
+  private readonly profile = inject(ProfileService);
+
   /** Taşlara benzersiz id vermek için artan sayaç. */
   private nextId = 1;
 
@@ -143,7 +133,7 @@ export class GameService {
   readonly remainingSeconds = signal<number>(0);
 
   /** En yüksek skor (localStorage'dan yüklenir, değişince kaydedilir). */
-  readonly bestScore = signal<number>(loadBestScore());
+  readonly bestScore = this.profile.bestScore;
 
   /** Oyunun anlık durumu. */
   readonly status = signal<GameStatus>(GameStatus.Idle);
@@ -157,16 +147,14 @@ export class GameService {
   /** (Seviye modu) anlık seviye. */
   readonly level = signal<number>(1);
 
-  /** Ulaşılan en yüksek seviye (localStorage'da kalıcı). */
-  readonly bestLevel = signal<number>(loadBestLevel());
+  /** Ulaşılan en yüksek seviye (ProfileService'te). */
+  readonly bestLevel = this.profile.bestLevel;
 
   /** Toplam altın (EconomyService'te; API sabit kalsın diye delege edilir). */
   readonly gold = this.economy.gold;
 
   /** Bugüne kadar kazanılan toplam altın (EconomyService'te). */
   readonly totalGoldEarned = this.economy.totalGoldEarned;
-  /** Ad/avatar en son ne zaman değişti (bulut birleştirmede tercih LWW'si için). */
-  private readonly prefsUpdatedAt = signal<number>(loadPrefsAt());
 
   /** Ödülü zaten alınmış seviyeler (tekrar tamamlamada altın verilmez). */
   private readonly rewardedLevels = new Set<number>(loadRewardedLevels());
@@ -192,21 +180,18 @@ export class GameService {
   /** İpucu temizleme zamanlayıcısı. */
   private hintTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // --- Profil / istatistik / seri / başarım -------------------
+  // --- Profil / istatistik (ProfileService'e delege) ----------
 
   /** Oyuncu adı. */
-  readonly playerName = signal<string>(loadName());
-
+  readonly playerName = this.profile.playerName;
   /** Oynanan toplam oyun. */
-  readonly gamesPlayed = signal<number>(loadStat('gamesPlayed'));
+  readonly gamesPlayed = this.profile.gamesPlayed;
   /** Kazanılan oyun (2048'e ulaşma / tüm seviyeler). */
-  readonly gamesWon = signal<number>(loadStat('gamesWon'));
+  readonly gamesWon = this.profile.gamesWon;
   /** Ulaşılan en yüksek kare değeri. */
-  readonly bestTile = signal<number>(loadStat('bestTile'));
+  readonly bestTile = this.profile.bestTile;
   /** Toplam yapılan hamle. */
-  readonly totalMoves = signal<number>(loadStat('totalMoves'));
-  /** En az bir bomba kullanıldı mı? */
-  private bombUsed = signal<boolean>(loadStat('bombUsed') === 1);
+  readonly totalMoves = this.profile.totalMoves;
 
   /** Anlık gün serisi. */
   readonly currentStreak = signal<number>(loadStreak('current'));
@@ -231,11 +216,8 @@ export class GameService {
   /** Alınmayı bekleyen (tamamlanmış ama alınmamış) görev sayısı. */
   readonly claimableMissions = this.missions.claimable;
 
-  /** Kazanma yüzdesi (0-100). */
-  readonly winRate = computed<number>(() => {
-    const played = this.gamesPlayed();
-    return played === 0 ? 0 : Math.round((this.gamesWon() / played) * 100);
-  });
+  /** Kazanma yüzdesi (0-100) — ProfileService'te. */
+  readonly winRate = this.profile.winRate;
 
   /** Bugün günlük ödül alınabilir mi? */
   readonly canClaimDaily = computed<boolean>(() => this.lastRewardDay() !== dayKey(new Date()));
@@ -747,11 +729,8 @@ export class GameService {
     this.spawnRandomTile();
     this.startCountdown(cfg.seconds);
 
-    // Bu seviyeye ulaşıldı → en yüksek seviyeyi güncelle
-    if (this.level() > this.bestLevel()) {
-      this.bestLevel.set(this.level());
-      saveBestLevel(this.level());
-    }
+    // Bu seviyeye ulaşıldı → en yüksek seviyeyi güncelle (ProfileService)
+    this.profile.reportBestLevel(this.level());
   }
 
   /**
@@ -950,9 +929,7 @@ export class GameService {
     // Geri alma bombalanan kareyi geri getirip gücü boşa harcatırdı.
     this.history.set(null);
 
-    if (!this.bombUsed()) {
-      this.bombUsed.set(true);
-      this.saveStats();
+    if (this.profile.markBombUsed()) {
       this.checkAchievements(); // "Bombacı" başarımı
     }
     return true;
@@ -1056,32 +1033,19 @@ export class GameService {
     }
   }
 
-  // --- Profil / istatistik / seri / günlük / başarım ----------
+  // --- Profil (ProfileService'e delege) -----------------------
 
-  /** Oyuncu adını ayarlar (kalıcı). */
+  /** Seçili profil avatarı (ProfileService'te). */
+  readonly avatar = this.profile.avatar;
+
+  /** Oyuncu adını ayarlar (ProfileService). */
   setName(name: string): void {
-    const clean = name.trim().slice(0, 16) || 'Oyuncu';
-    this.playerName.set(clean);
-    saveName(clean);
-    this.touchPrefs(); // tercih değişti → bulut birleştirmede LWW için damga
+    this.profile.setName(name);
   }
 
-  /** Tercih (ad/avatar) değiştiğinde zaman damgasını günceller. */
-  private touchPrefs(): void {
-    const ts = Date.now();
-    this.prefsUpdatedAt.set(ts);
-    savePrefsAt(ts);
-  }
-
-  /** Seçili profil avatarı (kalıcı + hesapla senkron). */
-  readonly avatar = signal<string>(loadAvatar());
-
-  /** Avatarı değiştirir; listede olmayan bir değer yok sayılır. */
+  /** Avatarı değiştirir (ProfileService; listede olmayan değer yok sayılır). */
   setAvatar(a: string): void {
-    if (!AVATARS.includes(a)) return;
-    this.avatar.set(a);
-    saveAvatar(a);
-    this.touchPrefs(); // tercih değişti → bulut birleştirmede LWW için damga
+    this.profile.setAvatar(a);
   }
 
   // --- Hesap senkronizasyonu ----------------------------------
@@ -1096,7 +1060,7 @@ export class GameService {
     return {
       v: 2,
       updatedAt: Date.now(),
-      prefsAt: this.prefsUpdatedAt(),
+      prefsAt: this.profile.prefsUpdatedAt(),
       gold: this.gold(),
       totalGoldEarned: this.totalGoldEarned(),
       bestScore: this.bestScore(),
@@ -1126,13 +1090,9 @@ export class GameService {
     if (typeof d['name'] === 'string') this.playerName.set(d['name'] as string);
     if (typeof d['avatar'] === 'string' && AVATARS.includes(d['avatar'] as string)) {
       this.avatar.set(d['avatar'] as string);
-      saveAvatar(d['avatar'] as string);
     }
     const champ = num(d['championships']);
-    if (champ !== null) {
-      this.championships.set(champ);
-      saveChampionships(champ);
-    }
+    if (champ !== null) this.championships.set(champ);
     const gp = num(d['gamesPlayed']);
     if (gp !== null) this.gamesPlayed.set(gp);
     const gw = num(d['gamesWon']);
@@ -1148,16 +1108,10 @@ export class GameService {
     }
     // Tercih zaman damgası (birleşmiş değer sunucudan) — LWW tutarlılığı için.
     const pa = num(d['prefsAt']);
-    if (pa !== null) {
-      this.prefsUpdatedAt.set(pa);
-      savePrefsAt(pa);
-    }
-    // Kalıcı kaydet
+    if (pa !== null) this.profile.prefsUpdatedAt.set(pa);
+    // Kalıcı kaydet (ekonomi + profil kendi durumunu yazar)
     this.economy.save();
-    saveBestScore(this.bestScore());
-    saveBestLevel(this.bestLevel());
-    saveName(this.playerName());
-    this.saveStats();
+    this.profile.persist();
     saveAchievements(this.unlockedAchievements());
   }
 
@@ -1223,12 +1177,11 @@ export class GameService {
       this.powers.set(inv);
       savePowers(inv);
     }
-    this.championships.update((n) => n + 1);
-    saveChampionships(this.championships());
+    this.profile.addChampionship();
   }
 
-  /** Kazanılan ay sonu şampiyonluğu sayısı (profilde rozet). */
-  readonly championships = signal<number>(loadChampionships());
+  /** Kazanılan ay sonu şampiyonluğu sayısı (ProfileService'te). */
+  readonly championships = this.profile.championships;
 
   /**
    * Bugün alınacak/alınan ödülün döngüdeki günü (1-7).
@@ -1247,13 +1200,10 @@ export class GameService {
   /** 7 günlük ödül takvimi (arayüzde gösterilir). */
   readonly rewardCalendar = DAILY_REWARDS;
 
-  /** Oyun sonunda istatistikleri günceller. */
+  /** Oyun sonunda istatistikleri günceller (istatistik ProfileService'te). */
   private recordGameEnd(won: boolean): void {
     if (this.aiPlayed()) return; // YZ oynadıysa ilerleme sayılmaz
-    this.gamesPlayed.update((n) => n + 1);
-    if (won) this.gamesWon.update((n) => n + 1);
-    this.totalMoves.update((n) => n + this.moves());
-    this.saveStats();
+    this.profile.recordGame(won, this.moves());
     this.checkAchievements();
     this.trackMission('games', 1);
     if (won) this.trackMission('wins', 1);
@@ -1264,11 +1214,7 @@ export class GameService {
     if (this.aiPlayed()) return; // YZ oynadıysa istatistik sayılmaz
     let max = this.bestTile();
     for (const t of this.tiles()) if (t.value > max) max = t.value;
-    if (max !== this.bestTile()) {
-      this.bestTile.set(max);
-      this.saveStats();
-      this.checkAchievements();
-    }
+    if (this.profile.reportBestTile(max)) this.checkAchievements();
   }
 
   /**
@@ -1297,7 +1243,7 @@ export class GameService {
       case 'streak-7':
         return clamp(this.bestStreak(), 7);
       case 'bomb-use':
-        return clamp(this.bombUsed() ? 1 : 0, 1);
+        return clamp(this.profile.bombUsed() ? 1 : 0, 1);
       case 'rich':
         return clamp(this.totalGoldEarned(), 1000);
       default:
@@ -1351,22 +1297,12 @@ export class GameService {
       case 'streak-7':
         return this.bestStreak() >= 7;
       case 'bomb-use':
-        return this.bombUsed();
+        return this.profile.bombUsed();
       case 'rich':
         return this.totalGoldEarned() >= 1000;
       default:
         return false;
     }
-  }
-
-  private saveStats(): void {
-    saveStats({
-      gamesPlayed: this.gamesPlayed(),
-      gamesWon: this.gamesWon(),
-      bestTile: this.bestTile(),
-      totalMoves: this.totalMoves(),
-      bombUsed: this.bombUsed() ? 1 : 0,
-    });
   }
 
   // --- Görevler (façade → MissionsService) --------------------
@@ -1667,12 +1603,9 @@ export class GameService {
     return tile;
   }
 
-  /** Anlık skor en yüksek skoru geçtiyse güncelle ve kalıcı kaydet. */
+  /** Anlık skor en yüksek skoru geçtiyse güncelle (ProfileService). */
   private updateBestScore(): void {
     if (this.aiPlayed()) return; // YZ oynadıysa rekor sayılmaz
-    if (this.score() > this.bestScore()) {
-      this.bestScore.set(this.score());
-      saveBestScore(this.bestScore());
-    }
+    this.profile.reportBestScore(this.score());
   }
 }

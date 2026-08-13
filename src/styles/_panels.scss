@@ -1,0 +1,109 @@
+@use 'variables' as v;
+
+// ============================================================
+//  Paylaşılan panel "chrome"u + ilerleme çubukları (GLOBAL)
+//
+//  Tüm modal paneller (ayarlar, mağaza, profil, günlük, skor tablosu,
+//  başarımlar, görevler, arkadaşlar, çok oyunculu, hesap) ORTAK bu kabuğu
+//  kullanır. Monoliti bölerken paneller ayrı bileşenlere taşınıyor; bileşenler
+//  App'in kapsüllü stiline erişemediğinden bu ortak parçalar paylaşılan (global)
+//  yere alındı. Böylece hem app.html'de kalan hem de bileşene taşınan paneller
+//  aynı görünümü kullanır. (overlay-fade / pulse-low keyframe'leri global'dir.)
+// ============================================================
+
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.45);
+  animation: overlay-fade 180ms ease-in-out;
+}
+
+.settings-panel {
+  width: min(100%, 380px);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--color-bg);
+  color: var(--color-text);
+  border-radius: v.$radius-lg;
+  padding: clamp(1.2rem, 5vw, 1.75rem);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.settings-title {
+  margin: 0 0 0.25rem;
+  font-size: clamp(1.4rem, 5vw, 1.8rem);
+  font-weight: 800;
+}
+
+.settings-note {
+  margin: 0 0 1.25rem;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.settings-heading {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  letter-spacing: 1.5px;
+  opacity: 0.75;
+}
+
+.settings-close {
+  width: 100%;
+}
+
+// --- İlerleme çubuğu ---------------------------------------
+// Görevler, başarım ilerlemesi VE canlı pozisyon göstergesi (.h-*) paylaşır.
+.mission-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-text) 18%, transparent);
+  overflow: hidden;
+  margin: 0.3rem 0 0.15rem;
+}
+
+.mission-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-button);
+  transition: width 250ms ease;
+}
+
+// Sağlık çubuğunun rengi duruma göre değişir
+.mission-fill.h-good {
+  background: #3fa96b;
+}
+.mission-fill.h-risky {
+  background: #d99b2b;
+}
+.mission-fill.h-danger {
+  background: #e8503a;
+}
+
+// --- Paylaşılan keyframe'ler (GLOBAL) ----------------------
+// Panel açılış solması ve "ödül al" nabzı; hem app.scss'te kalan paneller hem
+// ayrı bileşenler kullanır. Global tanım → Angular kapsüllemesinden etkilenmez.
+@keyframes overlay-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-low {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}

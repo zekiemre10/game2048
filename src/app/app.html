@@ -751,88 +751,9 @@
   </div>
 }
 
-<!-- Görevler paneli -->
+<!-- Görevler paneli (ayrı bileşen: components/missions-panel) -->
 @if (missionsOpen()) {
-  <div class="settings-backdrop" (click)="onCloseMissions()">
-    <div
-      class="settings-panel"
-      role="dialog"
-      aria-modal="true"
-      [attr.aria-label]="t('nav.missions')"
-      (click)="$event.stopPropagation()"
-    >
-      <h2 class="settings-title">{{ t('mis.title') }}</h2>
-      <p class="settings-note">{{ t('mis.note') }}</p>
-
-      <h3 class="settings-heading">{{ t('mis.daily') }}</h3>
-      <div class="mission-list">
-        @for (m of dailyView(); track m.id) {
-          <div class="mission-item" [class.done]="m.progress >= m.def.target">
-            <span class="mission-icon">{{ m.def.icon }}</span>
-            <div class="mission-info">
-              <div class="mission-desc">{{ L(m.def.desc, m.def.descEn) }}</div>
-              <div class="mission-bar">
-                <span
-                  class="mission-fill"
-                  [style.width.%]="(m.progress / m.def.target) * 100"
-                ></span>
-              </div>
-              <div class="mission-prog">{{ m.progress }} / {{ m.def.target }}</div>
-            </div>
-            @if (m.claimed) {
-              <span class="mission-claimed">✓</span>
-            } @else if (m.progress >= m.def.target) {
-              <button
-                class="btn-primary mission-claim"
-                type="button"
-                (click)="onClaimMission(m.id, 'daily')"
-              >
-                💰 {{ m.def.gold }}
-              </button>
-            } @else {
-              <span class="mission-reward">💰 {{ m.def.gold }}</span>
-            }
-          </div>
-        }
-      </div>
-
-      <h3 class="settings-heading">{{ t('mis.weekly') }}</h3>
-      <div class="mission-list">
-        @for (m of weeklyView(); track m.id) {
-          <div class="mission-item" [class.done]="m.progress >= m.def.target">
-            <span class="mission-icon">{{ m.def.icon }}</span>
-            <div class="mission-info">
-              <div class="mission-desc">{{ L(m.def.desc, m.def.descEn) }}</div>
-              <div class="mission-bar">
-                <span
-                  class="mission-fill"
-                  [style.width.%]="(m.progress / m.def.target) * 100"
-                ></span>
-              </div>
-              <div class="mission-prog">{{ m.progress }} / {{ m.def.target }}</div>
-            </div>
-            @if (m.claimed) {
-              <span class="mission-claimed">✓</span>
-            } @else if (m.progress >= m.def.target) {
-              <button
-                class="btn-primary mission-claim"
-                type="button"
-                (click)="onClaimMission(m.id, 'weekly')"
-              >
-                💰 {{ m.def.gold }}
-              </button>
-            } @else {
-              <span class="mission-reward">💰 {{ m.def.gold }}</span>
-            }
-          </div>
-        }
-      </div>
-
-      <button class="btn-primary settings-close" type="button" (click)="onCloseMissions()">
-        {{ t('btn.close') }}
-      </button>
-    </div>
-  </div>
+  <app-missions-panel (close)="onCloseMissions()" />
 }
 
 <!-- Arkadaşlar paneli -->

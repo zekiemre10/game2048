@@ -11,6 +11,7 @@ import { StartScreen } from './components/start-screen/start-screen';
 import { BoardComponent } from './components/board/board';
 import { Confetti } from './components/confetti/confetti';
 import { Tutorial } from './components/tutorial/tutorial';
+import { MissionsPanel } from './components/missions-panel/missions-panel';
 import { AVATARS, GameService } from './services/game.service';
 import { ThemeService } from './services/theme.service';
 import { THEMES } from './models/theme.model';
@@ -30,7 +31,6 @@ import { swipeDirection } from './logic/swipe';
 import { formatTime } from './logic/format-time';
 import { POWERS, PowerId } from './models/power.model';
 import { ACHIEVEMENTS } from './models/achievement.model';
-import { missionDef } from './models/mission.model';
 
 /** Ok tuşu → yön eşlemesi. */
 const KEY_TO_DIRECTION: Record<string, Direction> = {
@@ -43,7 +43,7 @@ const KEY_TO_DIRECTION: Record<string, Direction> = {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [StartScreen, BoardComponent, Confetti, Tutorial],
+  imports: [StartScreen, BoardComponent, Confetti, Tutorial, MissionsPanel],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
@@ -158,22 +158,6 @@ export class App {
     const p = this.game.achievementProgress(id);
     return p.target > 0 ? Math.min(100, (p.current / p.target) * 100) : 0;
   }
-
-  /** Günlük görevleri tanımlarıyla birleştirir (UI için). */
-  protected readonly dailyView = computed(() =>
-    this.game
-      .dailyMissions()
-      .map((m) => ({ ...m, def: missionDef(m.id)! }))
-      .filter((m) => m.def),
-  );
-
-  /** Haftalık görevleri tanımlarıyla birleştirir. */
-  protected readonly weeklyView = computed(() =>
-    this.game
-      .weeklyMissions()
-      .map((m) => ({ ...m, def: missionDef(m.id)! }))
-      .filter((m) => m.def),
-  );
 
   /** Ayarlar paneli açık mı? */
   protected readonly settingsOpen = signal(false);
@@ -857,10 +841,6 @@ export class App {
 
   onCloseMissions(): void {
     this.missionsOpen.set(false);
-  }
-
-  onClaimMission(id: string, type: 'daily' | 'weekly'): void {
-    this.game.claimMission(id, type);
   }
 
   // --- Hesap (giriş / kayıt) ---------------------------------

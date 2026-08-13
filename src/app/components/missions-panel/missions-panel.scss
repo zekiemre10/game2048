@@ -1,0 +1,71 @@
+@use '../../../styles/variables' as v;
+
+// Görevler paneline ÖZEL stiller (paylaşılan panel-chrome ve .mission-bar/.mission-fill
+// global src/styles/_panels.scss'te). pulse-low keyframe'i de global.
+
+.mission-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.mission-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  background: var(--color-cell-empty);
+  border-radius: v.$radius-md;
+
+  &.done {
+    box-shadow: inset 0 0 0 2px #3a9d4a;
+  }
+}
+
+.mission-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.mission-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mission-desc {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.mission-prog {
+  font-size: 0.72rem;
+  color: var(--color-text);
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.mission-reward {
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  color: #b8860b;
+  font-weight: 700;
+}
+
+.mission-claim {
+  flex-shrink: 0;
+  padding: 0.4rem 0.7rem;
+  min-height: 36px;
+  font-size: 0.85rem;
+  background: #f6c945;
+  color: #6b4e00;
+  animation: pulse-low 1.2s ease-in-out infinite;
+}
+
+.mission-claimed {
+  flex-shrink: 0;
+  color: #3a9d4a;
+  font-weight: 800;
+  font-size: 1.1rem;
+}

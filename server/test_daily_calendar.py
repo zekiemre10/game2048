@@ -64,7 +64,11 @@ def main():
     with open(ts_path, encoding="utf-8") as f:
         ts = f.read()
     ts_start = re.search(r"startDay:\s*'([^']+)'", ts).group(1)
-    ts_seeds = json.loads(re.search(r"seeds:\s*(\[[^\]]*\])", ts).group(1))
+    # seeds dizisi (prettier çok satırlı + sondaki virgülle biçimlendirebilir →
+    # JSON'a çevirmeden önce sondaki virgülü temizle).
+    seeds_text = re.search(r"seeds:\s*(\[[^\]]*\])", ts, re.S).group(1)
+    seeds_text = re.sub(r",(\s*)\]", r"\1]", seeds_text)
+    ts_seeds = json.loads(seeds_text)
     check(ts_start == server_json["startDay"], "startDay istemci=sunucu")
     check(ts_seeds == server_json["seeds"], "seed dizisi istemci=sunucu (birebir)")
 

@@ -24,6 +24,8 @@ import secrets
 import time
 import threading
 import traceback
+import urllib.request
+import urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 # Skoru istemciden değil, tohum+hamleden SUNUCU hesaplar (hile önleme).
@@ -106,6 +108,23 @@ LOGIN_MAX_TRIES = 10  # aynı kullanıcı adı için pencere başına deneme
 # Kısa pencere bilinçli bir tercih: kaba kuvvetin hızını keser ama parolasını
 # birkaç kez yanlış giren gerçek kullanıcıyı uzun süre dışarıda bırakmaz.
 LOGIN_WINDOW = 120  # saniye
+
+# --- LLM koç — kişiselleştirilmiş oyun sonu analizi -------------------------
+# Çalışma zamanı LLM çağrısı: API ANAHTARI YALNIZCA SUNUCUDA (ortam değişkeni),
+# istemciye ASLA gitmez. Sağlayıcı-bağımsızdır (anthropic | openai); anahtar
+# ayarlı değilse uç nokta 503 döner ve istemci şablon (describeGame) analizine
+# düşer — özellik hiçbir zaman hata göstermez. Maliyet kontrolü: kullanıcı
+# başına günlük + kısa pencere sınırı; oyun-başına-tek çağrı istemcide önbellekle.
+ANALYSIS_PROVIDER = os.environ.get("GAME2048_LLM_PROVIDER", "anthropic").strip().lower()
+ANALYSIS_API_KEY = os.environ.get("GAME2048_LLM_KEY", "").strip()
+ANALYSIS_MODEL = os.environ.get("GAME2048_LLM_MODEL", "").strip() or (
+    "gpt-4o-mini" if ANALYSIS_PROVIDER == "openai" else "claude-haiku-4-5-20251001"
+)
+ANALYSIS_DAILY_MAX = int(os.environ.get("GAME2048_LLM_DAILY_MAX", "30"))  # kullanıcı/gün
+ANALYSIS_BURST_MAX = 5     # kullanıcı başına pencere başına (kötüye kullanım guard'ı)
+ANALYSIS_BURST_WINDOW = 60  # saniye
+ANALYSIS_TIMEOUT = 20      # saniye (sağlayıcı yavaşsa şablona düş)
+ANALYSIS_MAX_CHARS = 900   # dönen metin üst sınırı (aşırı uzun/pahalı çıktı guard'ı)
 
 
 class BadRequest(Exception):
@@ -207,6 +226,155 @@ def verify_transcript(b):
         return False, 0, 0, "invalid_replay"
 
     return True, result["score"], result["maxTile"], "ok"
+
+
+# --------------------------------------------------------------------------
+#  LLM koç — istem + sağlayıcı çağrısı (sağlayıcı-bağımsız, stdlib urllib)
+# --------------------------------------------------------------------------
+def coach_available() -> bool:
+    """LLM koç yapılandırıldı mı? (Anahtar yoksa istemci şablona düşer.)"""
+    return bool(ANALYSIS_API_KEY)
+
+
+def clamp_summary(b: dict) -> dict:
+    """İstemci oyun özetini güvenli aralıklara sıkıştırır (uydurma değerleri ele)."""
+    def _i(v, lo, hi, dflt=0):
+        try:
+            return max(lo, min(hi, int(v)))
+        except (TypeError, ValueError):
+            return dflt
+
+    lang = "en" if str(b.get("lang")).lower() == "en" else "tr"
+    curve = []
+    curve_raw = b.get("healthCurve")
+    if isinstance(curve_raw, list):
+        # En fazla 24 küçük tamsayı (0-100); uzun oyunlar istemcide seyreltilir.
+        curve = [_i(v, 0, 100) for v in curve_raw[:24]]
+
+    turning = None
+    tp = b.get("turningPoint")
+    if isinstance(tp, dict):
+        turning = {
+            "move": _i(tp.get("move"), 0, MAX_MOVES),
+            "from": _i(tp.get("from"), 0, 100),
+            "to": _i(tp.get("to"), 0, 100),
+        }
+
+    inaccurate = []
+    inacc_raw = b.get("inaccurateMoves")
+    if isinstance(inacc_raw, list):
+        inaccurate = [_i(v, 0, MAX_MOVES) for v in inacc_raw[:12]]
+
+    return {
+        "mode": str(b.get("mode") or "classic")[:16],
+        "lang": lang,
+        "score": _i(b.get("score"), 0, MAX_SCORE),
+        "moves": _i(b.get("moves"), 0, MAX_MOVES),
+        "bestTile": _i(b.get("bestTile"), 0, 1 << 20),
+        "accuracy": _i(b.get("accuracy"), 0, 100),
+        "assistant": bool(b.get("assistant")),
+        "outcome": str(b.get("outcome") or "")[:16],  # won/lost/...
+        "healthCurve": curve,
+        "turningPoint": turning,
+        "inaccurateMoves": inaccurate,
+    }
+
+
+def build_coach_prompt(s: dict):
+    """(system, user) istem çiftini kurar. Model YALNIZCA verilen sayılara
+    dayanmalı, veri uydurmamalı; çıktı 2-4 cümle, somut ve cesaretlendirici."""
+    eff = round(s["score"] / s["moves"]) if s["moves"] else 0
+    facts = {
+        "mode": s["mode"],
+        "score": s["score"],
+        "moves": s["moves"],
+        "biggest_tile": s["bestTile"],
+        "points_per_move": eff,
+        "outcome": s["outcome"],
+        "position_health_curve_0to100": s["healthCurve"],
+    }
+    if s["assistant"]:
+        facts["move_accuracy_percent"] = s["accuracy"]
+        if s["inaccurateMoves"]:
+            facts["inaccurate_move_numbers"] = s["inaccurateMoves"]
+    if s["turningPoint"]:
+        facts["turning_point"] = s["turningPoint"]
+
+    if s["lang"] == "en":
+        system = (
+            "You are a warm, concise 2048 coach. Write 2-4 sentences of personal, "
+            "specific and encouraging feedback that helps the player improve. Ground "
+            "EVERY claim strictly in the provided numbers; never invent tiles, moves, "
+            "scores or events not present in the data. If a turning point is given, "
+            "say where the board fell apart and give ONE concrete tip for next time. "
+            "Plain text only — no markdown, no bullet lists."
+        )
+        user = ("Game data (JSON):\n" + json.dumps(facts)
+                + "\n\nWrite the coaching note in English.")
+    else:
+        system = (
+            "Sıcak ve öz bir 2048 koçusun. Oyuncunun gelişmesine yardım eden kişisel, "
+            "somut ve cesaretlendirici 2-4 cümlelik bir değerlendirme yaz. HER cümleyi "
+            "yalnızca verilen sayılara dayandır; veride olmayan taş, hamle, skor veya "
+            "olay UYDURMA. Dönüm noktası verildiyse tahtanın nerede bozulduğunu söyle "
+            "ve bir dahaki sefere için TEK somut ipucu ver. Sadece düz metin; markdown "
+            "veya madde işareti kullanma."
+        )
+        user = ("Oyun verisi (JSON):\n" + json.dumps(facts, ensure_ascii=False)
+                + "\n\nDeğerlendirmeyi Türkçe yaz.")
+    return system, user
+
+
+def llm_complete(system: str, user: str):
+    """Sağlayıcıya (anthropic|openai) tek istek; metin döndürür (hata → None).
+    Ağ çağrısı stdlib urllib ile (ek bağımlılık yok). Testler monkeypatch'ler."""
+    if not ANALYSIS_API_KEY:
+        return None
+    try:
+        if ANALYSIS_PROVIDER == "openai":
+            url = "https://api.openai.com/v1/chat/completions"
+            payload = {
+                "model": ANALYSIS_MODEL,
+                "max_tokens": 400,
+                "temperature": 0.7,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            }
+            headers = {
+                "Authorization": "Bearer " + ANALYSIS_API_KEY,
+                "Content-Type": "application/json",
+            }
+        else:  # anthropic (varsayılan)
+            url = "https://api.anthropic.com/v1/messages"
+            payload = {
+                "model": ANALYSIS_MODEL,
+                "max_tokens": 400,
+                "system": system,
+                "messages": [{"role": "user", "content": user}],
+            }
+            headers = {
+                "x-api-key": ANALYSIS_API_KEY,
+                "anthropic-version": "2023-06-01",
+                "Content-Type": "application/json",
+            }
+        req = urllib.request.Request(
+            url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=ANALYSIS_TIMEOUT) as r:
+            data = json.loads(r.read().decode("utf-8"))
+        if ANALYSIS_PROVIDER == "openai":
+            text = data["choices"][0]["message"]["content"]
+        else:
+            # Anthropic: content bir blok listesi; text bloklarını birleştir.
+            text = "".join(
+                c.get("text", "") for c in data.get("content", []) if c.get("type") == "text"
+            )
+        return (text or "").strip() or None
+    except Exception:
+        traceback.print_exc()  # ayrıntı yalnızca sunucu günlüğünde
+        return None
 
 
 # --------------------------------------------------------------------------
@@ -935,11 +1103,46 @@ class Handler(BaseHTTPRequestHandler):
             return self._monthly_submit()
         if p == "/monthly/claim":
             return self._monthly_claim()
+        if p == "/analysis":
+            return self._analysis()
         return self._send(404, {"error": "not_found"})
 
     def _auth_row(self, conn):
         """Bearer token'dan kullanıcı satırı; yoksa None."""
         return user_from_token(conn, self._token())
+
+    def _analysis(self):
+        """POST /analysis — kişiselleştirilmiş LLM koç metni.
+
+        • Auth ZORUNLU (misafirler istemcide şablona düşer).
+        • Anahtar yoksa 503 → istemci yerel şablon (describeGame) analizine düşer;
+          özellik hiçbir zaman hata göstermez.
+        • Maliyet: kullanıcı başına kısa pencere (burst) + günlük sınır. Oyun-başına
+          tek çağrı istemcide önbellekle sağlanır.
+        • Model YALNIZCA istemcinin gönderdiği oyun özetine dayanır (uydurma yok).
+        """
+        conn = db()
+        try:
+            me = self._auth_row(conn)
+            if not me:
+                return self._send(401, {"error": "unauthorized"})
+            if not coach_available():
+                return self._send(503, {"error": "coach_unavailable"})
+            if not rate_ok("analysis_burst", me["id"], ANALYSIS_BURST_MAX, ANALYSIS_BURST_WINDOW):
+                return self._send(429, {"error": "too_many_requests"})
+            if not rate_ok("analysis_day", me["id"], ANALYSIS_DAILY_MAX, 86400):
+                return self._send(429, {"error": "daily_limit"})
+            summary = clamp_summary(self._body())
+            system, user = build_coach_prompt(summary)
+            text = llm_complete(system, user)
+            if not text:
+                # Sağlayıcı hatası/zaman aşımı → istemci şablona düşsün.
+                return self._send(503, {"error": "coach_unavailable"})
+            if len(text) > ANALYSIS_MAX_CHARS:
+                text = text[:ANALYSIS_MAX_CHARS].rstrip() + "…"
+            return self._send(200, {"text": text, "ai": True})
+        finally:
+            conn.close()
 
     # --- Rotalar ---
     def _register(self):

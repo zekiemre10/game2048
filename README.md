@@ -69,10 +69,22 @@ bu tek motordan gelir:
   düştüğü **dönüm noktası** vurgulu ("38. hamlede tahtan bozuldu"). Bir noktaya
   tıklayınca o andaki tahta + YZ'nin önerdiği hamle görünür. Asistan kapalıyken de
   sağlık eğrisi + dönüm noktası çalışır (yalnız hamle-kalitesi işaretleri sönük)
+- 🧠 **Kişisel koç (LLM)** — oyun bitince "🧠 Kişisel koç" ile, senin oyununa özel,
+  insan diliyle 2-4 cümlelik değerlendirme: oyunun özeti (mod, skor, doğruluk,
+  dönüm noktası, sağlık eğrisi) sunucudaki `/analysis` uç noktasına gönderilir,
+  model somut ve öğretici bir paragraf döndürür. **API anahtarı yalnızca sunucuda**
+  (ortam değişkeni), istemci paketinde asla bulunmaz. Yalnızca giriş yapmış
+  oyunculara; maliyet kontrolü (kullanıcı başına günlük + kısa pencere sınırı,
+  oyun-başına tek çağrı). Sunucu erişilemez / anahtar yoksa **sessizce algoritmik
+  analize düşer** — özellik hiçbir zaman hata göstermez. Metin, YZ tarafından
+  üretildiği açıkça belirtilerek gösterilir
 
 Ayarlar'daki **🧠 YZ Asistanı** anahtarı öneri, hamle kalitesi ve pozisyon
 göstergesini birlikte açar/kapatır. Hamle başına ek maliyet ortanca **~2 ms**
-(en kötü ~40 ms) — arayüz hiç takılmaz.
+(en kötü ~40 ms) — arayüz hiç takılmaz. Yukarıdakilerin **tümü istemcide,
+çevrimdışı ve ücretsiz** çalışır; TEK istisna, isteğe bağlı **kişisel koç**
+(LLM): oyun sonunda butonla tetiklenir, tek çalışma-zamanı LLM çağrısıdır ve
+API anahtarı yalnızca sunucuda tutulur.
 
 ### Zorluk merdiveni (ölçülmüş)
 
@@ -323,7 +335,9 @@ Hesap, arkadaşlar, sohbet ve çok oyunculu yarış için `server/app.py` küç�
 Python servisidir (yalnızca standart kütüphane — `http.server`, `sqlite3`,
 `hashlib.pbkdf2`). Şifreler tuzlanıp özetlenir; oturumlar Bearer token ile taşınır.
 JSON uçları: `/register` · `/login` · `/me` · `/sync` · `/friends*` · `/messages*` ·
-`/rooms*`. Çok oyunculu yarışta tüm oyunculara **ortak tohum** gönderilir; böylece
+`/rooms*` · `/analysis` (LLM koç — API anahtarı yalnızca sunucuda, ortam
+değişkeninden; anahtar yoksa 503 → istemci şablon analizine düşer). Çok oyunculu
+yarışta tüm oyunculara **ortak tohum** gönderilir; böylece
 herkes birebir aynı taş dizisini alır (adil yarış), skorlar ~1sn'de bir eşitlenir.
 
 Güvenlik önlemleri: PBKDF2-SHA256 (600k tur, kullanıcıya özel tuz), sabit zamanlı
@@ -560,3 +574,5 @@ web sunucusuyla servis edilebilir. Canlı sürüm bu dosyaların
 - [x] Aylık şampiyonluk (her ay sıfırlanan sıralama + ay sonu büyük ödül)
 - [x] Oyun sonu hamle zaman çizelgesi ("nerede kaybettin?" — sağlık eğrisi + dönüm
       noktası + tıkla-tahtayı-gör, asistan kapalıyken de çalışır)
+- [x] Kişisel LLM koç (oyun sonu; sunucudaki `/analysis`, API anahtarı yalnızca
+      sunucuda; maliyet sınırlı; sunucu/anahtar yoksa şablon analize düşer)

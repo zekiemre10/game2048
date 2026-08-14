@@ -373,6 +373,29 @@
                 }
               }
 
+              <!-- Kişisel LLM koç (istek üzerine; yalnızca giriş yapmış oyuncuya) -->
+              @if (canCoach()) {
+                @if (coachText()) {
+                  <div class="overlay-coach">
+                    <p class="coach-text">{{ coachText() }}</p>
+                    @if (coachIsAi()) {
+                      <p class="coach-badge">🤖 {{ t('coach.aiLabel') }}</p>
+                    } @else {
+                      <p class="coach-badge coach-fallback">💡 {{ t('coach.unavailable') }}</p>
+                    }
+                  </div>
+                } @else {
+                  <button
+                    class="btn-primary ghost overlay-coach-btn"
+                    type="button"
+                    [disabled]="coachLoading()"
+                    (click)="onCoach()"
+                  >
+                    {{ coachLoading() ? t('coach.loading') : t('coach.button') }}
+                  </button>
+                }
+              }
+
               <!-- Hamle zaman çizelgesi: "oyunu nerede kaybettin?" (yarış hariç) -->
               @if (mode() !== GameMode.Race) {
                 <app-move-timeline />

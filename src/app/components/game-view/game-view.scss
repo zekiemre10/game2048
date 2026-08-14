@@ -810,6 +810,43 @@
   color: #e8503a;
 }
 
+.overlay-coach-btn {
+  margin: 0.4rem auto 0.2rem;
+}
+
+.overlay-coach {
+  margin: 0.5rem 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  // İnce mor vurgu: kişisel koç, algoritmik analizden görsel olarak ayrışsın.
+  background: linear-gradient(135deg, rgba(124, 92, 220, 0.14), var(--color-cell-empty));
+  border: 1px solid rgba(124, 92, 220, 0.35);
+  color: var(--color-text);
+  text-align: left;
+
+  .coach-text {
+    margin: 0;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    max-height: 40vh;
+    overflow-y: auto;
+  }
+
+  .coach-badge {
+    margin: 0.5rem 0 0;
+    font-size: 0.75rem;
+    opacity: 0.75;
+    font-style: italic;
+  }
+
+  .coach-fallback {
+    color: #b06a1e;
+    font-style: normal;
+    opacity: 0.9;
+  }
+}
+
 .race-standings {
   width: min(100%, 480px);
   margin: 0 auto 0.5rem;

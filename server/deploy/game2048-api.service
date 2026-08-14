@@ -33,6 +33,16 @@ Environment=GAME2048_PORT=8092
 # CORS'u yayın kökenine daraltmak için (bkz. app.py):
 # Environment=GAME2048_CORS_ORIGINS=http://34.158.136.9
 
+# --- LLM koç (kişiselleştirilmiş oyun sonu analizi) ---
+# API ANAHTARI YALNIZCA BURADA (sunucuda) — istemciye ASLA gitmez. Anahtar
+# ayarlanmazsa /analysis 503 döner ve istemci şablon analizine düşer (özellik
+# hata göstermez). Anahtarı doğrudan bu dosyaya yazmak yerine ayrı bir korumalı
+# dosyadan okumak daha güvenli:  EnvironmentFile=/etc/game2048-api.env  (chmod 600)
+# Environment=GAME2048_LLM_KEY=sk-...          # sağlayıcı API anahtarı (zorunlu)
+# Environment=GAME2048_LLM_PROVIDER=anthropic  # anthropic (varsayılan) | openai
+# Environment=GAME2048_LLM_MODEL=claude-haiku-4-5-20251001  # boşsa sağlayıcı varsayılanı
+# Environment=GAME2048_LLM_DAILY_MAX=30        # kullanıcı başına günlük analiz sınırı
+
 # --- Çökünce otomatik yeniden başlat ---
 Restart=on-failure
 RestartSec=3

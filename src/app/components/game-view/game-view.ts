@@ -93,6 +93,30 @@ export class GameView {
   /** Oyun sonu YZ (algoritmik) değerlendirme metni. */
   protected readonly analysisText = signal('');
 
+  /** Kişisel LLM koç metni (istek üzerine yüklenir; yeni oyunda temizlenir). */
+  protected readonly coachText = signal('');
+
+  /** Koç metni LLM üretimi mi (true) yoksa şablona mı düşüldü (false)? */
+  protected readonly coachIsAi = signal(false);
+
+  /** Koç isteği sürüyor mu (buton durumu). */
+  protected readonly coachLoading = signal(false);
+
+  /**
+   * Kişisel koç butonu görünsün mü? Yalnızca giriş yapmış oyuncuya, oyun bitince
+   * (yarış hariç). Misafirler yalnızca şablon analizi görür (maliyet kontrolü:
+   * kullanıcı-başına günlük sınır ancak hesapla uygulanabilir).
+   */
+  protected readonly canCoach = computed(
+    () =>
+      this.auth.isLoggedIn() &&
+      this.mode() !== GameMode.Race &&
+      (this.status() === GameStatus.Won ||
+        this.status() === GameStatus.Lost ||
+        this.status() === GameStatus.Failed ||
+        this.status() === GameStatus.LevelComplete),
+  );
+
   /** Envanterde en az 1 tane olan güçler (oyun içi güç çubuğu için). */
   protected readonly ownedPowers = computed(() => POWERS.filter((p) => this.powers()[p.id] > 0));
 
@@ -136,6 +160,11 @@ export class GameView {
           if (this.assistantOn()) this.analysisText.set(this.ai.localAnalysis());
         } else {
           this.analysisText.set('');
+          // Yeni oyun / oynanırken kişisel koç metnini de temizle (bir sonraki
+          // oyunda eski koç metni görünmesin; her oyun için tek çağrı korunur).
+          this.coachText.set('');
+          this.coachIsAi.set(false);
+          this.coachLoading.set(false);
         }
       });
     });
@@ -233,5 +262,21 @@ export class GameView {
   /** Biten oyunu YZ ile (algoritmik, anlık) değerlendir. */
   onAnalyze(): void {
     this.analysisText.set(this.ai.localAnalysis());
+  }
+
+  /**
+   * Kişisel LLM koç metnini iste (oyun başına tek çağrı). Sunucu erişilemez /
+   * anahtar yok / hız sınırı dolu ise sessizce yerel şablona düşer (`ai:false`).
+   */
+  async onCoach(): Promise<void> {
+    if (this.coachLoading() || this.coachText()) return; // zaten yüklendi/yükleniyor
+    this.coachLoading.set(true);
+    try {
+      const result = await this.ai.coach();
+      this.coachText.set(result.text);
+      this.coachIsAi.set(result.ai);
+    } finally {
+      this.coachLoading.set(false);
+    }
   }
 }

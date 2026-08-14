@@ -13,22 +13,22 @@ Bilgisayarda **ok tuşlarıyla**, telefonda **parmakla kaydırarak** oynanır.
 
 ## Ekran Görüntüleri
 
-| Açık tema | Koyu tema |
-|-----------|-----------|
+| Açık tema                               | Koyu tema                              |
+| --------------------------------------- | -------------------------------------- |
 | ![Açık tema](docs/screenshot-light.png) | ![Koyu tema](docs/screenshot-dark.png) |
 
-| Başlık ekranı | Mobil |
-|---------------|-------|
+| Başlık ekranı                               | Mobil                                              |
+| ------------------------------------------- | -------------------------------------------------- |
 | ![Başlık ekranı](docs/screenshot-start.png) | <img src="docs/screenshot-mobile.png" width="260"> |
 
-| Profil (ünvan + avatar) | Başarımlar (ilerleme çubuklu) |
-|-------------------------|-------------------------------|
+| Profil (ünvan + avatar)                | Başarımlar (ilerleme çubuklu)                   |
+| -------------------------------------- | ----------------------------------------------- |
 | ![Profil](docs/screenshot-profile.png) | ![Başarımlar](docs/screenshot-achievements.png) |
 
 ### Çevrimiçi özellikler
 
-| Arkadaşlar | Sohbet | Çok oyunculu yarış |
-|-----------|--------|--------------------|
+| Arkadaşlar                                 | Sohbet                              | Çok oyunculu yarış                               |
+| ------------------------------------------ | ----------------------------------- | ------------------------------------------------ |
 | ![Arkadaşlar](docs/screenshot-friends.png) | ![Sohbet](docs/screenshot-chat.png) | ![Çok oyunculu](docs/screenshot-multiplayer.png) |
 
 ## Nasıl oynanır
@@ -59,8 +59,8 @@ bu tek motordan gelir:
   Uzman); her düğme seçim ekranında **ölçülmüş gücünü** (2048'e ulaşma oranı)
   gösterir; bot **SUNUCUDA** koşar (adil, kararlı, manipüle edilemez) ve insanla
   **aynı tohumlu** taş dizisini oynar
-- ✨ **Hamle kalitesi** — her hamlen YZ'nin seçimiyle kıyaslanır: *Mükemmel · İyi ·
-  Daha iyisi vardı (↑)* — oyun sonunda **doğruluk yüzdesi** özeti
+- ✨ **Hamle kalitesi** — her hamlen YZ'nin seçimiyle kıyaslanır: _Mükemmel · İyi ·
+  Daha iyisi vardı (↑)_ — oyun sonunda **doğruluk yüzdesi** özeti
 - 🟢 **Canlı pozisyon göstergesi** — tahtanın sağlığı (İyi / Riskli / Tehlikeli);
   boş alan, köşe kullanımı ve kalan hamle yönlerinden hesaplanır
 - 🔍 **Oyun sonu değerlendirmesi** — köşe stratejisi, verimlilik ve kişisel ipucu
@@ -74,16 +74,16 @@ göstergesini birlikte açar/kapatır. Hamle başına ek maliyet ortanca **~2 ms
 Bot rakibin **dört zorluğu** artan güçtedir ve gelişen oyuncuya **kademeli**
 bir merdiven sunar. Motor `scripts/ai-bench.mjs` ile ölçülür (4×4, tam oyun):
 
-| Seviye | Arama | Ort. skor | 2048'e ulaşma | ms/hamle | Önceki kademeye oran |
-|--------|-------|-----------|---------------|----------|----------------------|
-| Kolay  | derinlik 1 (sığ) | 5.041 | %0 | 0.02 | — |
-| Orta   | derinlik 2, kaba örnekleme + düz sezgisel | 15.192 | %23 | 0.03 | **3.0×** |
-| Zor    | derinlik 2, tam sezgisel | 35.038 | %67 | 0.08 | **2.3×** |
-| **Uzman** | **derinlik 3→4 (yinelemeli)** | **55.343** | **%100** | **17.7** | **1.6×** |
+| Seviye    | Arama                                     | Ort. skor  | 2048'e ulaşma | ms/hamle | Önceki kademeye oran |
+| --------- | ----------------------------------------- | ---------- | ------------- | -------- | -------------------- |
+| Kolay     | derinlik 1 (sığ)                          | 5.041      | %0            | 0.02     | —                    |
+| Orta      | derinlik 2, kaba örnekleme + düz sezgisel | 15.192     | %23           | 0.03     | **3.0×**             |
+| Zor       | derinlik 2, tam sezgisel                  | 35.038     | %67           | 0.08     | **2.3×**             |
+| **Uzman** | **derinlik 3→4 (yinelemeli)**             | **55.343** | **%100**      | **17.7** | **1.6×**             |
 
 Her kademe bir öncekinden ölçülebilir şekilde güçlü ve **ardışık fark 5 katı
 geçmiyor** (kademeli geçiş). Uzman hamle başına **17.7 ms ≤ 30 ms**.
-*(Kolay/Orta/Zor 30 oyun; Uzman yavaş olduğundan 10 oyun.)*
+_(Kolay/Orta/Zor 30 oyun; Uzman yavaş olduğundan 10 oyun.)_
 
 **Eski hata (bu iş):** Kolay ile Orta arasında **25 kat uçurum** vardı — Kolay
 2048'e hiç ulaşmıyor, Orta oyunların %97'sinde ulaşıyordu; arada seçenek yoktu.
@@ -93,6 +93,7 @@ lever derinlikti ve derinlik 1→2 arası skoru 3.5k'dan 33k'ya sıçratıyordu.
 
 **Çözüm:** rastgele hamle **tamamen kaldırıldı** — artık her seviye **hep
 mantıklı** oynar. Zayıflatma üç **deterministik** knob üzerinden yapılır:
+
 - **derinlik** — kaç hamle ileri baktığı (baskın lever),
 - **sampleK** — şans düğümü örnekleme genişliği (1 = kaba beklenen değer),
 - **snakePow / emptyMul** — sezgisel güç (köşe/monotonluk gradyanı + boş hücre
@@ -124,6 +125,7 @@ zamanlı hesap **sürekli CPU** tüketir ve çok odada ölçeklenmez; çizelge y
 CPU maliyeti **tek seferliktir** ve aynı adaleti/manipülasyon direncini sağlar.
 
 Nasıl:
+
 - **Motor Python'a taşındı** (`server/bot_ai.py`), istemcideki `ai.ts` bot
   fonksiyonlarının birebir eşi. Determinizm için **sabit derinlik** (zaman sınırı
   yok) ve **tam-sayı ağırlıklar** kullanılır → tek transandantal işlem (`pow`)
@@ -174,8 +176,8 @@ Nasıl:
   İlk üçte madalya, kendi sıran listede olmasan da gösterilir
 - 👑 **Aylık şampiyonluk** — sıralama **her ay yeniden başlar**; ay sonunda
   1. olan **2000 altın + her güçten 3 adet** kazanır ve profilinde 🏆 rozeti
-  birikir. Oyuncunun kendi rekoru ve ilerlemesi **asla sıfırlanmaz** —
-  aylık yarış ayrı bir tablodur
+     birikir. Oyuncunun kendi rekoru ve ilerlemesi **asla sıfırlanmaz** —
+     aylık yarış ayrı bir tablodur
 - 🎉 **Kutlama efektleri** — başarım / seviye / 2048 anında konfeti + ses
 - 🎓 **İlk oyun rehberi** — yeni oyuncuya 6 adımlık tanıtım (Ayarlar'dan tekrar açılır)
 - 🏠 **Ana ekran** — başlığa / mod seçimine dönüş (oyun ekranında ← tuşu)
@@ -212,7 +214,22 @@ src/
       tile/            # Tek kare: renk, konum, animasyonlar
       start-screen/    # Başlık ekranı
     services/
-      game.service.ts        # Oyun durumu (signals) + skor + süre/hamle + geri al + yarış (tohumlu RNG)
+      game.service.ts        # İNCE FAÇADE — sabit dış API'yi alt servislere delege eder (bkz. "Servis mimarisi")
+      board-store.ts         # Kernel: ham tahta durumu (tiles/skor/hamle/durum/mod) + primitifler + RNG
+      game-engine.ts         # Hamle akışı + oyun-sonu kuralları + skor/rekor + başarım/görev/ödül orkestrasyonu
+      modes.service.ts       # 5 mod kurulumu (Klasik/Zen/Zaman/Seviye/Günlük) + yaşam döngüsü + geri al
+      timer.service.ts       # Süre: yukarı sayan + geri sayım + duraklat (geri sayım bitince motora geri çağrı)
+      autoplay.service.ts    # "YZ'yi izle" motoru: gösterim + durdurunca oyuncu durumunu geri yükle
+      assistant-store.ts     # YZ asistanı durumu: hamle kalitesi + sağlık + öneri + autoplay bayrakları
+      power-effects.service.ts # Güç ETKİLERİ (bomba/karıştır/ipucu/+30sn); envanter ayrı serviste
+      powers.service.ts      # Güç envanteri + satın alma + oturum bayrakları
+      economy.service.ts     # Altın bakiyesi + toplam kazanç
+      profile.service.ts     # Kimlik (ad/avatar/şampiyonluk) + rekorlar + ömürlük istatistikler
+      achievements.service.ts# Başarım kümesi + koşul/ilerleme (yaprak: stat parametreyle gelir)
+      missions.service.ts    # Günlük + haftalık görevler + ilerleme + ödül
+      rewards.service.ts     # Gün serisi (streak) + 7 günlük ödül takvimi
+      cloud-sync.service.ts  # Hesap anlık görüntüsü + sunucudan geri uygulama
+      game-storage.ts        # TÜM localStorage okuma/yazma (saf fonksiyonlar, tek yer)
       theme.service.ts       # Açık/koyu tema (localStorage)
       audio.service.ts       # Arka plan müziği (loop, ses, kalıcı)
       sfx.service.ts         # Ses efektleri (Web Audio, prosedürel)
@@ -241,6 +258,59 @@ src/
 server/
   app.py               # Backend: hesap + arkadaşlar + sohbet + çok oyunculu (Python stdlib)
 ```
+
+## Servis mimarisi (oyun katmanı)
+
+Oyun mantığı eskiden tek bir 2.000+ satırlık `game.service.ts` içindeydi (13
+farklı test dosyası = 13 farklı sorumluluğun itirafı). Artık her biri **tek
+sorumluluğu olan** ve **500 satırın altında** servislere bölündü. `GameService`
+ince bir **façade**'dır: eski (sabit) dış API'yi korur ve alt servislere delege
+eder — böylece paneller/uygulama/testler değişmeden çalışır.
+
+**Katmanlar (bağımlılık TEK YÖN — aşağıya doğru; döngü yok):**
+
+```
+                         GameService  (façade — sabit dış API)
+                              │  delege
+   ┌──────────────┬──────────┼───────────────┬──────────────┐
+   ▼              ▼          ▼                ▼              ▼
+ModesService  PowerEffects  AutoplayService  CloudSync   (doğrudan delegeler)
+   │  (mod)      │ (etki)      │ (YZ izle)      │ (senkron)
+   └──────┬──────┴──────┬──────┘                │
+          ▼             ▼                        │
+      GameEngine  (hamle akışı + oyun-sonu + orkestrasyon)
+          │                                      │
+   ┌──────┴───────────────────────────────┬─────┘
+   ▼                                       ▼
+BoardStore (tahta kernel'i)    Domain servisleri: economy · profile ·
+TimerService · AssistantStore   achievements · missions · rewards · powers
+   │                                       │
+   └───────────────► game-storage.ts ◄─────┘   (tüm localStorage, tek yer)
+```
+
+**İlkeler:**
+
+- **Kernel = BoardStore.** Oyunun "kaynak gerçeği" (taşlar, skor, hamle, durum,
+  mod, seviye, geçmiş) + tahta primitifleri (kare üret, tohumlu RNG, transkript).
+  Hiçbir bağımlılığı yok; herkes bunu okur/yazar.
+- **Yaprak domain servisleri** kendi durumunu + kalıcılığını tutar; başkasına
+  bağımlılıkları ya yoktur ya da yalnızca daha alttakine (ör. `powers → economy`).
+  Başarımlar gibi "koşulu okuyan" servislere gereken veri **parametre olarak**
+  geçer — böylece çekirdeğe geri bağlanmazlar (döngü engellenir).
+- **GameEngine** hamleyi işler ve skor/başarım/görev/ödül/kutlamayı **orkestre
+  eder**; durumu alt servislerde tutar, yalnızca çağırır.
+- **Mod kurulumu, güç efektleri ve otomatik oynatma** GameEngine'i (ve durumu)
+  _aşağı_ enjekte eder; GameEngine bunları geri enjekte etmez → **döngüsel
+  bağımlılık yoktur.** Süre bitişi gibi ters yönlü tek olay, TimerService'e
+  atanan bir **geri çağrı** (callback) ile motora bildirilir.
+- **Kalıcılık + bulut senkronu tek yerde:** tüm `localStorage` erişimi
+  `game-storage.ts`'te (saf fonksiyonlar), hesap anlık görüntüsü/geri uygulama
+  `cloud-sync.service.ts`'te toplanır.
+
+Mevcut 13 `game.service.*.spec.ts` dosyası `GameService` façade'ı üzerinden
+(davranış aynı kaldığından) değişmeden geçer; her biri zaten bir alan (seviye,
+güçler, görevler, ödüller, profil, review…) test ettiğinden yeni servislerin
+sözleşmesini de doğrular.
 
 ## Backend (çevrimiçi özellikler)
 
@@ -325,13 +395,13 @@ giriş yapınca bulut yereli ezip o cihazda çevrimdışı kazanılanı siliyord
 Artık gelen veri saklananla **alan alan birleşir** (`server/app.py` →
 `merge_progress`); hiçbir taraf sessizce kaybolmaz. Kurallar alan tipine göre:
 
-| Alan | Kural | Neden |
-|------|-------|-------|
-| Rekorlar (skor, kare, seviye) | **MAX** — büyük olan kazanır | rekor düşmemeli |
-| İstatistikler (oyun/hamle/şampiyonluk) | **MAX** (monoton sayaç) | asla geriye gitmez |
-| Başarımlar | **BİRLEŞİM** | açılan hiçbir başarım kapanmaz |
-| **Altın bakiyesi** | **özel:** kazanılan(monoton) ve harcanan(=kazanılan−bakiye, o da monoton) **ayrı ayrı MAX**; bakiye = kazanılan−harcanan | bir cihazda kazanılan + diğerinde harcanan **ikisi de** korunur → kayıp/çoğalma yok |
-| Tercihler (ad, avatar) | **EN SON** değişen kazanır (`prefsAt` damgası) | çakışan tercihte deterministik |
+| Alan                                   | Kural                                                                                                                    | Neden                                                                               |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| Rekorlar (skor, kare, seviye)          | **MAX** — büyük olan kazanır                                                                                             | rekor düşmemeli                                                                     |
+| İstatistikler (oyun/hamle/şampiyonluk) | **MAX** (monoton sayaç)                                                                                                  | asla geriye gitmez                                                                  |
+| Başarımlar                             | **BİRLEŞİM**                                                                                                             | açılan hiçbir başarım kapanmaz                                                      |
+| **Altın bakiyesi**                     | **özel:** kazanılan(monoton) ve harcanan(=kazanılan−bakiye, o da monoton) **ayrı ayrı MAX**; bakiye = kazanılan−harcanan | bir cihazda kazanılan + diğerinde harcanan **ikisi de** korunur → kayıp/çoğalma yok |
+| Tercihler (ad, avatar)                 | **EN SON** değişen kazanır (`prefsAt` damgası)                                                                           | çakışan tercihte deterministik                                                      |
 
 Her snapshot **sürüm (`v`) + zaman damgası** taşır; sunucu birleştirmeyi bunlarla
 yapar ve **birleşmiş (güvenilir) sonucu geri döndürür** → istemci yerelini onunla
@@ -339,7 +409,7 @@ günceller, böylece diğer cihazın ilerlemesi de bu cihaza gelir. Giriş/açı
 `/me`-ezme yerine `/sync`-birleştirme yolundan geçer. Eski (sürümsüz) bloklara
 toleranslıdır → **mevcut hesaplar göçte bozulmaz** (testle doğrulandı).
 
-> **Altın neden özel, güçler neden şimdilik yerel?** Harcanabilir bir *bakiye*'yi
+> **Altın neden özel, güçler neden şimdilik yerel?** Harcanabilir bir _bakiye_'yi
 > güvenle birleştirmek için tek değer yetmez; kazanılan/harcanan gibi **monoton**
 > geçmiş gerekir (aksi hâlde MAX ile harcanan altın "dirilir", SUM ile çoğalır).
 > Altında `totalGoldEarned` zaten tutulduğundan harcanan = kazanılan−bakiye ile

@@ -111,7 +111,12 @@
           @for (p of mpPlayers(); track p.id; let i = $index) {
             <div class="race-row" [class.me]="isMe(p.id)">
               <span class="race-pos">{{ i + 1 }}.</span>
-              <span class="race-name">{{ mpPlayerName(p) }}</span>
+              <span class="race-name">
+                {{ mpPlayerName(p) }}
+                @if (botTaunt(p); as taunt) {
+                  <span class="race-taunt">💬 {{ taunt }}</span>
+                }
+              </span>
               <span class="race-pts">{{ p.score }}</span>
               @if (p.done) {
                 <span class="race-flag">🏁</span>

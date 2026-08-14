@@ -24,7 +24,11 @@ DIR_CHAR = {"up": "U", "down": "D", "left": "L", "right": "R"}
 
 # Botun hamle temposu (ms) — güçlü seviye daha hızlı/akıcı oynar. Sunucu skor
 # çizelgesini bu tempoya göre yayınlar (eski istemci speedFor'un sunucu karşılığı).
-BOT_SPEED_MS = {"easy": 480, "medium": 360, "hard": 280, "expert": 240}
+# Karakterler de kendi temposunu taşır ("Acelesi Var" en hızlı oynar).
+BOT_SPEED_MS = {
+    "easy": 480, "medium": 360, "hard": 280, "expert": 240,
+    "corner": 300, "space": 330, "hasty": 240, "balanced": 300,
+}
 
 # Seviye başına arama ayarları — ai.ts LEVEL_CFG + BOT_DEPTH ile BİREBİR aynı.
 BOT_CFG = {
@@ -33,6 +37,24 @@ BOT_CFG = {
     "hard":   {"depth": 2, "sampleK": 2, "expandFour": True,  "snakePow": 1.0, "emptyMul": 4},
     "expert": {"depth": 3, "sampleK": 2, "expandFour": True,  "snakePow": 1.0, "emptyMul": 4},
 }
+
+# Bot KARAKTERLERİ — ai.ts BOT_CHARACTERS ile BİREBİR aynı ağırlık setleri.
+# Motor değişmez; her karakter yalnızca farklı bir ağırlık seti (snakePow/emptyMul
+# + derinlik/örnekleme). Parite: server/test_bot_parity.py (karakter fixture'ları).
+BOT_CHARACTERS = {
+    "corner":   {"depth": 2, "sampleK": 2, "expandFour": True, "snakePow": 1.2, "emptyMul": 1},
+    "space":    {"depth": 2, "sampleK": 2, "expandFour": True, "snakePow": 0.5, "emptyMul": 8},
+    "hasty":    {"depth": 1, "sampleK": 2, "expandFour": True, "snakePow": 0.3, "emptyMul": 1},
+    "balanced": {"depth": 2, "sampleK": 2, "expandFour": True, "snakePow": 1.0, "emptyMul": 4},
+}
+
+
+def resolve_cfg(key):
+    """Bir bot anahtarını (zorluk kademesi VEYA karakter kimliği) ayara çözer.
+    ai.ts resolveBotConfig eşi. Sunucu `level` sütununda ikisini de tutabilir."""
+    if key in BOT_CHARACTERS:
+        return BOT_CHARACTERS[key]
+    return BOT_CFG.get(key, BOT_CFG["medium"])
 
 _weight_cache = {}
 
@@ -122,9 +144,8 @@ def _chance_node(g, depth, cfg):
     return total
 
 
-def bot_move(g, level):
-    """Sabit derinlikte deterministik expectimax hamlesi. ai.ts botMove eşi."""
-    cfg = BOT_CFG[level]
+def bot_move_cfg(g, cfg):
+    """Sabit derinlikte deterministik expectimax hamlesi. ai.ts botMoveCfg eşi."""
     legal = [d for d in DIRECTIONS if move_grid(g, d)[2]]
     if not legal:
         return None
@@ -141,10 +162,16 @@ def bot_move(g, level):
     return best
 
 
+def bot_move(g, level):
+    """Zorluk kademesi/karakteriyle bot hamlesi (geriye dönük). ai.ts botMove eşi."""
+    return bot_move_cfg(g, resolve_cfg(level))
+
+
 def play_bot_game(seed, level, max_moves, size=4, on_progress=None, progress_every=32):
     """
     Tohumdan botun oyununu (en çok max_moves hamle) oynatır; skor ZAMAN
-    çizelgesini döndürür. ai.ts playBotGame ile birebir.
+    çizelgesini döndürür. ai.ts playBotGame/playBotGameByKey ile birebir.
+    `level` bir zorluk kademesi VEYA karakter kimliği olabilir (resolve_cfg).
       scores[k] = k. hamleden SONRA kümülatif skor (scores[0] = 0)
       bests[k]  = k. hamleden sonra en büyük kare
 
@@ -153,6 +180,7 @@ def play_bot_game(seed, level, max_moves, size=4, on_progress=None, progress_eve
     hesabında bot yarış saatini geçtiği için hiç aç kalmaz). Callback OYUNU
     ETKİLEMEZ; çıktı parite testinde birebir aynıdır.
     """
+    cfg = resolve_cfg(level)
     rand = mulberry32(seed & _MASK)
     grid = [[0] * size for _ in range(size)]
     _spawn(grid, rand)
@@ -163,7 +191,7 @@ def play_bot_game(seed, level, max_moves, size=4, on_progress=None, progress_eve
     bests = [_max(grid)]
     score = 0
     for i in range(max_moves):
-        d = bot_move(grid, level)
+        d = bot_move_cfg(grid, cfg)
         if d is None:
             break
         nxt, gained, moved = move_grid(grid, d)

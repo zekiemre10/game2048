@@ -250,6 +250,38 @@
   margin-bottom: 1rem;
 }
 
+// Karakter bazlı yarış galibiyeti
+.profile-charwins {
+  margin-bottom: 1rem;
+}
+.profile-charwins-title {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  opacity: 0.8;
+  margin-bottom: 0.4rem;
+}
+.charwin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.charwin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: v.$radius-md;
+  background: var(--color-cell-empty);
+  font-size: 0.85rem;
+}
+.charwin-score {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+  font-weight: 700;
+}
+
 .pstat {
   background: var(--color-cell-empty);
   border-radius: v.$radius-md;

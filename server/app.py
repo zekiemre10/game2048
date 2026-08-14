@@ -31,7 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 # Skoru istemciden değil, tohum+hamleden SUNUCU hesaplar (hile önleme).
 from replay import replay_game, daily_seed
 # Çok oyunculu bot artık SUNUCUDA koşar (adil, kararlı, manipüle edilemez).
-from bot_ai import play_bot_game, BOT_SPEED_MS
+from bot_ai import play_bot_game, BOT_SPEED_MS, BOT_CHARACTERS
 
 # Zorluk kademeleri (istemci AI_LEVELS ile aynı) + oda başına bot sınırı.
 BOT_LEVELS = ("easy", "medium", "hard", "expert")
@@ -910,6 +910,10 @@ def room_state(conn, code):
                 score, best, done = _bot_score_at(code, p["user_id"], elapsed_ms)
             else:
                 score, best, done = 0, 0, False
+        # `level` sütunu botun ANAHTARINI tutar: ya bir karakter kimliği
+        # (yeni: corner/space/…) ya bir zorluk kademesi (eski: easy/…).
+        key = p["level"]
+        is_char = is_bot and key in BOT_CHARACTERS
         players.append({
             "id": p["user_id"],
             "username": p["username"],
@@ -917,7 +921,8 @@ def room_state(conn, code):
             "best": best,
             "done": done,
             "isBot": is_bot,        # botlar negatif kimlikli
-            "level": p["level"],    # bot zorluğu (VERİ); insanlarda null
+            "character": key if is_char else None,  # yeni: bot karakteri
+            "level": None if is_char else (key if is_bot else None),  # eski: zorluk botları
         })
 
     # Sıralama: skor ↓, en büyük kare ↓, ad ↑ (bot skorları hesaplandıktan SONRA).
@@ -1804,7 +1809,13 @@ class Handler(BaseHTTPRequestHandler):
 
     # --- YZ botları (host tarafından yönetilir) ----------------
     def _room_addbot(self):
-        """POST /rooms/addbot {code, difficulty} -> odaya YZ botu ekle (host, lobi)."""
+        """POST /rooms/addbot {code, character|difficulty} -> odaya YZ botu ekle (host, lobi).
+
+        Tercih edilen: `character` (isimli rakip — corner/space/hasty/balanced).
+        Geriye dönük: `difficulty` (eski zorluk kademesi — easy/medium/hard/expert).
+        Her iki durumda da seçilen ANAHTAR `level` sütununda VERİ olarak saklanır;
+        bot oyunu sunucuda ondan (resolve_cfg) çözülür.
+        """
         conn = db()
         try:
             me = self._auth_row(conn)
@@ -1812,13 +1823,23 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(401, {"error": "unauthorized"})
             b = self._body()
             code = (b.get("code") or "").strip().upper()
-            diff = (b.get("difficulty") or "medium").lower()
-            names = {"easy": "🤖 Bot (Kolay)", "medium": "🤖 Bot (Orta)",
-                     "hard": "🤖 Bot (Zor)", "expert": "🤖 Bot (Uzman)"}
-            # Zorluk VERİ olarak taşınır ve DOĞRULANIR (geçerli kademelerden biri).
-            # Görünen ad yalnızca gösterim içindir; seviye artık ondan çözülmez.
-            if diff not in names:
-                return self._send(400, {"error": "invalid_level"})
+            # Sunucu-tarafı yedek görünen ad (istemci aktif dile göre yeniden yazar).
+            char_names = {"corner": "📐 Köşeci", "space": "🌿 Alan Açan",
+                          "hasty": "⚡ Acelesi Var", "balanced": "⚖️ Dengeli"}
+            level_names = {"easy": "🤖 Bot (Kolay)", "medium": "🤖 Bot (Orta)",
+                           "hard": "🤖 Bot (Zor)", "expert": "🤖 Bot (Uzman)"}
+            character = (b.get("character") or "").lower().strip()
+            if character:
+                # Yeni yol: isimli karakter (kayıt defterinde DOĞRULANIR).
+                if character not in BOT_CHARACTERS:
+                    return self._send(400, {"error": "invalid_character"})
+                key, display = character, char_names.get(character, "🤖 Bot")
+            else:
+                # Eski yol: zorluk kademesi.
+                diff = (b.get("difficulty") or "medium").lower()
+                if diff not in level_names:
+                    return self._send(400, {"error": "invalid_level"})
+                key, display = diff, level_names[diff]
             room = conn.execute("SELECT * FROM rooms WHERE code=?", (code,)).fetchone()
             if not room:
                 return self._send(404, {"error": "room_not_found"})
@@ -1841,7 +1862,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 conn.execute(
                     "INSERT INTO room_players (code, user_id, username, level, joined) VALUES (?,?,?,?,?)",
-                    (code, bot_id, names[diff], diff, int(time.time())),
+                    (code, bot_id, display, key, int(time.time())),
                 )
             except sqlite3.IntegrityError:
                 # Host butona iki kez bastıysa iki istek de aynı kimliği

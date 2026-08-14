@@ -29,20 +29,23 @@ const out = await build({
 const dir = mkdtempSync(join(tmpdir(), 'botfix-'));
 const file = join(dir, 'ai.mjs');
 writeFileSync(file, out.outputFiles[0].text);
-const { playBotGame } = await import(pathToFileURL(file).href);
+const { playBotGameByKey, BOT_CHARACTER_IDS } = await import(pathToFileURL(file).href);
 unlinkSync(file);
 
 const SEEDS = [1, 2, 3, 42, 1000, 123456];
 const LEVELS = ['easy', 'medium', 'hard', 'expert'];
+// Parite hem zorluk kademelerini hem BOT KARAKTERLERİni kapsar (ikisi de aynı
+// motoru farklı ağırlık setiyle besler; ikisi de TS↔Python birebir olmalı).
+const KEYS = [...LEVELS, ...BOT_CHARACTER_IDS];
 const MAX_MOVES = 600; // parite için bol; expert d3 JS'te hızlı
 
 const fixtures = [];
-for (const level of LEVELS) {
+for (const key of KEYS) {
   for (const seed of SEEDS) {
-    const g = playBotGame(seed, level, MAX_MOVES);
+    const g = playBotGameByKey(seed, key, MAX_MOVES);
     fixtures.push({
       seed,
-      level,
+      key, // zorluk kademesi VEYA karakter kimliği
       maxMoves: MAX_MOVES,
       moves: g.moves,
       scores: g.scores,
@@ -59,8 +62,8 @@ writeFileSync(
   JSON.stringify({ generated: 'gen-bot-fixtures.mjs', maxMoves: MAX_MOVES, fixtures }, null, 0),
 );
 console.log(`Yazıldı: ${path}`);
-console.log(`${fixtures.length} fixture (${LEVELS.length} seviye × ${SEEDS.length} tohum)`);
+console.log(`${fixtures.length} fixture (${KEYS.length} anahtar × ${SEEDS.length} tohum)`);
 for (const f of fixtures)
   console.log(
-    `  ${f.level.padEnd(7)} tohum ${String(f.seed).padStart(6)}: ${f.moves.length} hamle, skor ${f.finalScore}, en büyük ${f.maxTile}`,
+    `  ${f.key.padEnd(9)} tohum ${String(f.seed).padStart(6)}: ${f.moves.length} hamle, skor ${f.finalScore}, en büyük ${f.maxTile}`,
   );

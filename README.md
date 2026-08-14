@@ -55,10 +55,15 @@ bu tek motordan gelir:
 - 💡 **Hamle önerisi** — oyun başına 5 hak; en iyi yönü ok olarak gösterir
 - 🤖 **YZ gösterimi** — "YZ Oynasın" ile motoru izle. **Yalnızca örnektir:** durdurunca
   tahtan, skorun, sürün ve hakların aynen geri gelir; ilerlemen etkilenmez
-- 🏁 **YZ rakibi** — çok oyunculu odaya 4 zorlukta bot ekle (Kolay / Orta / Zor /
-  Uzman); her düğme seçim ekranında **ölçülmüş gücünü** (2048'e ulaşma oranı)
-  gösterir; bot **SUNUCUDA** koşar (adil, kararlı, manipüle edilemez) ve insanla
-  **aynı tohumlu** taş dizisini oynar
+- 🎭 **Karakter rakipler** — çok oyunculu odaya **isimli, kişilikli** bot rakipler
+  ekle: **📐 Köşeci** (köşe disiplini, güçlü), **⚖️ Dengeli** (her yönü dengeler),
+  **🌿 Alan Açan** (boş alanı kollar, uzun yaşar), **⚡ Acelesi Var** (hızlı skor,
+  sonra tıkanır). Hepsi **aynı motoru farklı ağırlık setiyle** besler (yeni
+  algoritma yok); güçleri `scripts/bot-characters-bench.mjs` ile **ölçülür** ve
+  seçim ekranında gösterilir. Bot **SUNUCUDA** koşar (adil, kararlı, manipüle
+  edilemez), insanla **aynı tohumlu** diziyi oynar; yarışta kişilikli **laf atar**
+  (TR/EN). Karakter bazlı galibiyetin profilde tutulur. (İç zorluk kademeleri
+  Kolay/Orta/Zor/Uzman ipucu + YZ gösterimi için korunur.)
 - ✨ **Hamle kalitesi** — her hamlen YZ'nin seçimiyle kıyaslanır: _Mükemmel · İyi ·
   Daha iyisi vardı (↑)_ — oyun sonunda **doğruluk yüzdesi** özeti
 - 🟢 **Canlı pozisyon göstergesi** — tahtanın sağlığı (İyi / Riskli / Tehlikeli);
@@ -576,3 +581,5 @@ web sunucusuyla servis edilebilir. Canlı sürüm bu dosyaların
       noktası + tıkla-tahtayı-gör, asistan kapalıyken de çalışır)
 - [x] Kişisel LLM koç (oyun sonu; sunucudaki `/analysis`, API anahtarı yalnızca
       sunucuda; maliyet sınırlı; sunucu/anahtar yoksa şablon analize düşer)
+- [x] Bot karakterleri (isimli rakipler: Köşeci/Dengeli/Alan Açan/Acelesi Var;
+      ölçülmüş güç + yarış içi laf atma + karakter bazlı galibiyet; TS↔Python parite)

@@ -183,19 +183,20 @@ function snakeWeights(n: number, pow: number): ValueGrid {
   return w;
 }
 
-// Sezgisel ZAYIFLATMA knobları — zorluk merdiveni bunlarla kurulur; her
-// bestMove çağrısı seviyeye göre ayarlar (rastgele hamle YOK, bot hep mantıklı
-// oynar, sadece daha az iyi):
-//   heuristicSnakePow → köşe/monotonluk gradyan gücü (bkz. snakeWeights)
-//   heuristicEmptyMul → boş hücre (hayatta kalma) ödülü çarpanı; düşük = daha
-//                       az ileri görüşlü, tahtayı erken doldurur.
-let heuristicSnakePow = 1;
-let heuristicEmptyMul = 4;
-
-/** Izgarayı puanlar (yüksek = daha iyi). */
-export function evaluate(g: ValueGrid): number {
+/**
+ * Izgarayı puanlar (yüksek = daha iyi). İki AĞIRLIK parametre olarak verilir
+ * (server/bot_ai.py evaluate ile birebir imza) — böylece farklı ağırlık setleri
+ * (zorluk kademeleri VE bot karakterleri) aynı motoru besler, motor değişmez:
+ *   snakePow → köşe/monotonluk gradyan gücü (bkz. snakeWeights); yüksek = köşe
+ *              disiplini, düşük = düz/kısa görüşlü.
+ *   emptyMul → boş hücre (hayatta kalma) ödülü çarpanı; yüksek = daha ileri
+ *              görüşlü/alan açan, düşük = tahtayı erken doldurur.
+ * PARİTE NOTU: ağırlıklar snakeWeights içinde tam sayıya yuvarlanır; buraya YENİ
+ * bir transandantal/kesirli terim EKLEME (TS↔Python bit-birebir pariteyi bozar).
+ */
+export function evaluate(g: ValueGrid, snakePow: number, emptyMul: number): number {
   const n = g.length;
-  const w = snakeWeights(n, heuristicSnakePow);
+  const w = snakeWeights(n, snakePow);
   let weighted = 0;
   let empties = 0;
   let maxVal = 0;
@@ -210,7 +211,7 @@ export function evaluate(g: ValueGrid): number {
       if (v > maxVal) maxVal = v;
     }
   // Boş hücreler hayatta kalmayı sağlar → oyun ilerledikçe ölçeklenen ödül.
-  return weighted + empties * maxVal * heuristicEmptyMul;
+  return weighted + empties * maxVal * emptyMul;
 }
 
 // --- Expectimax ---------------------------------------------
@@ -249,25 +250,25 @@ function checkTime(): void {
   if ((++nodeCounter & 511) === 0 && now() > deadline) throw TIMEOUT;
 }
 
-/** Oyuncu düğümü: en iyi hamlenin değeri. */
-function maxNode(g: ValueGrid, depth: number): number {
-  if (depth === 0) return evaluate(g);
+/** Oyuncu düğümü: en iyi hamlenin değeri. Ağırlıklar (snakePow/emptyMul) geçilir. */
+function maxNode(g: ValueGrid, depth: number, snakePow: number, emptyMul: number): number {
+  if (depth === 0) return evaluate(g, snakePow, emptyMul);
   checkTime();
   let best = -Infinity;
   for (const dir of DIRECTIONS) {
     const { grid, moved } = simulateMove(g, dir);
     if (!moved) continue;
-    const v = chanceNode(grid, depth - 1);
+    const v = chanceNode(grid, depth - 1, snakePow, emptyMul);
     if (v > best) best = v;
   }
   return best === -Infinity ? NO_MOVE_PENALTY : best;
 }
 
 /** Şans düğümü: rastgele taş üretiminin beklenen değeri. */
-function chanceNode(g: ValueGrid, depth: number): number {
-  if (depth === 0) return evaluate(g);
+function chanceNode(g: ValueGrid, depth: number, snakePow: number, emptyMul: number): number {
+  if (depth === 0) return evaluate(g, snakePow, emptyMul);
   const cells = emptyCells(g);
-  if (cells.length === 0) return evaluate(g);
+  if (cells.length === 0) return evaluate(g, snakePow, emptyMul);
   checkTime();
 
   // Dallanmayı sınırla: en çok sampleK temsilci hücre örnekle.
@@ -276,11 +277,11 @@ function chanceNode(g: ValueGrid, depth: number): number {
   const per = 1 / sample.length;
   for (const [r, c] of sample) {
     if (expandFour) {
-      total += per * 0.9 * maxNode(placeTile(g, r, c, 2), depth);
-      total += per * CHANCE_OF_FOUR * maxNode(placeTile(g, r, c, 4), depth);
+      total += per * 0.9 * maxNode(placeTile(g, r, c, 2), depth, snakePow, emptyMul);
+      total += per * CHANCE_OF_FOUR * maxNode(placeTile(g, r, c, 4), depth, snakePow, emptyMul);
     } else {
       // Yalnızca 2-taşı (0.9); 4-taşı atlanır → dallanma yarı → daha derin.
-      total += per * maxNode(placeTile(g, r, c, 2), depth);
+      total += per * maxNode(placeTile(g, r, c, 2), depth, snakePow, emptyMul);
     }
   }
   return total;
@@ -291,11 +292,17 @@ function chanceNode(g: ValueGrid, depth: number): number {
  * (bestMove ve reviewMove ortak kullanır — tutarlı karşılaştırma.)
  * Süre dolarsa TIMEOUT fırlatır (çağıran yakalar).
  */
-function scoreDirections(g: ValueGrid, legal: Direction[], depth: number): Map<Direction, number> {
+function scoreDirections(
+  g: ValueGrid,
+  legal: Direction[],
+  depth: number,
+  snakePow: number,
+  emptyMul: number,
+): Map<Direction, number> {
   const out = new Map<Direction, number>();
   for (const dir of legal) {
     const { grid } = simulateMove(g, dir);
-    out.set(dir, chanceNode(grid, depth - 1));
+    out.set(dir, chanceNode(grid, depth - 1, snakePow, emptyMul));
   }
   return out;
 }
@@ -485,8 +492,6 @@ export function bestMove(g: ValueGrid, level: AiLevel = 'medium'): Direction | n
   const cfg = LEVEL_CFG[level];
   sampleK = cfg.sampleK;
   expandFour = cfg.expandFour;
-  heuristicSnakePow = cfg.snakePow;
-  heuristicEmptyMul = cfg.emptyMul;
   const start = now();
   deadline = start + cfg.timeCapMs;
   nodeCounter = 0;
@@ -501,7 +506,7 @@ export function bestMove(g: ValueGrid, level: AiLevel = 'medium'): Direction | n
     }
     const dStart = now();
     try {
-      const vals = scoreDirections(g, legal, depth);
+      const vals = scoreDirections(g, legal, depth, cfg.snakePow, cfg.emptyMul);
       // Bu derinlik TAM tamamlandı → en iyisini benimse.
       let bestVal = -Infinity;
       for (const dir of legal) {
@@ -552,24 +557,46 @@ function maxTileOf(g: ValueGrid): number {
 }
 
 /**
- * Bot hamlesi: SABİT derinlikte (BOT_DEPTH), zaman sınırı OLMADAN expectimax.
+ * Deterministik bot ayarı: sabit derinlik + şans örnekleme + iki sezgisel ağırlık.
+ * Hem zorluk kademeleri hem BOT KARAKTERLERİ bunu üretir → tek motor, farklı setler.
+ * (server/bot_ai.py BOT_CFG / BOT_CHARACTERS ile birebir aynı alanlar.)
+ */
+export interface BotConfig {
+  depth: number;
+  sampleK: number;
+  expandFour: boolean;
+  snakePow: number;
+  emptyMul: number;
+}
+
+/** Bir zorluk kademesinin bot ayarı (LEVEL_CFG + sabit BOT_DEPTH). */
+function levelBotConfig(level: AiLevel): BotConfig {
+  const c = LEVEL_CFG[level];
+  return {
+    depth: BOT_DEPTH[level],
+    sampleK: c.sampleK,
+    expandFour: c.expandFour,
+    snakePow: c.snakePow,
+    emptyMul: c.emptyMul,
+  };
+}
+
+/**
+ * Bot hamlesi: SABİT derinlikte (cfg.depth), zaman sınırı OLMADAN expectimax.
  * Tamamen deterministik → aynı tahtada hep aynı hamle, makineden bağımsız.
  * (bestMove'un aksine yinelemeli derinleşme/zaman kapısı yoktur.)
  */
-export function botMove(g: ValueGrid, level: AiLevel): Direction | null {
+export function botMoveCfg(g: ValueGrid, cfg: BotConfig): Direction | null {
   const legal = DIRECTIONS.filter((d) => simulateMove(g, d).moved);
   if (legal.length === 0) return null;
   if (legal.length === 1) return legal[0];
 
-  const cfg = LEVEL_CFG[level];
   sampleK = cfg.sampleK;
   expandFour = cfg.expandFour;
-  heuristicSnakePow = cfg.snakePow;
-  heuristicEmptyMul = cfg.emptyMul;
   deadline = Infinity;
   nodeCounter = 0;
 
-  const vals = scoreDirections(g, legal, BOT_DEPTH[level]);
+  const vals = scoreDirections(g, legal, cfg.depth, cfg.snakePow, cfg.emptyMul);
   let best = legal[0];
   let bestVal = -Infinity;
   for (const dir of legal) {
@@ -580,6 +607,11 @@ export function botMove(g: ValueGrid, level: AiLevel): Direction | null {
     }
   }
   return best;
+}
+
+/** Zorluk kademesiyle bot hamlesi (geriye dönük API + parite fixtures). */
+export function botMove(g: ValueGrid, level: AiLevel): Direction | null {
+  return botMoveCfg(g, levelBotConfig(level));
 }
 
 /** Botun oynadığı deterministik oyunun sonucu (skor ZAMAN çizelgesiyle). */
@@ -595,12 +627,12 @@ export interface BotGame {
 }
 
 /**
- * Tohumdan botun oyununu SONUNA (ya da maxMoves'a) kadar oynatır ve skor
- * ZAMAN ÇİZELGESİni döndürür. Taş üretimi mulberry32 ile insan oyuncuyla AYNI
- * tohumlu diziyi kullanır (adalet). Sunucu bunu yarış başında bir kez çağırıp
- * çizelgeyi yayınlar; Python eşi server/bot_ai.py.play_bot_game.
+ * Tohumdan botun oyununu (verilen AYARLA) SONUNA (ya da maxMoves'a) kadar
+ * oynatır ve skor ZAMAN ÇİZELGESİni döndürür. Taş üretimi mulberry32 ile insan
+ * oyuncuyla AYNI tohumlu diziyi kullanır (adalet). Python eşi
+ * server/bot_ai.py.play_bot_game.
  */
-export function playBotGame(seed: number, level: AiLevel, maxMoves: number): BotGame {
+export function playBotGameCfg(seed: number, cfg: BotConfig, maxMoves: number): BotGame {
   const rand = mulberry32(seed >>> 0);
   let g = emptyGrid(4);
   const spawn = () => {
@@ -617,7 +649,7 @@ export function playBotGame(seed: number, level: AiLevel, maxMoves: number): Bot
   const bests: number[] = [maxTileOf(g)];
   let score = 0;
   for (let m = 0; m < maxMoves; m++) {
-    const dir = botMove(g, level);
+    const dir = botMoveCfg(g, cfg);
     if (dir === null) break;
     const res = simulateMove(g, dir);
     if (!res.moved) break;
@@ -629,6 +661,111 @@ export function playBotGame(seed: number, level: AiLevel, maxMoves: number): Bot
     bests.push(maxTileOf(g));
   }
   return { moves: moves.join(''), scores, bests, maxTile: maxTileOf(g), finalScore: score };
+}
+
+/** Zorluk kademesiyle bot oyunu (geriye dönük API + parite fixtures). */
+export function playBotGame(seed: number, level: AiLevel, maxMoves: number): BotGame {
+  return playBotGameCfg(seed, levelBotConfig(level), maxMoves);
+}
+
+// --- Bot karakterleri: isimli rakipler, farklı oyun stilleri ------
+//
+// Çok oyunculu bot artık tek bir zorluk ayarı değil, KİŞİLİĞİ olan rakipler
+// galerisi. Motor değişmez; her karakter yalnızca farklı bir AĞIRLIK SETİdir
+// (snakePow/emptyMul + derinlik/örnekleme). server/bot_ai.py BOT_CHARACTERS ile
+// BİREBİR aynı olmalı (parite: test_bot_parity.py). Güç ölçümle belirlenir
+// (scripts/bot-characters-bench.mjs) ve seçim ekranında gösterilir.
+
+export type BotCharacterId = 'corner' | 'space' | 'hasty' | 'balanced';
+
+/** Karakter kimlikleri (doğrulama + UI için tek kaynak). */
+export const BOT_CHARACTER_IDS: readonly BotCharacterId[] = [
+  'corner',
+  'space',
+  'hasty',
+  'balanced',
+];
+
+export function isBotCharacter(x: unknown): x is BotCharacterId {
+  return typeof x === 'string' && (BOT_CHARACTER_IDS as readonly string[]).includes(x);
+}
+
+/** Bir bot karakterinin kimliği + avatarı + ağırlık seti. */
+export interface BotCharacter {
+  id: BotCharacterId;
+  avatar: string;
+  cfg: BotConfig;
+}
+
+/**
+ * Karakter ağırlık setleri — hepsi DETERMİNİSTİK, parite-güvenli (yalnızca
+ * mevcut iki ağırlık + derinlik/örnekleme farkı; yeni sezgisel terim YOK):
+ *   • corner (Köşeci)   — yüksek snakePow, düşük emptyMul → köşe disiplini, istikrarlı.
+ *   • space  (Alan Açan)— yüksek emptyMul → boş hücreyi kollar, uzun yaşar, yavaş büyür.
+ *   • hasty  (Acelesi Var)— derinlik 1 + düz gradyan → miyop, hızlı skor sonra tıkanır.
+ *   • balanced (Dengeli)— tam sezgisel, derinlik 2 (mevcut güçlü ayar).
+ */
+export const BOT_CHARACTERS: Record<BotCharacterId, BotCharacter> = {
+  corner: {
+    id: 'corner',
+    avatar: '📐',
+    cfg: { depth: 2, sampleK: 2, expandFour: true, snakePow: 1.2, emptyMul: 1 },
+  },
+  space: {
+    id: 'space',
+    avatar: '🌿',
+    cfg: { depth: 2, sampleK: 2, expandFour: true, snakePow: 0.5, emptyMul: 8 },
+  },
+  hasty: {
+    id: 'hasty',
+    avatar: '⚡',
+    cfg: { depth: 1, sampleK: 2, expandFour: true, snakePow: 0.3, emptyMul: 1 },
+  },
+  balanced: {
+    id: 'balanced',
+    avatar: '⚖️',
+    cfg: { depth: 2, sampleK: 2, expandFour: true, snakePow: 1, emptyMul: 4 },
+  },
+};
+
+/** Bir karakterin ÖLÇÜLEN gücü (scripts/bot-characters-bench.mjs çıktısı). */
+export interface CharacterStrength {
+  /** Ortalama nihai skor (40 oyun). */
+  avg: number;
+  /** 2048'e ulaşma oranı (%) — güç çubuğu bunu gösterir. */
+  reach2048: number;
+  /** Görülen en büyük kare. */
+  peakTile: number;
+  /** Görülen en küçük (en kötü oyun) kare. */
+  floorTile: number;
+}
+
+/**
+ * Karakterlerin ÖLÇÜLEN gücü — scripts/bot-characters-bench.mjs (40 oyun,
+ * deterministik playBotGame yolu) ile üretilir. Seçim ekranı bunu gösterir.
+ * Ağırlık setleri değişirse betiği yeniden koştur ve buradaki değerleri güncelle.
+ */
+export const BOT_CHARACTER_STRENGTH: Record<BotCharacterId, CharacterStrength> = {
+  corner: { avg: 41500, reach2048: 90, peakTile: 4096, floorTile: 256 },
+  space: { avg: 24232, reach2048: 55, peakTile: 4096, floorTile: 128 },
+  hasty: { avg: 3472, reach2048: 0, peakTile: 1024, floorTile: 32 },
+  balanced: { avg: 32231, reach2048: 70, peakTile: 4096, floorTile: 512 },
+};
+
+/**
+ * Bir bot ANAHTARINI (zorluk kademesi VEYA karakter kimliği) bot ayarına çözer.
+ * Sunucu `level` sütununda ya bir kademe ya bir karakter kimliği tutar; ikisi de
+ * buradan çözülür. Python eşi server/bot_ai.py.resolve_cfg.
+ */
+export function resolveBotConfig(key: string): BotConfig {
+  if (isBotCharacter(key)) return BOT_CHARACTERS[key].cfg;
+  if (isAiLevel(key)) return levelBotConfig(key);
+  return levelBotConfig('medium');
+}
+
+/** Anahtarla (kademe/karakter) bot oyunu — parite fixtures + ölçüm betiği kullanır. */
+export function playBotGameByKey(seed: number, key: string, maxMoves: number): BotGame {
+  return playBotGameCfg(seed, resolveBotConfig(key), maxMoves);
 }
 
 // --- Hamle kalitesi -----------------------------------------
@@ -663,11 +800,9 @@ export function reviewMove(
   // yönler eşit derinlikte, nesnel güçte kıyaslanmalı). Süre sınırı yok.
   sampleK = 3;
   expandFour = true;
-  heuristicSnakePow = 1;
-  heuristicEmptyMul = 4;
   deadline = Infinity;
   nodeCounter = 0;
-  const vals = scoreDirections(g, legal, 4);
+  const vals = scoreDirections(g, legal, 4, 1, 4); // tam sezgisel: snakePow 1, emptyMul 4
 
   let bestDir = legal[0];
   let bestVal = -Infinity;

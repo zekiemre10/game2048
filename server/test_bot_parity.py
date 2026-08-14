@@ -28,8 +28,9 @@ def main():
 
     fails = 0
     for fx in fixtures:
-        got = play_bot_game(fx["seed"], fx["level"], fx["maxMoves"])
-        tag = f"{fx['level']:<7} tohum {fx['seed']:>6}"
+        key = fx.get("key", fx.get("level"))  # kademe VEYA karakter kimliği
+        got = play_bot_game(fx["seed"], key, fx["maxMoves"])
+        tag = f"{key:<9} tohum {fx['seed']:>6}"
         problems = []
         if got["moves"] != fx["moves"]:
             # İlk ayrışan hamleyi bul (teşhis için)

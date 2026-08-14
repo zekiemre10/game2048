@@ -2,7 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { API_BASE, AuthService } from './auth.service';
 import { GameService } from './game.service';
 import { GameMode, GameStatus } from '../models/tile.model';
-import { AiLevel, isAiLevel } from '../logic/ai';
+import { AiLevel, BotCharacterId, isAiLevel, isBotCharacter } from '../logic/ai';
 
 // ============================================================
 //  2048 — Çok oyunculu yarış servisi
@@ -22,7 +22,9 @@ export interface RoomPlayer {
   best: number;
   done: boolean;
   isBot?: boolean;
-  /** Bot zorluğu VERİ olarak (sunucudan). İnsanlarda tanımsız. */
+  /** Bot KARAKTERİ (yeni: corner/space/…) VERİ olarak. İnsanlarda/eski botlarda tanımsız. */
+  character?: BotCharacterId;
+  /** Eski zorluk botu VERİ olarak (geriye dönük). Karakter botlarında/insanlarda tanımsız. */
   level?: AiLevel;
 }
 
@@ -56,6 +58,8 @@ export class MultiplayerService {
 
   private loopOn = false;
   private raceStarted = false;
+  /** Karakter galibiyeti YALNIZCA bir kez kaydedilsin diye biten oda kodu. */
+  private recordedFinishCode: string | null = null;
 
   /** Oda kur (host). */
   async createRoom(duration = 180): Promise<MpResult> {
@@ -81,6 +85,7 @@ export class MultiplayerService {
       const j = await res.json().catch(() => ({}));
       if (!res.ok) return { ok: false, error: j.error || 'error' };
       this.raceStarted = false;
+      this.recordedFinishCode = null;
       this.room.set(j.room);
       this.startLoop();
       return { ok: true };
@@ -119,6 +124,12 @@ export class MultiplayerService {
     // Zorluğu İSTEMCİDE de doğrula (sunucu da doğrular) — geçersiz kademe gitmesin.
     if (!isAiLevel(difficulty)) return { ok: false, error: 'invalid_level' };
     return this.botAction('/rooms/addbot', { difficulty });
+  }
+
+  /** Odaya isimli KARAKTER botu ekle (host, lobide). Yeni galeri seçim yolu. */
+  async addBotCharacter(character: BotCharacterId): Promise<MpResult> {
+    if (!isBotCharacter(character)) return { ok: false, error: 'invalid_character' };
+    return this.botAction('/rooms/addbot', { character });
   }
 
   /** Botu çıkar (host, lobide). */
@@ -253,7 +264,21 @@ export class MultiplayerService {
       const remaining = Math.max(2, next.duration - (now - started));
       this.game.startRace(next.seed, remaining);
     }
-    // Botlar SUNUCUDA koşar (adil, kararlı, manipüle edilemez); istemci artık
-    // bot çalıştırmaz. Skorları oda durumunda sunucudan gelir.
+    // Yarış bitti → karakter bazlı galibiyeti BİR KEZ kaydet (skorca geçtiğim
+    // karakterler "yenildi" sayılır). Botlar SUNUCUDA koşar; skorlar sunucudan.
+    if (next.status === 'finished' && this.recordedFinishCode !== next.code) {
+      this.recordedFinishCode = next.code;
+      this.recordCharacterOutcomes(next);
+    }
+  }
+
+  /** Biten yarışta, skorca geçtiğim her karakter botunu "yenildi" say. */
+  private recordCharacterOutcomes(room: RoomState): void {
+    const me = room.players.find((p) => p.id === this.auth.user()?.id);
+    if (!me) return; // yarışa katılmadıysam kaydetme
+    const results = room.players
+      .filter((p) => p.isBot && isBotCharacter(p.character))
+      .map((p) => ({ id: p.character as string, beaten: me.score > p.score }));
+    this.game.recordCharacterResults(results);
   }
 }

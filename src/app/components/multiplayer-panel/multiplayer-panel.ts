@@ -9,7 +9,14 @@ import {
 import { I18nService } from '../../services/i18n.service';
 import { AuthService } from '../../services/auth.service';
 import { MultiplayerService, RoomPlayer } from '../../services/multiplayer.service';
-import { isAiLevel } from '../../logic/ai';
+import {
+  BOT_CHARACTERS,
+  BOT_CHARACTER_IDS,
+  BOT_CHARACTER_STRENGTH,
+  BotCharacterId,
+  isAiLevel,
+  isBotCharacter,
+} from '../../logic/ai';
 
 /**
  * Çok oyunculu paneli (oda kur/katıl, lobi, bot ekleme, canlı sıralama).
@@ -55,14 +62,40 @@ export class MultiplayerPanel {
   });
 
   /**
-   * Oyuncunun görünen adı. Botlarda ad, seviyeden ve AKTİF DİLDEN üretilir
-   * (sunum ayrıntısı; iş mantığı `p.level` verisine bakar, isme değil). Böylece
-   * dil değişince bot adı da güncellenir. Seviye verisi yoksa sunucu adına düşer.
+   * Bot karakter galerisi (seçim ekranı @for). Güç çubuğu genişliği ÖLÇÜLEN
+   * ortalama skora göre normalize edilir (en güçlü = %100); metinde 2048 oranı.
+   */
+  private static readonly MAX_AVG = Math.max(
+    ...BOT_CHARACTER_IDS.map((id) => BOT_CHARACTER_STRENGTH[id].avg),
+  );
+  protected readonly characters = BOT_CHARACTER_IDS.map((id) => ({
+    id,
+    avatar: BOT_CHARACTERS[id].avatar,
+    reach2048: BOT_CHARACTER_STRENGTH[id].reach2048,
+    // Çubuk: ortalama skora göre 0-100 (hasty gibi zayıflarda da görünür kalsın).
+    power: Math.max(
+      4,
+      Math.round((BOT_CHARACTER_STRENGTH[id].avg / MultiplayerPanel.MAX_AVG) * 100),
+    ),
+  }));
+
+  /** Karakter kimliğinden görünen ad (avatar + AKTİF DİLDEN isim). */
+  protected characterName(id: BotCharacterId): string {
+    return `${BOT_CHARACTERS[id].avatar} ${this.t('char.' + id + '.name')}`;
+  }
+
+  /**
+   * Oyuncunun görünen adı. Botlarda ad VERİDEN (karakter/seviye) ve AKTİF DİLDEN
+   * üretilir (sunum ayrıntısı; iş mantığı `p.character`/`p.level` verisine bakar).
+   * Dil değişince ad da güncellenir. Veri yoksa sunucu adına düşer.
    */
   protected mpPlayerName(p: RoomPlayer): string {
-    if (p.isBot && isAiLevel(p.level)) {
-      const key = 'mp.bot' + p.level[0].toUpperCase() + p.level.slice(1);
-      return `🤖 Bot (${this.t(key)})`;
+    if (p.isBot) {
+      if (isBotCharacter(p.character)) return this.characterName(p.character);
+      if (isAiLevel(p.level)) {
+        const key = 'mp.bot' + p.level[0].toUpperCase() + p.level.slice(1);
+        return `🤖 Bot (${this.t(key)})`;
+      }
     }
     return p.username;
   }
@@ -105,10 +138,10 @@ export class MultiplayerPanel {
     if (!r.ok) this.mpError.set(`mp.err.${r.error}`);
   }
 
-  /** Odaya YZ botu ekle (host). */
-  async onAddBot(difficulty: 'easy' | 'medium' | 'hard' | 'expert'): Promise<void> {
+  /** Odaya isimli KARAKTER botu ekle (host). */
+  async onAddBotCharacter(id: BotCharacterId): Promise<void> {
     this.mpError.set('');
-    const r = await this.mp.addBot(difficulty);
+    const r = await this.mp.addBotCharacter(id);
     if (!r.ok) this.mpError.set(`mp.err.${r.error}`);
   }
 

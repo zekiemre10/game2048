@@ -163,6 +163,23 @@
       </div>
     </div>
 
+    <!-- Karakter bazlı yarış galibiyeti (yalnızca karşılaşılan karakterler) -->
+    @if (characterStats().length) {
+      <div class="profile-charwins">
+        <span class="profile-charwins-title">{{ t('prof.charWins') }}</span>
+        <div class="charwin-list">
+          @for (c of characterStats(); track c.id) {
+            <div class="charwin-row">
+              <span class="charwin-name">{{ c.avatar }} {{ t('char.' + c.id + '.name') }}</span>
+              <span class="charwin-score">{{
+                t('prof.charWinScore', { a: c.beaten, b: c.faced })
+              }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
     <!--
       Giriş yapılmışsa burada bir şey gösterilmez: kullanıcı adı zaten
       panelin başlığında yazıyor, çıkış da Ayarlar'da. Yalnızca misafire

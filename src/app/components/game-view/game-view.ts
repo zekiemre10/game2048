@@ -15,7 +15,7 @@ import { I18nService } from '../../services/i18n.service';
 import { AiService } from '../../services/ai.service';
 import { AuthService } from '../../services/auth.service';
 import { MultiplayerService, RoomPlayer } from '../../services/multiplayer.service';
-import { isAiLevel } from '../../logic/ai';
+import { BOT_CHARACTERS, isAiLevel, isBotCharacter } from '../../logic/ai';
 import { Direction, GameMode, GameStatus } from '../../models/tile.model';
 import { formatTime } from '../../logic/format-time';
 import { POWERS, PowerId } from '../../models/power.model';
@@ -175,11 +175,28 @@ export class GameView {
    * (dil değişince bot adı da güncellenir). Seviye verisi yoksa sunucu adına düşer.
    */
   protected mpPlayerName(p: RoomPlayer): string {
-    if (p.isBot && isAiLevel(p.level)) {
-      const key = 'mp.bot' + p.level[0].toUpperCase() + p.level.slice(1);
-      return `🤖 Bot (${this.t(key)})`;
+    if (p.isBot) {
+      if (isBotCharacter(p.character)) {
+        return `${BOT_CHARACTERS[p.character].avatar} ${this.t('char.' + p.character + '.name')}`;
+      }
+      if (isAiLevel(p.level)) {
+        const key = 'mp.bot' + p.level[0].toUpperCase() + p.level.slice(1);
+        return `🤖 Bot (${this.t(key)})`;
+      }
     }
     return p.username;
+  }
+
+  /**
+   * Yarış içi karakter laf atması (kişiliği pekiştirir). Tetikleyici anlık
+   * sıralamadan türer: yarış başı (skor 0) → start; bot önümdeyse → lead; ben
+   * botu geçtiysem → behind. Yalnızca karakter botları ve yarış sürerken.
+   */
+  protected botTaunt(p: RoomPlayer): string | null {
+    if (!isBotCharacter(p.character) || this.status() !== GameStatus.Playing) return null;
+    const me = this.mpPlayers().find((x) => this.isMe(x.id));
+    const trigger = p.score === 0 ? 'start' : !me || p.score > me.score ? 'lead' : 'behind';
+    return this.t(`char.${p.character}.taunt.${trigger}`);
   }
 
   /** Bir oyuncu ben miyim? */

@@ -156,19 +156,25 @@
   margin-bottom: 0.3rem;
 }
 
-// --- Bot zorluk seçimi: 4 kademe, ölçülmüş güç göstergeli ---
-.mp-botlevels {
+// --- Bot KARAKTER galerisi: isimli rakipler, avatar + ölçülmüş güç ---
+.mp-botchars {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 0.4rem;
 }
 
-.mp-botlevel {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.15rem;
-  padding: 0.45rem 0.55rem;
+.mp-botchar {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'avatar name'
+    'avatar desc'
+    'bar bar'
+    'str str';
+  align-items: center;
+  column-gap: 0.5rem;
+  row-gap: 0.1rem;
+  padding: 0.5rem 0.6rem;
   border-radius: 10px;
   border: 1px solid var(--panel-border, rgba(128, 128, 128, 0.3));
   background: var(--panel-bg, rgba(255, 255, 255, 0.6));
@@ -179,57 +185,74 @@
     transform 0.08s ease,
     box-shadow 0.15s ease;
 }
-.mp-botlevel:hover {
+.mp-botchar:hover {
   transform: translateY(-1px);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
 }
-.mp-botlevel.lvl-easy {
+// Karakter başına aksan rengi (avatar teması).
+.mp-botchar.char-corner {
+  border-left-color: #6f9ceb;
+}
+.mp-botchar.char-space {
   border-left-color: #3fb950;
 }
-.mp-botlevel.lvl-medium {
-  border-left-color: #d29922;
+.mp-botchar.char-hasty {
+  border-left-color: #f0b429;
 }
-.mp-botlevel.lvl-hard {
-  border-left-color: #db6d28;
-}
-.mp-botlevel.lvl-expert {
-  border-left-color: #f85149;
+.mp-botchar.char-balanced {
+  border-left-color: #9c7cdc;
 }
 
-.mp-botlevel-name {
+.mp-botchar-avatar {
+  grid-area: avatar;
+  font-size: 1.7rem;
+  line-height: 1;
+}
+.mp-botchar-name {
+  grid-area: name;
   font-size: 0.9rem;
   font-weight: 700;
 }
-.mp-botlevel-str {
-  font-size: 0.72rem;
-  opacity: 0.75;
+.mp-botchar-desc {
+  grid-area: desc;
+  font-size: 0.68rem;
+  opacity: 0.7;
+  line-height: 1.2;
 }
-.mp-botlevel-bar {
+.mp-botchar-str {
+  grid-area: str;
+  font-size: 0.7rem;
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+  margin-top: 0.1rem;
+}
+.mp-botchar-bar {
+  grid-area: bar;
   display: block;
   width: 100%;
   height: 4px;
-  margin-top: 0.15rem;
+  margin-top: 0.25rem;
   border-radius: 3px;
   background: rgba(128, 128, 128, 0.22);
   overflow: hidden;
 }
-.mp-botlevel-bar i {
+.mp-botchar-bar i {
   display: block;
   height: 100%;
   border-radius: 3px;
   background: currentColor;
 }
-.mp-botlevel.lvl-easy .mp-botlevel-bar i {
+.mp-botchar.char-corner .mp-botchar-bar i {
+  background: #6f9ceb;
+}
+.mp-botchar.char-space .mp-botchar-bar i {
   background: #3fb950;
 }
-.mp-botlevel.lvl-medium .mp-botlevel-bar i {
-  background: #d29922;
+.mp-botchar.char-hasty .mp-botchar-bar i {
+  background: #f0b429;
 }
-.mp-botlevel.lvl-hard .mp-botlevel-bar i {
-  background: #db6d28;
-}
-.mp-botlevel.lvl-expert .mp-botlevel-bar i {
-  background: #f85149;
+.mp-botchar.char-balanced .mp-botchar-bar i {
+  background: #9c7cdc;
 }
 
 .mp-botstrength-hint {

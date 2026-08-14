@@ -156,6 +156,14 @@ export class GameService {
   /** Kazanma yüzdesi (0-100) — ProfileService'te. */
   readonly winRate = this.profile.winRate;
 
+  /** Karakter bazlı yarış galibiyeti (id → {faced, beaten}) — ProfileService'te. */
+  readonly characterWins = this.profile.characterWins;
+
+  /** Bir çok oyunculu yarış bitince karakter sonuçlarını işler. */
+  recordCharacterResults(results: { id: string; beaten: boolean }[]): void {
+    this.profile.recordCharacterResults(results);
+  }
+
   /** Bugün günlük ödül alınabilir mi? (RewardsService'te) */
   readonly canClaimDaily = this.rewards.canClaimDaily;
 

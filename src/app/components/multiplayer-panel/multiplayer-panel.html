@@ -86,31 +86,27 @@
         <p class="auth-error">{{ t(mpError()) }}</p>
       }
 
-      <!-- Host: bot ekle (lobide) — 4 kademe, her biri ölçülmüş güç gösterir -->
+      <!-- Host: karakter rakip ekle (lobide) — isimli, avatarlı, ölçülmüş güçlü -->
       @if (room.status === 'lobby' && mpIsHost()) {
         <div class="mp-addbots">
           <span class="mp-addbots-label">{{ t('mp.addBot') }}</span>
-          <div class="mp-botlevels">
-            <button type="button" class="mp-botlevel lvl-easy" (click)="onAddBot('easy')">
-              <span class="mp-botlevel-name">{{ t('mp.botEasy') }}</span>
-              <span class="mp-botlevel-str">{{ t('mp.botEasyStr') }}</span>
-              <span class="mp-botlevel-bar"><i style="width: 5%"></i></span>
-            </button>
-            <button type="button" class="mp-botlevel lvl-medium" (click)="onAddBot('medium')">
-              <span class="mp-botlevel-name">{{ t('mp.botMedium') }}</span>
-              <span class="mp-botlevel-str">{{ t('mp.botMediumStr') }}</span>
-              <span class="mp-botlevel-bar"><i style="width: 33%"></i></span>
-            </button>
-            <button type="button" class="mp-botlevel lvl-hard" (click)="onAddBot('hard')">
-              <span class="mp-botlevel-name">{{ t('mp.botHard') }}</span>
-              <span class="mp-botlevel-str">{{ t('mp.botHardStr') }}</span>
-              <span class="mp-botlevel-bar"><i style="width: 70%"></i></span>
-            </button>
-            <button type="button" class="mp-botlevel lvl-expert" (click)="onAddBot('expert')">
-              <span class="mp-botlevel-name">{{ t('mp.botExpert') }}</span>
-              <span class="mp-botlevel-str">{{ t('mp.botExpertStr') }}</span>
-              <span class="mp-botlevel-bar"><i style="width: 98%"></i></span>
-            </button>
+          <div class="mp-botchars">
+            @for (ch of characters; track ch.id) {
+              <button
+                type="button"
+                class="mp-botchar char-{{ ch.id }}"
+                (click)="onAddBotCharacter(ch.id)"
+                [attr.aria-label]="
+                  t('char.' + ch.id + '.name') + ' — ' + t('char.' + ch.id + '.desc')
+                "
+              >
+                <span class="mp-botchar-avatar" aria-hidden="true">{{ ch.avatar }}</span>
+                <span class="mp-botchar-name">{{ t('char.' + ch.id + '.name') }}</span>
+                <span class="mp-botchar-desc">{{ t('char.' + ch.id + '.desc') }}</span>
+                <span class="mp-botchar-str">{{ t('char.strength', { n: ch.reach2048 }) }}</span>
+                <span class="mp-botchar-bar"><i [style.width.%]="ch.power"></i></span>
+              </button>
+            }
           </div>
           <p class="mp-botstrength-hint">{{ t('mp.botStrengthHint') }}</p>
         </div>

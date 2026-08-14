@@ -1,10 +1,12 @@
 import { Injectable, computed, signal } from '@angular/core';
 import {
   AVATARS,
+  CharacterWinsBlob,
   loadAvatar,
   loadBestLevel,
   loadBestScore,
   loadChampionships,
+  loadCharacterWins,
   loadName,
   loadPrefsAt,
   loadStat,
@@ -12,6 +14,7 @@ import {
   saveBestLevel,
   saveBestScore,
   saveChampionships,
+  saveCharacterWins,
   saveName,
   savePrefsAt,
   saveStats,
@@ -52,6 +55,27 @@ export class ProfileService {
     const played = this.gamesPlayed();
     return played === 0 ? 0 : Math.round((this.gamesWon() / played) * 100);
   });
+
+  /** Karakter bazlı yarış galibiyeti (id → {faced, beaten}). Cihaz-yerel. */
+  readonly characterWins = signal<CharacterWinsBlob>(loadCharacterWins());
+
+  /**
+   * Bir yarış bitince karakter sonuçlarını işler: her karşılaşılan karakterin
+   * `faced` sayacı artar; skorca geçildiyse `beaten` de artar. (Çok oyunculu
+   * yarış sonu — tek oyunculu recordGame'den ayrı.)
+   */
+  recordCharacterResults(results: { id: string; beaten: boolean }[]): void {
+    if (!results.length) return;
+    this.characterWins.update((prev) => {
+      const next: CharacterWinsBlob = { ...prev };
+      for (const r of results) {
+        const cur = next[r.id] ?? { faced: 0, beaten: 0 };
+        next[r.id] = { faced: cur.faced + 1, beaten: cur.beaten + (r.beaten ? 1 : 0) };
+      }
+      saveCharacterWins(next);
+      return next;
+    });
+  }
 
   /** Oyuncu adını ayarlar (temizle + kaydet + tercih damgası). */
   setName(name: string): void {

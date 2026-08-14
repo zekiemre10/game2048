@@ -298,6 +298,9 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'prof.totalMoves': { tr: 'TOPLAM HAMLE', en: 'TOTAL MOVES' },
   'prof.bestLevel': { tr: 'EN İYİ SEVİYE', en: 'BEST LEVEL' },
   'prof.totalGold': { tr: 'TOPLAM ALTIN', en: 'TOTAL GOLD' },
+  // Karakter bazlı yarış galibiyeti (profil bölümü)
+  'prof.charWins': { tr: '🎭 Karakterlere karşı', en: '🎭 Vs. characters' },
+  'prof.charWinScore': { tr: '{a}/{b} galibiyet', en: '{a}/{b} wins' },
   // Ünvan (hesabın genel ilerlemesi — oyun içi "Seviye"den ayrı)
   'prof.points': { tr: 'puan', en: 'points' },
   'prof.pointsLeft': { tr: 'puan kaldı', en: 'points to go' },
@@ -460,15 +463,41 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'mp.botMedium': { tr: 'Orta', en: 'Medium' },
   'mp.botHard': { tr: 'Zor', en: 'Hard' },
   'mp.botExpert': { tr: 'Uzman', en: 'Expert' },
-  // Seçim ekranında gösterilen ölçülmüş güç (scripts/ai-bench.mjs, 30 oyun).
-  'mp.botEasyStr': { tr: '2048: %0 · 512–1024', en: '2048: 0% · 512–1024' },
-  'mp.botMediumStr': { tr: '2048: %23 · 1024–2048', en: '2048: 23% · 1024–2048' },
-  'mp.botHardStr': { tr: '2048: %67 · 2048–4096', en: '2048: 67% · 2048–4096' },
-  'mp.botExpertStr': { tr: '2048: %95 · 4096+', en: '2048: 95% · 4096+' },
   'mp.botStrengthHint': {
-    tr: 'Zorluk = ortalama 30 oyunda 2048’e ulaşma oranı',
-    en: 'Difficulty = share of 30 games reaching 2048',
+    tr: 'Güç = 40 oyunda 2048’e ulaşma oranı; her karakter farklı oynar',
+    en: 'Power = share of 40 games reaching 2048; each character plays differently',
   },
+
+  // --- Bot karakterleri: isimli rakipler (ad + tanım + ölçülmüş güç) ---
+  // Güç ölçümü: scripts/bot-characters-bench.mjs (40 oyun). Kimlikler ai.ts
+  // BOT_CHARACTER_IDS ile aynı; ad/tanım dinamik anahtarla (char.<id>.name) çözülür.
+  'char.strength': { tr: '2048: %{n}', en: '2048: {n}%' },
+  'char.corner.name': { tr: 'Köşeci', en: 'Cornerer' },
+  'char.corner.desc': { tr: 'Köşe disiplini, istikrarlı', en: 'Corner discipline, steady' },
+  'char.space.name': { tr: 'Alan Açan', en: 'Space Maker' },
+  'char.space.desc': { tr: 'Boş alanı kollar, uzun yaşar', en: 'Guards space, survives long' },
+  'char.hasty.name': { tr: 'Acelesi Var', en: 'Hasty' },
+  'char.hasty.desc': { tr: 'Hızlı skor, sonra tıkanır', en: 'Fast score, then stalls' },
+  'char.balanced.name': { tr: 'Dengeli', en: 'Balanced' },
+  'char.balanced.desc': { tr: 'Her yönü dengeler', en: 'Balances everything' },
+
+  // Yarış içi laf atmalar (tetikleyiciler: start = yarış başı, lead = bot öne
+  // geçince, behind = oyuncu botu geçince). Kişiliği pekiştirir.
+  'char.corner.taunt.start': { tr: 'Köşeyi bana bırak.', en: 'Leave the corner to me.' },
+  'char.corner.taunt.lead': { tr: 'Disiplin kazandırır. 📐', en: 'Discipline wins. 📐' },
+  'char.corner.taunt.behind': { tr: 'Bir hata yaptım, düzelirim.', en: 'One slip — I’ll recover.' },
+  'char.space.taunt.start': { tr: 'Acele yok, nefes al. 🌿', en: 'No rush, breathe. 🌿' },
+  'char.space.taunt.lead': { tr: 'Yavaş ama sağlam.', en: 'Slow but solid.' },
+  'char.space.taunt.behind': { tr: 'Alanım daralıyor…', en: 'My space is shrinking…' },
+  'char.hasty.taunt.start': { tr: 'Hızlı olan kazanır! ⚡', en: 'Fast wins! ⚡' },
+  'char.hasty.taunt.lead': { tr: 'Gördün mü? Şimşek gibi!', en: 'See? Like lightning!' },
+  'char.hasty.taunt.behind': { tr: 'Ay, çok hızlı gittim…', en: 'Ugh, went too fast…' },
+  'char.balanced.taunt.start': {
+    tr: 'Bakalım kim dengeli. ⚖️',
+    en: 'Let’s see who’s balanced. ⚖️',
+  },
+  'char.balanced.taunt.lead': { tr: 'Dengede kalan önde kalır.', en: 'Stay balanced, stay ahead.' },
+  'char.balanced.taunt.behind': { tr: 'Dengemi bulacağım.', en: 'I’ll find my balance.' },
   'mp.startRace': { tr: '🏁 Yarışı Başlat', en: '🏁 Start Race' },
   'mp.needTwo': {
     tr: 'Başlatmak için en az 2 oyuncu gerekir.',
@@ -493,6 +522,7 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'mp.err.room_full': { tr: 'Oda dolu.', en: 'The room is full.' },
   'mp.err.invalid_score': { tr: 'Geçersiz skor.', en: 'Invalid score.' },
   'mp.err.invalid_level': { tr: 'Geçersiz zorluk seviyesi.', en: 'Invalid difficulty level.' },
+  'mp.err.invalid_character': { tr: 'Geçersiz karakter.', en: 'Invalid character.' },
   'mp.err.too_many_bots': {
     tr: 'Bu odada en fazla 5 bot olabilir.',
     en: 'This room allows at most 5 bots.',

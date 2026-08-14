@@ -22,6 +22,7 @@ const AVATAR_KEY = 'game2048.avatar';
 const ASSISTANT_KEY = 'game2048.assistant';
 const CHAMPION_KEY = 'game2048.championships';
 const STATS_KEY = 'game2048.stats';
+const CHARWINS_KEY = 'game2048.charwins'; // karakter bazlı yarış galibiyeti
 const STREAK_KEY = 'game2048.streak';
 const DAILY_KEY = 'game2048.dailyDay';
 const ACHIEVEMENTS_KEY = 'game2048.achievements';
@@ -313,6 +314,36 @@ export function loadStat(key: keyof StatsBlob): number {
 export function saveStats(blob: StatsBlob): void {
   try {
     localStorage?.setItem(STATS_KEY, JSON.stringify(blob));
+  } catch {
+    /* yoksay */
+  }
+}
+
+// --- Karakter bazlı yarış galibiyeti -----------------------
+// Her bot karakteri için: kaç kez karşılaşıldı + kaç kez yenildi (skorca geçildi).
+// Yalnızca YEREL tutulur (bulut senkronu alan-bazlı birleştirmede bilinmeyen
+// alanları düşürür; bu istatistik cihaz-yerel bir başarımdır).
+
+export interface CharacterWin {
+  faced: number;
+  beaten: number;
+}
+export type CharacterWinsBlob = Record<string, CharacterWin>;
+
+export function loadCharacterWins(): CharacterWinsBlob {
+  try {
+    if (typeof localStorage === 'undefined') return {};
+    const raw = localStorage.getItem(CHARWINS_KEY);
+    const obj = raw ? JSON.parse(raw) : {};
+    return obj && typeof obj === 'object' ? obj : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveCharacterWins(blob: CharacterWinsBlob): void {
+  try {
+    localStorage?.setItem(CHARWINS_KEY, JSON.stringify(blob));
   } catch {
     /* yoksay */
   }

@@ -9,6 +9,7 @@ import {
 import { AVATARS, GameService } from '../../services/game.service';
 import { I18nService } from '../../services/i18n.service';
 import { AuthService } from '../../services/auth.service';
+import { BOT_CHARACTERS, BOT_CHARACTER_IDS } from '../../logic/ai';
 
 /**
  * Profil paneli (ünvan + avatar + 7 günlük ödül takvimi + istatistikler).
@@ -55,6 +56,20 @@ export class ProfilePanel {
   protected readonly currentStreak = this.game.currentStreak;
   protected readonly bestStreak = this.game.bestStreak;
   protected readonly totalGoldEarned = this.game.totalGoldEarned;
+
+  /**
+   * Karakter bazlı yarış galibiyeti: yalnızca EN AZ BİR kez karşılaşılan
+   * karakterler (avatar + ad + "yenildi/karşılaşıldı"). Boşsa bölüm gizlenir.
+   */
+  protected readonly characterStats = computed(() => {
+    const wins = this.game.characterWins();
+    return BOT_CHARACTER_IDS.map((id) => ({
+      id,
+      avatar: BOT_CHARACTERS[id].avatar,
+      faced: wins[id]?.faced ?? 0,
+      beaten: wins[id]?.beaten ?? 0,
+    })).filter((c) => c.faced > 0);
+  });
 
   /** Avatar seçici açık mı? */
   protected readonly avatarPickerOpen = signal(false);

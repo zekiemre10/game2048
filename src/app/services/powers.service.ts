@@ -29,6 +29,28 @@ export class PowersService {
   /** Bu oyunda güç kullanıldı mı? (kullanılan oyun sıralama dışıdır) */
   readonly usedThisGame = signal<boolean>(false);
 
+  /** İpucu yönünü otomatik temizleyen zamanlayıcı. */
+  private hintTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** İpucu yönünü gösterir ve kısa süre sonra otomatik temizler. */
+  showHint(dir: Direction): void {
+    this.hintDirection.set(dir);
+    if (this.hintTimer) clearTimeout(this.hintTimer);
+    if (typeof setTimeout !== 'undefined') {
+      this.hintTimer = setTimeout(() => this.hintDirection.set(null), 2500);
+    }
+  }
+
+  /** Güç efektlerini temizler (yeni oyun/seviye/reset'te): bomba modu + ipucu. */
+  clearFx(): void {
+    this.bombMode.set(false);
+    this.hintDirection.set(null);
+    if (this.hintTimer) {
+      clearTimeout(this.hintTimer);
+      this.hintTimer = null;
+    }
+  }
+
   /** Bir gücü altınla satın alır (envantere ekler). @returns başarılıysa true. */
   buy(id: PowerId): boolean {
     if (!this.economy.spend(powerDef(id).price)) return false;

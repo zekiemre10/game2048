@@ -7,6 +7,7 @@ import { RewardsService } from './rewards.service';
 import { PowersService } from './powers.service';
 import { BoardStore, GameSnapshot } from './board-store';
 import { TimerService } from './timer.service';
+import { ASSIST_HINT_QUOTA, AssistantStore } from './assistant-store';
 import {
   BOARD_SIZE,
   Cell,
@@ -18,7 +19,7 @@ import {
   Tile,
 } from '../models/tile.model';
 import { applyMove, hasAnyMove } from '../logic/board-logic';
-import { AiLevel, MoveReview, ValueGrid, bestMove, positionHealth, reviewMove } from '../logic/ai';
+import { AiLevel, ValueGrid, bestMove } from '../logic/ai';
 import { rankFor, rankPoints } from '../logic/rank';
 import { DAILY_DURATION, dailySeed, utcDayKey } from '../logic/daily-challenge';
 
@@ -27,13 +28,7 @@ export type CelebrationKind = 'win' | 'level' | 'achievement';
 import { MAX_LEVEL, levelConfig } from '../models/level.model';
 import { PowerId } from '../models/power.model';
 import { MissionMetric, MissionProgress } from '../models/mission.model';
-import {
-  AVATARS,
-  loadAssistant,
-  loadRewardedLevels,
-  saveAssistant,
-  saveRewardedLevels,
-} from './game-storage';
+import { AVATARS, loadRewardedLevels, saveRewardedLevels } from './game-storage';
 
 /** Avatar listesi kalıcılık katmanında; eski içe aktarımlar için yeniden dışa aç. */
 export { AVATARS } from './game-storage';
@@ -89,6 +84,9 @@ export class GameService {
 
   /** Süre yönetimi ayrı serviste (yukarı sayan / geri sayım / duraklat). */
   private readonly timer = inject(TimerService);
+
+  /** YZ asistanı durumu ayrı serviste (değerlendirme/sağlık/öneri/bayraklar). */
+  private readonly assistant = inject(AssistantStore);
 
   // --- Durum sinyalleri (BoardStore'da; buradan delege) -------
 
@@ -252,8 +250,8 @@ export class GameService {
     this.cancelAutoplay(); // sürüyorsa gösterimi bitir, eski durumu ATMA
     this.paused.set(false);
     this.aiAssisted.set(false); // yeni oyun → temiz sayfa
-    this.resetAssistHints();
-    this.resetMoveReview();
+    this.assistant.resetHints();
+    this.assistant.resetMoveReview();
     this.mode.set(mode);
     this.boardSize.set(size);
     this.tiles.set([]);
@@ -292,8 +290,8 @@ export class GameService {
     this.cancelAutoplay();
     this.paused.set(false);
     this.aiAssisted.set(false);
-    this.resetAssistHints();
-    this.resetMoveReview();
+    this.assistant.resetHints();
+    this.assistant.resetMoveReview();
     this.beginRecordedGame(dailySeed(day)); // tohum günden türetilir
     this.dailyDay.set(day);
     this.mode.set(GameMode.Daily);
@@ -318,8 +316,8 @@ export class GameService {
     this.cancelAutoplay();
     this.paused.set(false);
     this.aiAssisted.set(false); // yeni yarış → temiz sayfa
-    this.resetAssistHints();
-    this.resetMoveReview();
+    this.assistant.resetHints();
+    this.assistant.resetMoveReview();
     this.beginRecordedGame(seed); // yarış: ortak tohum (herkes aynı taşlar)
     this.mode.set(GameMode.Race);
     this.boardSize.set(BOARD_SIZE); // yarış her zaman 4×4
@@ -336,94 +334,34 @@ export class GameService {
     this.registerActivity();
   }
 
-  // --- YZ Asistanı ------------------------------------------
+  // --- YZ Asistanı (AssistantStore'a delege) -----------------
 
-  /**
-   * Asistan açık mı? (Ayarlar'daki anahtar)
-   * Öneri, hamle kalitesi ve pozisyon göstergesinin tamamını yönetir.
-   */
-  readonly assistantOn = signal<boolean>(loadAssistant());
+  static readonly ASSIST_HINT_QUOTA = ASSIST_HINT_QUOTA;
+
+  readonly assistantOn = this.assistant.assistantOn;
+  readonly lastMoveReview = this.assistant.lastMoveReview;
+  readonly moveRatings = this.assistant.moveRatings;
+  readonly ratedMoves = this.assistant.ratedMoves;
+  readonly accuracy = this.assistant.accuracy;
+  readonly health = this.assistant.health;
+  readonly assistHintsLeft = this.assistant.assistHintsLeft;
+  readonly assistHintDir = this.assistant.assistHintDir;
+  readonly autoplaying = this.assistant.autoplaying;
+  readonly aiAssisted = this.assistant.aiAssisted;
+  readonly aiDemoResult = this.assistant.aiDemoResult;
 
   setAssistant(on: boolean): void {
-    this.assistantOn.set(on);
-    saveAssistant(on);
-    if (!on) this.resetMoveReview();
+    this.assistant.setAssistant(on);
   }
 
-  // --- Hamle kalitesi + doğruluk ------------------------------
-
-  /** Son hamlenin YZ değerlendirmesi (bir sonraki hamlede yenilenir). */
-  readonly lastMoveReview = signal<MoveReview | null>(null);
-
-  /** Bu oyundaki hamle kalitesi sayaçları. */
-  readonly moveRatings = signal({ best: 0, good: 0, inaccurate: 0 });
-
-  /** Değerlendirilen toplam hamle. */
-  readonly ratedMoves = computed(() => {
-    const r = this.moveRatings();
-    return r.best + r.good + r.inaccurate;
-  });
-
-  /** Doğruluk yüzdesi: en iyi + yakın hamlelerin oranı. */
-  readonly accuracy = computed(() => {
-    const total = this.ratedMoves();
-    if (total === 0) return 100;
-    const r = this.moveRatings();
-    return Math.round(((r.best + r.good) / total) * 100);
-  });
-
-  /** Tahtanın anlık sağlığı (arama yapmaz, ucuzdur). */
-  readonly health = computed(() => positionHealth(this.toValueGrid()));
-
-  private resetMoveReview(): void {
-    this.lastMoveReview.set(null);
-    this.moveRatings.set({ best: 0, good: 0, inaccurate: 0 });
-  }
-
-  // --- YZ Asistanı: oyun başına sınırlı hamle önerisi --------
-
-  /** Bir oyunda verilebilecek en fazla öneri sayısı. */
-  static readonly ASSIST_HINT_QUOTA = 5;
-
-  /** Bu oyunda kalan öneri hakkı. */
-  readonly assistHintsLeft = signal(GameService.ASSIST_HINT_QUOTA);
-
-  /** Şu an gösterilen öneri yönü (hamle yapılınca temizlenir). */
-  readonly assistHintDir = signal<Direction | null>(null);
-
-  /** Öneri iste: hak varsa en iyi hamleyi hesaplar ve bir hak düşer. */
+  /** Öneri iste (hak varsa) — AssistantStore. */
   requestAssistHint(): void {
-    if (this.status() !== GameStatus.Playing) return;
-    if (this.paused() || this.autoplaying()) return;
-    if (this.assistHintsLeft() <= 0) return;
-    const dir = bestMove(this.toValueGrid(), 'expert');
-    if (!dir) return;
-    this.assistHintDir.set(dir);
-    this.assistHintsLeft.update((n) => n - 1);
+    this.assistant.requestHint();
   }
-
-  /** Yeni oyunda öneri hakkını yenile. */
-  private resetAssistHints(): void {
-    this.assistHintsLeft.set(GameService.ASSIST_HINT_QUOTA);
-    this.assistHintDir.set(null);
-  }
-
-  // --- Yapay zekâ: otomatik oynatma ("YZ'yi izle") -----------
-
-  /** YZ şu an otomatik mi oynuyor? */
-  readonly autoplaying = signal(false);
-
-  /**
-   * Bu oyunda YZ EN AZ BİR hamle yaptı mı?
-   * Yalnızca yeni oyun başlayınca sıfırlanır. `autoplaying` anlık bayrak
-   * olduğundan tek başına yetmez: YZ'yi durdurup tek bir manuel hamle yapmak
-   * YZ'nin kurduğu tahtayı rekor/görev/altın olarak yazdırabiliyordu.
-   */
-  readonly aiAssisted = signal(false);
 
   /** İlerleme (rekor, görev, istatistik, altın) sayılmamalı mı? */
   aiPlayed(): boolean {
-    return this.autoplaying() || this.aiAssisted();
+    return this.assistant.aiPlayed();
   }
 
   // --- Kutlama (ses + konfeti tetikleyici) --------------------
@@ -454,9 +392,6 @@ export class GameService {
    * kendi skoruna ve kendi süresine geri döner.
    */
   private preAiSnapshot: AiDemoSnapshot | null = null;
-
-  /** Gösterim bitince YZ'nin ulaştığı skor (kısa süre gösterilir). */
-  readonly aiDemoResult = signal<number | null>(null);
   private demoNoticeTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** YZ otomatik oynatmayı başlat/durdur. */
@@ -614,8 +549,8 @@ export class GameService {
     this.cancelAutoplay(); // sürüyorsa gösterimi bitir, eski durumu ATMA
     this.paused.set(false);
     this.aiAssisted.set(false); // yeni seviye → temiz sayfa
-    this.resetAssistHints();
-    this.resetMoveReview();
+    this.assistant.resetHints();
+    this.assistant.resetMoveReview();
     const cfg = levelConfig(this.level());
     this.boardSize.set(BOARD_SIZE); // seviye modu her zaman 4×4
     this.tiles.set([]);
@@ -1152,16 +1087,7 @@ export class GameService {
 
     // Hamle kalitesi: YALNIZCA insan hamleleri, asistan açıkken ve tahta
     // henüz DEĞİŞMEDEN değerlendirilir (kıyas hamle öncesi pozisyona göre).
-    if (this.assistantOn() && !this.autoplaying()) {
-      const review = reviewMove(this.toValueGrid(), direction, 'medium');
-      this.lastMoveReview.set(review);
-      if (review) {
-        this.moveRatings.update((r) => ({
-          ...r,
-          [review.rating]: r[review.rating] + 1,
-        }));
-      }
-    }
+    this.assistant.recordReview(direction);
 
     this.assistHintDir.set(null); // öneri yalnızca gösterildiği tahta içindi
 

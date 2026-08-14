@@ -3,12 +3,35 @@ import { GameService } from './game.service';
 
 // ============================================================
 //  2048 — Hesap servisi (kayıt / giriş)
-//  Backend: http://34.158.136.9/emre/2048/api
 //  Token localStorage'da; giriş yapınca ilerleme hesapla senkronlanır.
 // ============================================================
 
-/** Backend kök adresi (prod/localhost/file:// hepsinden çalışsın diye tam URL). */
-export const API_BASE = 'http://34.158.136.9/emre/2048/api';
+/**
+ * Backend kök adresi.
+ *  • DAĞITIMDA **same-origin**: sayfa hangi şema+host'taysa (`location.origin`)
+ *    API de orada → `http://…/emre/2048/api` veya `https://2048.aicirkit.com/emre/2048/api`.
+ *    Böylece HTTPS 2048 sayfasında API çağrısı da HTTPS olur → **mixed-content YOK**,
+ *    giriş/kayıt HTTPS üzerinden çalışır (2048'e 301/HSTS uygulanmasının önündeki engel kalkar).
+ *  • YEREL geliştirmede (ng serve → localhost/127.0.0.1) canlı backend'e **mutlak** URL
+ *    (localhost:4200'de backend yok; CORS izinli).
+ */
+/** Canlı backend'in mutlak adresi (yerel geliştirme + SSR yedeği). */
+const DEV_API_BASE = 'http://34.158.136.9/emre/2048/api';
+
+/** Saf: verilen host/origin için API kökü (same-origin dağıtım · mutlak dev). */
+export function apiBaseFor(hostname: string | undefined | null, origin: string): string {
+  if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
+    return origin + '/emre/2048/api'; // dağıtım: same-origin (HTTPS'te HTTPS)
+  }
+  return DEV_API_BASE; // yerel geliştirme: canlı backend'e mutlak
+}
+
+function resolveApiBase(): string {
+  if (typeof location !== 'undefined') return apiBaseFor(location.hostname, location.origin);
+  return DEV_API_BASE;
+}
+
+export const API_BASE = resolveApiBase();
 const API = API_BASE;
 const TOKEN_KEY = 'game2048.token';
 

@@ -74,6 +74,14 @@ bu tek motordan gelir:
   (mükemmel derecede bonus). Derleme zamanında üretilir; **çalışma zamanı üretimi
   yok** (yalnızca ipucu için mevcut tahtayı çözer). Doğrulama tam arama olduğundan
   Uzman botun kalitesinden **bağımsız** güvenilirdir
+- 🎲 **Küratörlü günlük tohumlar** — motorun içerik-küratörü olarak ikinci
+  kullanımı: `scripts/gen-daily-calendar.mjs` her aday tohumu YZ paneliyle
+  (Kolay..Uzman) oynatıp **ulaşılabilir ortalama skoru** ve **değişkenliği**
+  (skill ödülü) ölçer; ölçütleri (avg≥6000 & spread≥4000) geçen tohumlar ≥1
+  yıllık bir **takvime** yazılır (formül yerine takvim). Herkes o gün aynı tahtayı
+  görür (**belirleyicilik korunur** — istemci TS + sunucu JSON birebir); takvim
+  bitince istemci+sunucu **FNV-1a formülüne** düşer. Böylece "şanssız" günlük
+  tahtalar elenir, günlük hep adil + yarışılabilir olur
 - 🎯 **Bana uygun rakip** — elle seçimin yanında **uyarlanabilir** bir seçenek:
   son N oyunundaki (tahta **boyutu bazında**) ortalama skoruna göre sana **kıl
   payı** yarışacak bir rung eşlenir. Zorluk **kademeli** değişir (kayan pencere +
@@ -603,3 +611,5 @@ web sunucusuyla servis edilebilir. Canlı sürüm bu dosyaların
       boyut bazında eşleştirme, kademeli değişim; elle seçim korunur)
 - [x] Bulmaca modu (YZ üretimli + tam-arama doğrulamalı 42 bulmaca, 3 tür/7 bölüm;
       derleme zamanı üretimi, ilerleme + en iyi derece + altın ödül + ipucu)
+- [x] Küratörlü günlük tohumlar (YZ paneliyle ort. skor + değişkenlik ölçülüp ≥1
+      yıllık takvim; istemci+sunucu birebir, belirleyici; takvim bitince formül yedeği)

@@ -1,8 +1,11 @@
 // ============================================================
 //  2048 — Günlük meydan okuma
-//  Herkes o gün AYNI tahtayı oynar: tohum gün anahtarından türetilir.
-//  Formül backend'deki `daily_seed` ile BİREBİR aynıdır (FNV-1a).
+//  Herkes o gün AYNI tahtayı oynar. Tohum önce YZ ile KÜRATÖRLENMİŞ takvimden
+//  gelir (adil + ilginç tahtalar); takvim kapsamı dışında FORMÜLE (FNV-1a) düşer.
+//  Takvim + formül backend ile BİREBİR aynıdır (belirleyicilik şart: istemci
+//  oynar, sunucu aynı tohumla replay ederek doğrular).
 // ============================================================
+import { DAILY_CALENDAR } from './daily-calendar.data';
 
 /** Bugünün gün anahtarı (UTC) — `YYYY-MM-DD`. */
 export function utcDayKey(now: Date = new Date()): string {
@@ -24,6 +27,25 @@ export function dailySeed(day: string): number {
     h = Math.imul(h, 16777619) >>> 0;
   }
   return h || 1;
+}
+
+/** `YYYY-MM-DD` gününün takvim başlangıcına göre sıfır tabanlı gün dizini (UTC). */
+function dayIndex(day: string, startDay: string): number {
+  const [y1, m1, d1] = startDay.split('-').map(Number);
+  const [y2, m2, d2] = day.split('-').map(Number);
+  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000);
+}
+
+/**
+ * Günün tohumu: KÜRATÖRLÜ takvimde varsa oradan (adil + ilginç), yoksa FORMÜL
+ * (dailySeed) yedeği. Sunucudaki `daily_seed` ile BİREBİR aynı mantık — aksi
+ * hâlde oyuncu farklı tahta oynar ve gönderdiği skor replay'de reddedilir.
+ */
+export function curatedDailySeed(day: string): number {
+  const { startDay, seeds } = DAILY_CALENDAR;
+  const i = dayIndex(day, startDay);
+  if (i >= 0 && i < seeds.length) return seeds[i];
+  return dailySeed(day); // takvim dışı → formül yedeği
 }
 
 /** Günlük meydan okuma süresi (saniye) — herkes için eşit. */

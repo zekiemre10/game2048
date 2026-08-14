@@ -1,0 +1,6 @@
+Günlük tohum takvimi raporu
+Üretildi: 370 tohum, başlangıç 2026-09-01 (≥1 yıl)
+Eşik: avg≥6000 & spread≥4000 · panel easy,medium,hard,expert · 500 hamle
+Seçilen ort(avg)=7174 · ort(spread)=6359
+min(avg)=6007 · min(spread)=4008
+Denenen aday: 515 · kabul oranı %72

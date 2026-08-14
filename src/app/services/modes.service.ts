@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { BOARD_SIZE, GameMode, GameStatus, TIME_ATTACK_SECONDS } from '../models/tile.model';
 import { MAX_LEVEL, levelConfig } from '../models/level.model';
-import { DAILY_DURATION, dailySeed, utcDayKey } from '../logic/daily-challenge';
+import { DAILY_DURATION, curatedDailySeed, utcDayKey } from '../logic/daily-challenge';
 import { BoardStore } from './board-store';
 import { TimerService } from './timer.service';
 import { AssistantStore } from './assistant-store';
@@ -91,7 +91,7 @@ export class ModesService {
     this.autoplay.cancel();
     this.timer.paused.set(false);
     this.assistant.startNewGame(); // oneri + degerlendirme + zaman cizelgesi sifirla
-    this.beginRecordedGame(dailySeed(day)); // tohum günden türetilir
+    this.beginRecordedGame(curatedDailySeed(day)); // küratörlü takvim (yoksa formül)
     this.dailyDay.set(day);
     this.board.mode.set(GameMode.Daily);
     this.board.boardSize.set(BOARD_SIZE); // günlük her zaman 4×4 (adil)

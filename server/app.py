@@ -22,6 +22,7 @@ import sqlite3
 import hashlib
 import secrets
 import time
+import datetime
 import threading
 import traceback
 import urllib.request
@@ -724,17 +725,49 @@ def settle_finished_months(conn) -> None:
     conn.commit()
 
 
-def daily_seed(day: str) -> int:
-    """Gün anahtarından kararlı bir tohum üretir (istemciyle aynı formül).
+# YZ ile küratörlenmiş günlük tohum takvimi (scripts/gen-daily-calendar.mjs).
+# İstemcideki src/app/logic/daily-calendar.data.ts ile BİREBİR aynı dosyadan
+# üretilir. Dosya yoksa/bozuksa sessizce FORMÜL yedeğine düşülür (kırılmaz).
+def _load_daily_calendar():
+    try:
+        path = os.path.join(os.path.dirname(__file__), "daily_calendar.json")
+        with open(path, encoding="utf-8") as f:
+            cal = json.load(f)
+        if isinstance(cal, dict) and cal.get("startDay") and isinstance(cal.get("seeds"), list):
+            return {"startDay": cal["startDay"], "seeds": [int(s) for s in cal["seeds"]]}
+    except Exception:
+        pass
+    return {"startDay": None, "seeds": []}
 
-    Basit FNV-benzeri karma: aynı gün → aynı tohum, ardışık günler
-    birbirine benzemeyen tahtalar verir.
-    """
+
+_DAILY_CALENDAR = _load_daily_calendar()
+
+
+def _formula_seed(day: str) -> int:
+    """Gün anahtarından kararlı tohum — FNV-1a (istemci dailySeed ile birebir)."""
     h = 2166136261
     for ch in day:
         h ^= ord(ch)
         h = (h * 16777619) & 0xFFFFFFFF
     return h or 1
+
+
+def daily_seed(day: str) -> int:
+    """Günün tohumu: KÜRATÖRLÜ takvimde varsa oradan (adil + ilginç tahta),
+    yoksa FORMÜL (FNV-1a) yedeği. İstemcideki curatedDailySeed ile BİREBİR aynı
+    mantık — aksi hâlde oyuncunun gönderdiği transkript replay'de tutmaz.
+    """
+    cal = _DAILY_CALENDAR
+    seeds = cal["seeds"]
+    start = cal["startDay"]
+    if start and seeds:
+        try:
+            i = (datetime.date.fromisoformat(day) - datetime.date.fromisoformat(start)).days
+            if 0 <= i < len(seeds):
+                return seeds[i]
+        except Exception:
+            pass
+    return _formula_seed(day)
 
 
 def make_token(conn, user_id: int) -> str:

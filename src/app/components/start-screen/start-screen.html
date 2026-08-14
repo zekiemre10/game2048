@@ -82,7 +82,7 @@
             <span
               class="ach-strip-icon"
               [class.locked]="!isUnlocked(a.id)"
-              [title]="L(a.name, a.nameEn)"
+              [title]="t('ach.' + a.id + '.name')"
               >{{ a.icon }}</span
             >
           }

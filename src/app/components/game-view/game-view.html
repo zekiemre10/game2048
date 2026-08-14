@@ -106,12 +106,14 @@
               <button
                 class="power-btn"
                 type="button"
-                [title]="L(p.desc, p.descEn)"
-                [attr.aria-label]="L(p.name, p.nameEn) + ' — ' + L(p.desc, p.descEn)"
+                [title]="t('power.' + p.id + '.desc')"
+                [attr.aria-label]="
+                  t('power.' + p.id + '.name') + ' — ' + t('power.' + p.id + '.desc')
+                "
                 (click)="onUsePower(p.id)"
               >
                 <span class="power-icon" aria-hidden="true">{{ p.icon }}</span>
-                <span class="power-name">{{ L(p.name, p.nameEn) }}</span>
+                <span class="power-name">{{ t('power.' + p.id + '.name') }}</span>
                 <span class="power-count">×{{ powers()[p.id] }}</span>
               </button>
             }

@@ -37,7 +37,7 @@
             @if (th.price > 0) {
               <div class="store-card" [class.active]="theme() === th.id">
                 <span class="card-swatch" [style.background]="themeGradient(th.swatch)"></span>
-                <span class="card-name">{{ L(th.name, th.nameEn) }}</span>
+                <span class="card-name">{{ t('theme.' + th.id + '.name') }}</span>
                 @if (theme() === th.id) {
                   <span class="card-badge used">{{ t('store.used') }}</span>
                 } @else if (isThemeOwned(th.id)) {
@@ -64,12 +64,12 @@
             <div class="store-card">
               <span class="card-icon">{{ p.icon }}</span>
               <span class="card-name">
-                {{ L(p.name, p.nameEn) }}
+                {{ t('power.' + p.id + '.name') }}
                 @if (powers()[p.id] > 0) {
                   <span class="card-owned">×{{ powers()[p.id] }}</span>
                 }
               </span>
-              <span class="card-desc">{{ L(p.desc, p.descEn) }}</span>
+              <span class="card-desc">{{ t('power.' + p.id + '.desc') }}</span>
               <button
                 class="card-btn buy"
                 type="button"

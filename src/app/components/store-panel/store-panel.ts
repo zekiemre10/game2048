@@ -27,7 +27,6 @@ export class StorePanel {
 
   protected readonly t = (key: string, params?: Record<string, string | number>) =>
     this.i18n.t(key, params);
-  protected readonly L = (tr: string, en: string) => this.i18n.L(tr, en);
 
   protected readonly gold = this.game.gold;
   protected readonly powers = this.game.powers;

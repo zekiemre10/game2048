@@ -78,11 +78,9 @@ export class App {
   private readonly leaderboard = inject(LeaderboardService);
   private readonly daily = inject(DailyService);
 
-  /** Statik metin çevirisi (şablonda {{ t('key') }}). */
+  /** Statik metin çevirisi (şablonda anahtarla çağrılır). */
   protected readonly t = (key: string, params?: Record<string, string | number>) =>
     this.i18n.t(key, params);
-  /** Model verisi çevirisi (TR/EN). */
-  protected readonly L = (tr: string, en: string) => this.i18n.L(tr, en);
   // Ana bileşende kalanlar: Idle/oyun geçişi (gate) + üst çubuk verisi +
   // skor gönderimi/giriş effect'lerinin ihtiyaç duyduğu durumlar. Oyun HUD'u,
   // yan panel ve overlay tamamen components/game-view'e taşındı.

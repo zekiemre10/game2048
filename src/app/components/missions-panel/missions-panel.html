@@ -15,7 +15,7 @@
         <div class="mission-item" [class.done]="m.progress >= m.def.target">
           <span class="mission-icon">{{ m.def.icon }}</span>
           <div class="mission-info">
-            <div class="mission-desc">{{ L(m.def.desc, m.def.descEn) }}</div>
+            <div class="mission-desc">{{ t('mission.' + m.def.id + '.desc') }}</div>
             <div class="mission-bar">
               <span class="mission-fill" [style.width.%]="(m.progress / m.def.target) * 100"></span>
             </div>
@@ -44,7 +44,7 @@
         <div class="mission-item" [class.done]="m.progress >= m.def.target">
           <span class="mission-icon">{{ m.def.icon }}</span>
           <div class="mission-info">
-            <div class="mission-desc">{{ L(m.def.desc, m.def.descEn) }}</div>
+            <div class="mission-desc">{{ t('mission.' + m.def.id + '.desc') }}</div>
             <div class="mission-bar">
               <span class="mission-fill" [style.width.%]="(m.progress / m.def.target) * 100"></span>
             </div>

@@ -16,19 +16,17 @@ export interface RankStats {
 export interface Rank {
   id: string;
   icon: string;
-  name: string;
-  nameEn: string;
   /** Bu ünvana geçmek için gereken puan. */
   minPoints: number;
 }
 
-/** Ünvan basamakları (artan sırada). */
+/** Ünvan basamakları (artan sırada). Adlar i18n'de: rank.<id>.name */
 export const RANKS: Rank[] = [
-  { id: 'novice', icon: '🌱', name: 'Çırak', nameEn: 'Novice', minPoints: 0 },
-  { id: 'apprentice', icon: '🔧', name: 'Kalfa', nameEn: 'Apprentice', minPoints: 500 },
-  { id: 'expert', icon: '⭐', name: 'Usta', nameEn: 'Expert', minPoints: 1500 },
-  { id: 'master', icon: '🏅', name: 'Üstat', nameEn: 'Master', minPoints: 3500 },
-  { id: 'legend', icon: '👑', name: 'Efsane', nameEn: 'Legend', minPoints: 7000 },
+  { id: 'novice', icon: '🌱', minPoints: 0 },
+  { id: 'apprentice', icon: '🔧', minPoints: 500 },
+  { id: 'expert', icon: '⭐', minPoints: 1500 },
+  { id: 'master', icon: '🏅', minPoints: 3500 },
+  { id: 'legend', icon: '👑', minPoints: 7000 },
 ];
 
 /**

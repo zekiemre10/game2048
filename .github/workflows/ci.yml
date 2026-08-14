@@ -1,0 +1,35 @@
+name: CI
+
+# İstemci kapıları: i18n bütünlüğü + biçim + testler + derleme.
+# (Backend testleri stdlib; ayrıca çalıştırılır: python server/run_tests.py)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # i18n bütünlüğü: diller arası eksik/fazla, ölü + tanımsız anahtar (CI kapısı).
+      - run: npm run check:i18n
+      - run: npm run format:check
+      - run: npm test
+      - run: npm run build
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python server/run_tests.py

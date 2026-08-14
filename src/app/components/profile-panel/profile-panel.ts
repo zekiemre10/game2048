@@ -36,7 +36,6 @@ export class ProfilePanel {
 
   protected readonly t = (key: string, params?: Record<string, string | number>) =>
     this.i18n.t(key, params);
-  protected readonly L = (tr: string, en: string) => this.i18n.L(tr, en);
 
   protected readonly authUser = this.auth.user;
   protected readonly avatar = this.game.avatar;
@@ -81,7 +80,7 @@ export class ProfilePanel {
   protected readonly displayName = computed(() => {
     const u = this.authUser();
     if (u) return u.username;
-    return this.i18n.L('Oyuncu', 'Player');
+    return this.i18n.t('common.player');
   });
 
   /** Avatar seçiciyi aç/kapat. */

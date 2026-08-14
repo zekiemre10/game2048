@@ -37,7 +37,6 @@ export class SettingsPanel {
 
   protected readonly t = (key: string, params?: Record<string, string | number>) =>
     this.i18n.t(key, params);
-  protected readonly L = (tr: string, en: string) => this.i18n.L(tr, en);
   protected readonly lang = this.i18n.lang;
 
   protected readonly musicOn = this.audio.musicOn;

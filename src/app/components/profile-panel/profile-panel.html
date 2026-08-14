@@ -22,7 +22,7 @@
         <!-- Ünvan: hesabın genel ilerlemesi (oyun içi "Seviye"den ayrı) -->
         <span class="rank-badge">
           {{ rankInfo().rank.icon }}
-          {{ L(rankInfo().rank.name, rankInfo().rank.nameEn) }}
+          {{ t('rank.' + rankInfo().rank.id + '.name') }}
         </span>
         <!-- Ay sonu şampiyonlukları -->
         @if (championships() > 0) {
@@ -58,7 +58,7 @@
         <div class="rank-row">
           <span class="rank-now">{{ rankInfo().points }} {{ t('prof.points') }}</span>
           <span class="rank-next">
-            {{ next.icon }} {{ L(next.name, next.nameEn) }} — {{ rankInfo().remaining }}
+            {{ next.icon }} {{ t('rank.' + next.id + '.name') }} — {{ rankInfo().remaining }}
             {{ t('prof.pointsLeft') }}
           </span>
         </div>

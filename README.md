@@ -613,3 +613,5 @@ web sunucusuyla servis edilebilir. Canlı sürüm bu dosyaların
       derleme zamanı üretimi, ilerleme + en iyi derece + altın ödül + ipucu)
 - [x] Küratörlü günlük tohumlar (YZ paneliyle ort. skor + değişkenlik ölçülüp ≥1
       yıllık takvim; istemci+sunucu birebir, belirleyici; takvim bitince formül yedeği)
+- [x] i18n altyapısı (dil başına ayrı JSON + tembel yükleme; model metinleri tek
+      sistemde; varsayılan dil yedeği; eksik/fazla/ölü/tanımsız anahtar kontrolü CI'da)

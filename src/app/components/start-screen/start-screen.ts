@@ -50,7 +50,6 @@ export class StartScreen {
   }
 
   /** Dile göre metin seçer (TR/EN). */
-  protected readonly L = (tr: string, en: string) => this.i18n.L(tr, en);
 
   onSelectSize(n: number): void {
     this.selectedSize.set(n);

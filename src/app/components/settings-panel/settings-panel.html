@@ -102,7 +102,7 @@
               type="button"
               class="theme-swatch"
               [class.active]="theme() === th.id"
-              [title]="L(th.name, th.nameEn)"
+              [title]="t('theme.' + th.id + '.name')"
               (click)="onSelectTheme(th.id)"
             >
               <span class="swatch-colors">
@@ -110,7 +110,7 @@
                 <span [style.background]="th.swatch[1]"></span>
                 <span [style.background]="th.swatch[2]"></span>
               </span>
-              <span class="swatch-name">{{ L(th.name, th.nameEn) }}</span>
+              <span class="swatch-name">{{ t('theme.' + th.id + '.name') }}</span>
             </button>
           }
         }

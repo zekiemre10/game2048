@@ -24,7 +24,6 @@ export class AchievementsPanel {
 
   protected readonly t = (key: string, params?: Record<string, string | number>) =>
     this.i18n.t(key, params);
-  protected readonly L = (tr: string, en: string) => this.i18n.L(tr, en);
 
   protected readonly ACHIEVEMENTS = ACHIEVEMENTS;
   protected readonly achTotalCount = ACHIEVEMENTS.length;

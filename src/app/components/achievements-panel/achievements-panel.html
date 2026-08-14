@@ -17,14 +17,14 @@
           <span class="ach-icon">{{ a.icon }}</span>
           <div class="ach-info">
             <div class="ach-top">
-              <span class="ach-name">{{ L(a.name, a.nameEn) }}</span>
+              <span class="ach-name">{{ t('ach.' + a.id + '.name') }}</span>
               @if (isAchievementUnlocked(a.id)) {
                 <span class="ach-badge done">{{ t('store.unlocked') }}</span>
               } @else {
                 <span class="ach-badge">💰 {{ a.gold }}</span>
               }
             </div>
-            <div class="ach-desc">{{ L(a.desc, a.descEn) }}</div>
+            <div class="ach-desc">{{ t('ach.' + a.id + '.desc') }}</div>
             <!-- Kilitliyse ne kadar yaklaştığını göster -->
             @if (!isAchievementUnlocked(a.id)) {
               <div class="mission-bar">

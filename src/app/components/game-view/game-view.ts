@@ -49,7 +49,6 @@ export class GameView {
 
   protected readonly t = (key: string, params?: Record<string, string | number>) =>
     this.i18n.t(key, params);
-  protected readonly L = (tr: string, en: string) => this.i18n.L(tr, en);
 
   // --- Oyun durumu (şablona açılır) --------------------------
   protected readonly status = this.game.status;

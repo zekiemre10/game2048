@@ -1,8 +1,8 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { EconomyService } from './economy.service';
 import { MissionsService } from './missions.service';
 import { ProfileService } from './profile.service';
-import { AchievementsService, AchievementStats } from './achievements.service';
+import { AchievementsService } from './achievements.service';
 import { RewardsService } from './rewards.service';
 import { PowersService } from './powers.service';
 import { BoardStore } from './board-store';
@@ -11,20 +11,12 @@ import { ASSIST_HINT_QUOTA, AssistantStore } from './assistant-store';
 import { GameEngine } from './game-engine';
 import { AutoplayService } from './autoplay.service';
 import { ModesService } from './modes.service';
-import {
-  BOARD_SIZE,
-  Cell,
-  Direction,
-  Grid,
-  GameMode,
-  GameStatus,
-  Tile,
-} from '../models/tile.model';
-import { hasAnyMove } from '../logic/board-logic';
-import { AiLevel, ValueGrid, bestMove } from '../logic/ai';
+import { PowerEffectsService } from './power-effects.service';
+import { CloudSyncService } from './cloud-sync.service';
+import { BOARD_SIZE, Cell, Direction, GameMode, Grid, Tile } from '../models/tile.model';
+import { AiLevel, ValueGrid } from '../logic/ai';
 import { PowerId } from '../models/power.model';
 import { MissionMetric } from '../models/mission.model';
-import { AVATARS } from './game-storage';
 
 /** Kutlama türü — GameEngine'de tanımlı; eski içe aktarımlar için yeniden dışa aç. */
 export type { CelebrationKind } from './game-engine';
@@ -33,17 +25,10 @@ export type { CelebrationKind } from './game-engine';
 export { AVATARS } from './game-storage';
 
 // ============================================================
-//  2048 — Oyun servisi
-//  Oyunun tüm durumu Angular signal'ları ile tutulur.
-//  Kaynak gerçeği (source of truth): `tiles` — tahtadaki taşların
-//  listesi. `grid` bu listeden türetilen 2B görünümdür.
+//  2048 — Oyun servisi (façade)
+//  Tüm durum + mantık alt servislerde; GameService bunları enjekte edip eski
+//  (sabit) dış API'yi delege eder. Mimari için bkz. README > "Servis mimarisi".
 // ============================================================
-
-/** Kazanma değeri. */
-const WIN_VALUE = 2048;
-
-/** +30 saniye gücünün eklediği süre. */
-const TIME_POWER_SECONDS = 30;
 
 @Injectable({ providedIn: 'root' })
 export class GameService {
@@ -82,6 +67,12 @@ export class GameService {
 
   /** Mod kurulumu + yaşam döngüsü ayrı serviste (façade). */
   private readonly modes = inject(ModesService);
+
+  /** Güç efektleri (bomba/karıştır/ipucu/+30sn) ayrı serviste (façade). */
+  private readonly effects = inject(PowerEffectsService);
+
+  /** Bulut senkron köprüsü (hesap anlık görüntüsü + geri uygulama). */
+  private readonly cloud = inject(CloudSyncService);
 
   // --- Durum sinyalleri (BoardStore'da; buradan delege) -------
 
@@ -363,135 +354,19 @@ export class GameService {
     return this.powersSvc.buy(id);
   }
 
-  /**
-   * Bir gücü kullanır (envanterden düşer, etkisini uygular).
-   * @returns güç kullanıldıysa true.
-   */
+  /** Bir gücü kullanır (etkisini uygular) — PowerEffectsService. */
   usePower(id: PowerId): boolean {
-    if (this.powers()[id] <= 0) return false;
-    if (this.status() !== GameStatus.Playing) return false;
-
-    let applied = false;
-    switch (id) {
-      case 'time':
-        applied = this.applyAddTime();
-        break;
-      case 'bomb':
-        // Bomba: hedefleme modunu aç. Güç, kare gerçekten silinince düşer.
-        this.bombMode.set(true);
-        return true; // henüz tüketilmedi
-      case 'shuffle':
-        applied = this.applyShuffle();
-        break;
-      case 'undo':
-        applied = this.undo();
-        break;
-      case 'hint':
-        applied = this.applyHint();
-        break;
-    }
-
-    if (applied) this.consumePower(id);
-    return applied;
+    return this.effects.usePower(id);
   }
 
-  /** Bomba hedefleme modundayken bir kareyi siler (gücü tüketir). */
+  /** Bomba hedefleme modundayken bir kareyi siler — PowerEffectsService. */
   removeTileAt(row: number, col: number): boolean {
-    if (!this.bombMode()) return false;
-    const exists = this.tiles().some((t) => t.row === row && t.col === col);
-    if (!exists) return false;
-
-    this.tiles.update((list) => list.filter((t) => !(t.row === row && t.col === col)));
-    this.consumePower('bomb');
-    this.bombMode.set(false);
-    // Geri alma bombalanan kareyi geri getirip gücü boşa harcatırdı.
-    this.history.set(null);
-
-    if (this.profile.markBombUsed()) {
-      this.checkAchievements(); // "Bombacı" başarımı
-    }
-    return true;
+    return this.effects.removeTileAt(row, col);
   }
 
-  /** Bomba modunu iptal eder (güç harcanmaz). */
+  /** Bomba modunu iptal eder (güç harcanmaz) — PowerEffectsService. */
   cancelBomb(): void {
-    this.bombMode.set(false);
-  }
-
-  private consumePower(id: PowerId): void {
-    this.powersSvc.decrement(id);
-    this.trackMission('powers', 1); // görev: güç kullan
-    // Güç kullanılan oyun şampiyonluk sıralamasına GİRMEZ (doğrulanamaz +
-    // eşit şartlar). Yalnızca sıralama dışı bırakır; oyun normal devam eder.
-    this.powerUsedThisGame.set(true);
-  }
-
-  /** +30 saniye: yalnızca seviye modunda ve oynanırken. */
-  private applyAddTime(): boolean {
-    if (this.mode() !== GameMode.Level) return false;
-    this.timer.addTime(TIME_POWER_SECONDS);
-    return true;
-  }
-
-  /** Karıştır: mevcut karelerin değerlerini rastgele boş hücrelere dağıtır. */
-  private applyShuffle(): boolean {
-    const current = this.tiles();
-    if (current.length === 0) return false;
-
-    const n = this.boardSize();
-    const cells: Cell[] = [];
-    for (let r = 0; r < n; r++) {
-      for (let c = 0; c < n; c++) cells.push({ row: r, col: c });
-    }
-
-    // Karıştırma oyuncunun PARAYLA aldığı bir güç: kendisini oynanamaz bir
-    // tahtaya kilitlememeli. Hamlesi kalan bir dizilim bulunana dek dene.
-    let shuffled: Tile[] = [];
-    for (let attempt = 0; attempt < 30; attempt++) {
-      for (let i = cells.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [cells[i], cells[j]] = [cells[j], cells[i]];
-      }
-      // id'ler korunur → kareler yeni yerlerine kayarak animasyonla gider.
-      shuffled = current.map((t, i) => ({
-        id: t.id,
-        value: t.value,
-        row: cells[i].row,
-        col: cells[i].col,
-      }));
-      if (hasAnyMove(shuffled, n)) break;
-    }
-
-    this.tiles.set(shuffled);
-
-    // Tahta yine de kilitliyse (ör. dolu tahtada eş kare yok) oyunu
-    // usulünce bitir; sessizce donmuş bir ekranda bırakma.
-    if (!hasAnyMove(shuffled, n)) {
-      this.stopTimer();
-      if (this.mode() === GameMode.Level) {
-        this.status.set(GameStatus.Failed);
-      } else {
-        this.status.set(GameStatus.Lost);
-      }
-      this.recordGameEnd(false);
-    }
-    return true;
-  }
-
-  /** İpucu: 1 hamle ileriye bakan basit sezgiyle en iyi yönü işaretler. */
-  private applyHint(): boolean {
-    const dir = this.computeHint();
-    if (!dir) return false;
-    this.powersSvc.showHint(dir);
-    return true;
-  }
-
-  /**
-   * En iyi hamleyi YAPAY ZEKÂ (expectimax) ile seçer — "sonraki hamle önerisi".
-   * Aynı motoru otomatik oynatma ve çok oyunculu bot da kullanır.
-   */
-  private computeHint(): Direction | null {
-    return bestMove(this.toValueGrid(), 'expert');
+    this.effects.cancelBomb();
   }
 
   // --- Profil (ProfileService'e delege) -----------------------
@@ -509,70 +384,16 @@ export class GameService {
     this.profile.setAvatar(a);
   }
 
-  // --- Hesap senkronizasyonu ----------------------------------
+  // --- Hesap senkronizasyonu (CloudSyncService'e delege) -----
 
-  /**
-   * Hesaba kaydedilecek ilerleme anlık görüntüsü. Sürüm + zaman damgaları,
-   * sunucunun ALAN BAZLI birleştirmesi içindir (bkz. server merge_progress):
-   * rekorlar/sayaçlar MAX, başarımlar birleşim, altın kazanılan/harcanan MAX,
-   * ad/avatar prefsAt'a göre en son değişen kazanır.
-   */
+  /** Hesaba kaydedilecek ilerleme anlık görüntüsü — CloudSyncService. */
   accountSnapshot(): Record<string, unknown> {
-    return {
-      v: 2,
-      updatedAt: Date.now(),
-      prefsAt: this.profile.prefsUpdatedAt(),
-      gold: this.gold(),
-      totalGoldEarned: this.totalGoldEarned(),
-      bestScore: this.bestScore(),
-      bestLevel: this.bestLevel(),
-      name: this.playerName(),
-      avatar: this.avatar(),
-      championships: this.championships(),
-      gamesPlayed: this.gamesPlayed(),
-      gamesWon: this.gamesWon(),
-      bestTile: this.bestTile(),
-      totalMoves: this.totalMoves(),
-      achievements: [...this.unlockedAchievements()],
-    };
+    return this.cloud.snapshot();
   }
 
-  /** Hesaptan gelen ilerlemeyi uygular ve kalıcı kaydeder. */
+  /** Hesaptan gelen ilerlemeyi uygular ve kalıcı kaydeder — CloudSyncService. */
   applyAccountSnapshot(d: Record<string, unknown>): void {
-    const num = (v: unknown) => (typeof v === 'number' && v >= 0 ? v : null);
-    const g = num(d['gold']);
-    if (g !== null) this.gold.set(g);
-    const tge = num(d['totalGoldEarned']);
-    if (tge !== null) this.totalGoldEarned.set(tge);
-    const bs = num(d['bestScore']);
-    if (bs !== null) this.bestScore.set(bs);
-    const bl = num(d['bestLevel']);
-    if (bl !== null) this.bestLevel.set(bl);
-    if (typeof d['name'] === 'string') this.playerName.set(d['name'] as string);
-    if (typeof d['avatar'] === 'string' && AVATARS.includes(d['avatar'] as string)) {
-      this.avatar.set(d['avatar'] as string);
-    }
-    const champ = num(d['championships']);
-    if (champ !== null) this.championships.set(champ);
-    const gp = num(d['gamesPlayed']);
-    if (gp !== null) this.gamesPlayed.set(gp);
-    const gw = num(d['gamesWon']);
-    if (gw !== null) this.gamesWon.set(gw);
-    const bt = num(d['bestTile']);
-    if (bt !== null) this.bestTile.set(bt);
-    const tm = num(d['totalMoves']);
-    if (tm !== null) this.totalMoves.set(tm);
-    if (Array.isArray(d['achievements'])) {
-      this.achievements.restore(
-        (d['achievements'] as unknown[]).filter((x) => typeof x === 'string') as string[],
-      );
-    }
-    // Tercih zaman damgası (birleşmiş değer sunucudan) — LWW tutarlılığı için.
-    const pa = num(d['prefsAt']);
-    if (pa !== null) this.profile.prefsUpdatedAt.set(pa);
-    // Kalıcı kaydet (ekonomi + profil kendi durumunu yazar; başarımları restore kaydetti)
-    this.economy.save();
-    this.profile.persist();
+    this.cloud.apply(d);
   }
 
   /**

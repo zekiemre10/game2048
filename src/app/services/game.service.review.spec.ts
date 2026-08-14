@@ -91,4 +91,50 @@ describe('GameService — hamle kalitesi ve doğruluk', () => {
     service.setAssistant(false);
     expect(localStorage.getItem('game2048.assistant')).toBe('0');
   });
+
+  // --- Hamle zaman çizelgesi ("oyunu nerede kaybettin?") ------
+
+  it('her geçerli hamle çizelgeye bir nokta ekler (sağlık + skor + karar tahtası)', () => {
+    service.setAssistant(true);
+    service.startMode(GameMode.Classic);
+    playSome(10);
+    const tl = service.moveTimeline();
+    expect(tl.length).toBe(service.moves()); // geçerli hamle sayısı kadar nokta
+    const last = tl[tl.length - 1];
+    expect(last.move).toBe(tl.length);
+    expect(last.health).toBeGreaterThanOrEqual(0);
+    expect(last.health).toBeLessThanOrEqual(100);
+    expect(last.grid.length).toBeGreaterThan(0); // karar-anı tahtası saklandı
+    expect(last.score).toBe(service.score());
+  });
+
+  it('asistan KAPALIYKEN de çizelge dolar; kalite/öneri null (sağlık eğrisi hep çalışır)', () => {
+    service.setAssistant(false);
+    service.startMode(GameMode.Classic);
+    playSome(8);
+    const tl = service.moveTimeline();
+    expect(tl.length).toBe(service.moves());
+    expect(tl.every((p) => p.rating === null && p.best === null)).toBe(true);
+    expect(tl.every((p) => p.health >= 0 && p.health <= 100)).toBe(true);
+  });
+
+  it('yeni oyun çizelgeyi sıfırlar (ilk hamlede temiz sayfa)', () => {
+    service.startMode(GameMode.Classic);
+    playSome(6);
+    expect(service.moveTimeline().length).toBeGreaterThan(0);
+    service.startMode(GameMode.Classic);
+    expect(service.moveTimeline().length).toBe(0);
+    service.move(Direction.Up);
+    expect(service.moveTimeline().length).toBe(1); // yalnız yeni oyunun hamlesi
+  });
+
+  it('YZ gösterimi çizelgeye nokta eklemez (gösterim hamleleri sayılmaz)', () => {
+    service.startMode(GameMode.Classic);
+    playSome(5);
+    const before = service.moveTimeline().length;
+    service.startAutoplay('expert');
+    playSome(5);
+    service.stopAutoplay();
+    expect(service.moveTimeline().length).toBe(before);
+  });
 });

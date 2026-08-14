@@ -55,9 +55,7 @@ export class ModesService {
     this.beginRecordedGame(this.board.randomSeed()); // her oyun tohumlu → doğrulanabilir
     this.autoplay.cancel(); // sürüyorsa gösterimi bitir, eski durumu ATMA
     this.timer.paused.set(false);
-    this.assistant.aiAssisted.set(false); // yeni oyun → temiz sayfa
-    this.assistant.resetHints();
-    this.assistant.resetMoveReview();
+    this.assistant.startNewGame(); // oneri + degerlendirme + zaman cizelgesi sifirla
     this.board.mode.set(mode);
     this.board.boardSize.set(size);
     this.board.tiles.set([]);
@@ -89,9 +87,7 @@ export class ModesService {
     const day = utcDayKey();
     this.autoplay.cancel();
     this.timer.paused.set(false);
-    this.assistant.aiAssisted.set(false);
-    this.assistant.resetHints();
-    this.assistant.resetMoveReview();
+    this.assistant.startNewGame(); // oneri + degerlendirme + zaman cizelgesi sifirla
     this.beginRecordedGame(dailySeed(day)); // tohum günden türetilir
     this.dailyDay.set(day);
     this.board.mode.set(GameMode.Daily);
@@ -116,9 +112,7 @@ export class ModesService {
   startRace(seed: number, duration: number): void {
     this.autoplay.cancel();
     this.timer.paused.set(false);
-    this.assistant.aiAssisted.set(false); // yeni yarış → temiz sayfa
-    this.assistant.resetHints();
-    this.assistant.resetMoveReview();
+    this.assistant.startNewGame(); // oneri + degerlendirme + zaman cizelgesi sifirla
     this.beginRecordedGame(seed); // yarış: ortak tohum (herkes aynı taşlar)
     this.board.mode.set(GameMode.Race);
     this.board.boardSize.set(BOARD_SIZE); // yarış her zaman 4×4
@@ -148,9 +142,7 @@ export class ModesService {
     this.beginRecordedGame(this.board.randomSeed());
     this.autoplay.cancel(); // sürüyorsa gösterimi bitir, eski durumu ATMA
     this.timer.paused.set(false);
-    this.assistant.aiAssisted.set(false); // yeni seviye → temiz sayfa
-    this.assistant.resetHints();
-    this.assistant.resetMoveReview();
+    this.assistant.startNewGame(); // oneri + degerlendirme + zaman cizelgesi sifirla
     const cfg = levelConfig(this.board.level());
     this.board.boardSize.set(BOARD_SIZE); // seviye modu her zaman 4×4
     this.board.tiles.set([]);

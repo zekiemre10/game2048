@@ -9,6 +9,7 @@ import {
   untracked,
 } from '@angular/core';
 import { BoardComponent } from '../board/board';
+import { MoveTimeline } from '../move-timeline/move-timeline';
 import { GameService } from '../../services/game.service';
 import { I18nService } from '../../services/i18n.service';
 import { AiService } from '../../services/ai.service';
@@ -29,7 +30,7 @@ import { POWERS, PowerId } from '../../models/power.model';
 @Component({
   selector: 'app-game-view',
   standalone: true,
-  imports: [BoardComponent],
+  imports: [BoardComponent, MoveTimeline],
   templateUrl: './game-view.html',
   styleUrl: './game-view.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

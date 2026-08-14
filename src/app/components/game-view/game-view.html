@@ -373,6 +373,11 @@
                 }
               }
 
+              <!-- Hamle zaman çizelgesi: "oyunu nerede kaybettin?" (yarış hariç) -->
+              @if (mode() !== GameMode.Race) {
+                <app-move-timeline />
+              }
+
               <div class="overlay-actions">
                 @if (mode() === GameMode.Race) {
                   <!-- Yarış bitti → çok oyunculu panele dön (sonuçlar orada) -->

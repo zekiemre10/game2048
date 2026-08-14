@@ -728,3 +728,42 @@ export function positionHealth(g: ValueGrid): PositionHealth {
   const level: HealthLevel = score >= 60 ? 'good' : score >= 32 ? 'risky' : 'danger';
   return { score, level };
 }
+
+/**
+ * Oyun sonu hamle zaman çizelgesinin tek bir noktası: bir hamlenin yönü,
+ * kalitesi, o hamleden SONRAKİ pozisyon sağlığı ve kümülatif skor + hamle
+ * ÖNCESİ tahta (tıklanınca gösterilir). Kalite/öneri asistan kapalıyken null.
+ */
+export interface TimelinePoint {
+  /** 1'den başlayan hamle numarası. */
+  move: number;
+  /** Oynanan yön. */
+  direction: Direction;
+  /** Hamle kalitesi — asistan kapalıysa null. */
+  rating: MoveRating | null;
+  /** YZ'nin önerdiği yön — asistan kapalıysa null (tıklanınca yeniden hesaplanır). */
+  best: Direction | null;
+  /** Hamleden SONRA pozisyon sağlığı (0-100). */
+  health: number;
+  /** Hamleden sonra kümülatif skor. */
+  score: number;
+  /** Hamleden ÖNCE tahta (karar anı; tıklanınca gösterilir + YZ önerisi buradan). */
+  grid: ValueGrid;
+}
+
+/**
+ * Dönüm noktası: sağlığın en sert düştüğü hamlenin dizini (index). Ardışık iki
+ * nokta arasındaki en büyük sağlık DÜŞÜŞÜNÜ arar. Nokta yoksa/düşüş yoksa -1.
+ */
+export function findTurningPoint(points: TimelinePoint[]): number {
+  let worst = -1;
+  let worstDrop = 0;
+  for (let i = 1; i < points.length; i++) {
+    const drop = points[i - 1].health - points[i].health;
+    if (drop > worstDrop) {
+      worstDrop = drop;
+      worst = i;
+    }
+  }
+  return worst;
+}

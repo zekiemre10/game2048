@@ -1,5 +1,5 @@
 import { Direction } from '../models/tile.model';
-import { ValueGrid, positionHealth, reviewMove } from './ai';
+import { TimelinePoint, ValueGrid, findTurningPoint, positionHealth, reviewMove } from './ai';
 
 describe('YZ — hamle kalitesi (reviewMove)', () => {
   it('YZ ile aynı hamle "best" sayılır', () => {
@@ -128,5 +128,32 @@ describe('YZ — pozisyon sağlığı (positionHealth)', () => {
       expect(h.score).toBeGreaterThanOrEqual(0);
       expect(h.score).toBeLessThanOrEqual(100);
     }
+  });
+});
+
+describe('YZ — dönüm noktası (findTurningPoint)', () => {
+  const pt = (move: number, health: number): TimelinePoint => ({
+    move,
+    direction: Direction.Up,
+    rating: null,
+    best: null,
+    health,
+    score: 0,
+    grid: [],
+  });
+
+  it('en sert sağlık DÜŞÜŞÜNÜN olduğu hamlenin dizinini döndürür', () => {
+    // sağlık: 90 → 85 → 40 → 38  → en sert düşüş 85→40 (index 2)
+    const points = [pt(1, 90), pt(2, 85), pt(3, 40), pt(4, 38)];
+    expect(findTurningPoint(points)).toBe(2);
+  });
+
+  it('düşüş yoksa (hep artıyor/sabit) -1 döndürür', () => {
+    expect(findTurningPoint([pt(1, 50), pt(2, 60), pt(3, 60), pt(4, 80)])).toBe(-1);
+  });
+
+  it('boş/tek noktalı çizelgede -1 döndürür', () => {
+    expect(findTurningPoint([])).toBe(-1);
+    expect(findTurningPoint([pt(1, 70)])).toBe(-1);
   });
 });

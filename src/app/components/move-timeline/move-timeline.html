@@ -1,0 +1,104 @@
+@if (timeline().length > 0) {
+  <section class="tl">
+    <h4 class="tl-title">📉 {{ t('tl.title') }}</h4>
+    <p class="tl-intro">{{ t('tl.intro') }}</p>
+
+    <div class="tl-chart-wrap">
+      <svg
+        class="tl-chart"
+        [attr.viewBox]="'0 0 ' + VIEW_W + ' ' + VIEW_H"
+        role="img"
+        [attr.aria-label]="a11ySummary()"
+      >
+        <!-- Eşik çizgileri: İyi (60) / Riskli (32) -->
+        <line
+          class="tl-grid"
+          [attr.x1]="X_START"
+          [attr.x2]="X_END"
+          [attr.y1]="yFor(60)"
+          [attr.y2]="yFor(60)"
+        />
+        <line
+          class="tl-grid"
+          [attr.x1]="X_START"
+          [attr.x2]="X_END"
+          [attr.y1]="yFor(32)"
+          [attr.y2]="yFor(32)"
+        />
+
+        <!-- Sağlık eğrisi (alan + çizgi) -->
+        <path class="tl-area" [attr.d]="chart().area" />
+        <path class="tl-line" [attr.d]="chart().path" />
+
+        <!-- Dönüm noktası dikey vurgu -->
+        @for (nd of chart().nodes; track nd.i) {
+          @if (nd.turning) {
+            <line
+              class="tl-turnline"
+              [attr.x1]="nd.x"
+              [attr.x2]="nd.x"
+              [attr.y1]="0"
+              [attr.y2]="VIEW_H - 12"
+            />
+          }
+        }
+
+        <!-- Noktalar (tıklanabilir + klavye) -->
+        @for (nd of chart().nodes; track nd.i) {
+          <circle
+            class="tl-dot"
+            [class.err]="nd.inaccurate"
+            [class.turn]="nd.turning"
+            [attr.cx]="nd.x"
+            [attr.cy]="nd.y"
+            [attr.r]="nd.turning ? 4 : nd.inaccurate ? 3 : 2.2"
+            role="button"
+            tabindex="0"
+            [attr.aria-label]="t('tl.dotLabel', { n: nd.move, h: nd.health })"
+            (click)="select(nd.i)"
+            (keydown.enter)="select(nd.i)"
+            (keydown.space)="select(nd.i)"
+          />
+        }
+      </svg>
+    </div>
+
+    @if (turningSummary(); as ts) {
+      <p class="tl-turning">⚠️ {{ t('tl.turning', { n: ts.move, a: ts.from, b: ts.to }) }}</p>
+    }
+    @if (!assistantOn()) {
+      <p class="tl-note">💡 {{ t('tl.assistantOff') }}</p>
+    }
+
+    <!-- Seçili hamlenin ayrıntısı: karar-anı tahtası + oynanan/önerilen hamle -->
+    @if (detail(); as d) {
+      <div class="tl-detail">
+        <div class="tl-mini" role="img" [attr.aria-label]="t('tl.boardAt', { n: d.move })">
+          @for (row of d.rows; track $index) {
+            <div class="tl-mrow">
+              @for (v of row; track $index) {
+                <span class="tl-cell" [style.background]="cellColor(v)">{{ v > 0 ? v : '' }}</span>
+              }
+            </div>
+          }
+        </div>
+        <div class="tl-detail-info">
+          <span class="tl-detail-move">{{ t('tl.moveN', { n: d.move }) }}</span>
+          <span class="tl-mv">
+            {{ t('tl.yourMove') }} <strong class="tl-arrow">{{ arrow(d.played) }}</strong>
+          </span>
+          <span class="tl-mv tl-ai">
+            {{ t('tl.aiMove') }} <strong class="tl-arrow">{{ arrow(d.best) }}</strong>
+          </span>
+          @if (d.rating) {
+            <span class="tl-rate r-{{ d.rating }}">{{ t('ai.rate.' + d.rating) }}</span>
+          }
+        </div>
+      </div>
+      <p class="tl-tap">{{ t('tl.tapHint') }}</p>
+    }
+
+    <!-- Ekran okuyucu metin karşılığı (grafik içeriği) -->
+    <p class="tl-sr">{{ a11ySummary() }}</p>
+  </section>
+}

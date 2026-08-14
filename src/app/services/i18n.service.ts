@@ -116,6 +116,36 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'ai.rate.inaccurate': { tr: '⚠️ Daha iyisi vardı', en: '⚠️ There was better' },
   'ai.accuracy': { tr: 'Doğruluk', en: 'Accuracy' },
 
+  // Oyun sonu hamle zaman çizelgesi ("oyunu nerede kaybettin?")
+  'tl.title': { tr: 'Hamle Zaman Çizelgesi', en: 'Move Timeline' },
+  'tl.intro': {
+    tr: 'Oyun boyunca tahtanın sağlığı. Eğri düştükçe pozisyonun bozulur — en sert düşüş dönüm noktandır.',
+    en: "Your board's health through the game. The steeper the fall, the worse your position — the sharpest drop is your turning point.",
+  },
+  'tl.turning': {
+    tr: '{n}. hamlede tahtan bozuldu (sağlık %{a} → %{b}). Buradan öğren.',
+    en: 'Move {n} broke your board (health {a}% → {b}%). Learn from here.',
+  },
+  'tl.assistantOff': {
+    tr: 'Hamle kalitesi işaretleri YZ Asistanı açıkken görünür (Ayarlar); sağlık eğrisi her zaman çalışır.',
+    en: 'Move-quality marks appear with the AI Assistant on (Settings); the health curve always works.',
+  },
+  'tl.moveN': { tr: '{n}. hamle', en: 'Move {n}' },
+  'tl.yourMove': { tr: 'Oynadığın', en: 'You played' },
+  'tl.aiMove': { tr: 'YZ önerisi', en: 'AI suggests' },
+  'tl.boardAt': { tr: '{n}. hamledeki tahta', en: 'Board at move {n}' },
+  'tl.tapHint': {
+    tr: 'Bir noktaya dokun: o hamledeki tahtayı ve YZ’nin önerdiği hamleyi gör.',
+    en: 'Tap a point to see the board and the move the AI recommended there.',
+  },
+  'tl.dotLabel': { tr: '{n}. hamle, sağlık %{h}', en: 'Move {n}, health {h}%' },
+  'tl.a11yMoves': { tr: 'Toplam {n} hamle.', en: '{n} moves total.' },
+  'tl.a11yTurning': {
+    tr: 'Dönüm noktası: {n}. hamlede sağlık %{a}’dan %{b}’ye düştü.',
+    en: 'Turning point: at move {n}, health dropped from {a}% to {b}%.',
+  },
+  'tl.a11yErrors': { tr: 'Hatalı hamleler: {list}.', en: 'Inaccurate moves: {list}.' },
+
   'assist.suggestion': { tr: 'Önerilen hamle', en: 'Suggested move' },
   'assist.ask': { tr: '💡 Öneri', en: '💡 Hint' },
   'assist.none': { tr: 'Öneri hakkın bitti', en: 'No hints left' },

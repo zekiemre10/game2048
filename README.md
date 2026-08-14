@@ -64,6 +64,11 @@ bu tek motordan gelir:
 - 🟢 **Canlı pozisyon göstergesi** — tahtanın sağlığı (İyi / Riskli / Tehlikeli);
   boş alan, köşe kullanımı ve kalan hamle yönlerinden hesaplanır
 - 🔍 **Oyun sonu değerlendirmesi** — köşe stratejisi, verimlilik ve kişisel ipucu
+- 📉 **Hamle zaman çizelgesi** — oyun sonunda "nerede kaybettin?" grafiği: yatayda
+  hamleler, dikeyde pozisyon sağlığı; hatalı hamleler işaretli, sağlığın en sert
+  düştüğü **dönüm noktası** vurgulu ("38. hamlede tahtan bozuldu"). Bir noktaya
+  tıklayınca o andaki tahta + YZ'nin önerdiği hamle görünür. Asistan kapalıyken de
+  sağlık eğrisi + dönüm noktası çalışır (yalnız hamle-kalitesi işaretleri sönük)
 
 Ayarlar'daki **🧠 YZ Asistanı** anahtarı öneri, hamle kalitesi ve pozisyon
 göstergesini birlikte açar/kapatır. Hamle başına ek maliyet ortanca **~2 ms**
@@ -553,3 +558,5 @@ web sunucusuyla servis edilebilir. Canlı sürüm bu dosyaların
 - [x] İlk oyun rehberi (6 adımlık tanıtım, Ayarlar'dan tekrar açılır)
 - [x] 7 günlük ödül takvimi (artan ödül, aralarda güçler, 7. gün büyük ödül)
 - [x] Aylık şampiyonluk (her ay sıfırlanan sıralama + ay sonu büyük ödül)
+- [x] Oyun sonu hamle zaman çizelgesi ("nerede kaybettin?" — sağlık eğrisi + dönüm
+      noktası + tıkla-tahtayı-gör, asistan kapalıyken de çalışır)

@@ -1,6 +1,13 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Direction, GameStatus } from '../models/tile.model';
-import { MoveReview, bestMove, positionHealth, reviewMove } from '../logic/ai';
+import {
+  MoveReview,
+  TimelinePoint,
+  ValueGrid,
+  bestMove,
+  positionHealth,
+  reviewMove,
+} from '../logic/ai';
 import { BoardStore } from './board-store';
 import { TimerService } from './timer.service';
 import { loadAssistant, saveAssistant } from './game-storage';
@@ -64,14 +71,61 @@ export class AssistantStore {
   /**
    * Bir insan hamlesini değerlendirir (asistan açıkken, tahta DEĞİŞMEDEN önce).
    * Çekirdek `move()` bunu hamleyi uygulamadan hemen önce çağırır.
+   * @returns değerlendirme (asistan kapalı/YZ oynuyorsa null) — zaman çizelgesi için.
    */
-  recordReview(direction: Direction): void {
-    if (!this.assistantOn() || this.autoplaying()) return;
+  recordReview(direction: Direction): MoveReview | null {
+    if (!this.assistantOn() || this.autoplaying()) return null;
     const review = reviewMove(this.board.toValueGrid(), direction, 'medium');
     this.lastMoveReview.set(review);
     if (review) {
       this.moveRatings.update((r) => ({ ...r, [review.rating]: r[review.rating] + 1 }));
     }
+    return review;
+  }
+
+  // --- Oyun sonu hamle zaman çizelgesi ------------------------
+
+  /** Uzun oyunlarda bellek koruması için tutulan en fazla nokta (aşınca seyreltilir). */
+  private static readonly MAX_TIMELINE = 600;
+
+  /**
+   * Bu oyunun hamle zaman çizelgesi: her hamlenin sağlığı + kalitesi + karar-anı
+   * tahtası. Oyun-sonu grafiği bunu çizer. Asistan KAPALIYKEN de dolar (sağlık
+   * eğrisi asistana bağlı değil); yalnız kalite/öneri null olur.
+   */
+  readonly moveTimeline = signal<TimelinePoint[]>([]);
+
+  /**
+   * Hamle uygulandıktan SONRA çağrılır: sağlığı (hamle sonrası) + skoru ölçüp
+   * karar-anı ızgarasıyla (preGrid) birlikte çizelgeye ekler. YZ gösterimi
+   * (autoplay) sayılmaz. Yeni oyunun ilk hamlesinde çizelge sıfırlanır.
+   */
+  recordTimelinePoint(preGrid: ValueGrid, direction: Direction, review: MoveReview | null): void {
+    if (this.autoplaying()) return; // gösterim hamleleri sayılmaz
+    const point: TimelinePoint = {
+      move: this.board.moves(),
+      direction,
+      rating: review?.rating ?? null,
+      best: review?.best ?? null,
+      health: positionHealth(this.board.toValueGrid()).score, // hamle SONRASI
+      score: this.board.score(),
+      grid: preGrid,
+    };
+    this.moveTimeline.update((list) => {
+      const next = [...list, point];
+      // Bellek koruması: çok uzun oyunlarda her ikinci noktayı tutarak seyrelt.
+      return next.length > AssistantStore.MAX_TIMELINE * 2
+        ? next.filter((_, i) => i % 2 === 0)
+        : next;
+    });
+  }
+
+  /** Yeni oyun: öneri hakları + hamle değerlendirmesi + zaman çizelgesi sıfırlanır. */
+  startNewGame(): void {
+    this.aiAssisted.set(false);
+    this.resetHints();
+    this.resetMoveReview();
+    this.moveTimeline.set([]);
   }
 
   // --- Oyun başına sınırlı öneri ------------------------------

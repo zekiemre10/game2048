@@ -161,6 +161,9 @@ export class GameEngine {
   move(direction: Direction): boolean {
     if (this.board.status() !== GameStatus.Playing) return false;
 
+    // Karar anı: hamle ÖNCESİ tahta (zaman çizelgesinde tıklanınca gösterilir).
+    const preGrid = this.board.toValueGrid();
+
     const result = applyMove(this.board.tiles(), direction, this.board.boardSize());
     if (!result.moved) return false; // geçersiz hamle → sayaç ARTMAZ
 
@@ -168,7 +171,7 @@ export class GameEngine {
     this.board.recordMove(direction);
 
     // Hamle kalitesi: YALNIZCA insan hamleleri, asistan açıkken, tahta değişmeden.
-    this.assistant.recordReview(direction);
+    const review = this.assistant.recordReview(direction);
     this.assistant.assistHintDir.set(null); // öneri yalnızca gösterildiği tahta içindi
 
     // Geçerli hamle → hamle ÖNCESİ durumu sakla (geri al için). applyMove saf
@@ -203,6 +206,9 @@ export class GameEngine {
 
     this.board.spawnRandomTile(); // her geçerli hamleden sonra yeni bir kare
     this.updateBestTile();
+
+    // Oyun sonu zaman çizelgesi: sağlık (hamle sonrası) + karar-anı tahtası.
+    this.assistant.recordTimelinePoint(preGrid, direction, review);
 
     switch (this.board.mode()) {
       case GameMode.Level:

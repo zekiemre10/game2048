@@ -243,6 +243,8 @@ export class GameService {
   readonly autoplaying = this.assistant.autoplaying;
   readonly aiAssisted = this.assistant.aiAssisted;
   readonly aiDemoResult = this.assistant.aiDemoResult;
+  /** Oyun sonu hamle zaman çizelgesi (sağlık eğrisi + kalite) — AssistantStore. */
+  readonly moveTimeline = this.assistant.moveTimeline;
 
   setAssistant(on: boolean): void {
     this.assistant.setAssistant(on);

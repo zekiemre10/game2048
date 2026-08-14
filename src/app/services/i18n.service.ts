@@ -102,6 +102,7 @@ export class I18nService {
     this.lang.set(lang);
     saveLang(lang);
     this.applyHtmlLang(lang);
+    syncUrlLang(lang); // paylaşılan link doğru dilde açılsın (?lang=)
     this.lastLoad = this.use(lang);
   }
 
@@ -114,9 +115,15 @@ export class I18nService {
 
 function loadLang(): Lang {
   try {
+    // 1) URL ?lang= — paylaşılan link doğru dilde açılsın (kayıtlı tercihi ezer).
+    if (typeof location !== 'undefined') {
+      const q = new URLSearchParams(location.search).get('lang');
+      if (q === 'tr' || q === 'en') return q;
+    }
+    // 2) Kayıtlı tercih.
     const saved = localStorage?.getItem(LANG_KEY);
     if (saved === 'tr' || saved === 'en') return saved;
-    // Tarayıcı dili İngilizce ise EN başlat
+    // 3) Tarayıcı dili İngilizce ise EN başlat.
     if (typeof navigator !== 'undefined' && navigator.language?.startsWith('en')) {
       return 'en';
     }
@@ -124,6 +131,19 @@ function loadLang(): Lang {
     /* varsayılan */
   }
   return DEFAULT_LANG;
+}
+
+/** Aktif dili URL'de ?lang= olarak yansıtır (paylaşım için; sayfa yenilenmez). */
+function syncUrlLang(lang: Lang): void {
+  try {
+    if (typeof location === 'undefined' || typeof history === 'undefined') return;
+    const url = new URL(location.href);
+    if (url.searchParams.get('lang') === lang) return;
+    url.searchParams.set('lang', lang);
+    history.replaceState(history.state, '', url.toString());
+  } catch {
+    /* yoksay */
+  }
 }
 
 function saveLang(lang: Lang): void {

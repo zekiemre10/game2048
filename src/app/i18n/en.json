@@ -324,6 +324,8 @@
   "rank.novice.name": "Novice",
   "rew.day": "Day",
   "rew.title": "🎁 7-DAY REWARDS",
+  "seo.description": "Classic 2048 puzzle: slide tiles, merge equal numbers and reach 2048. Levels, daily challenge, multiplayer races and AI rivals — free, TR/EN.",
+  "seo.title": "2048 — Number Merge Puzzle",
   "set.account": "👤 ACCOUNT",
   "set.assistant": "🧠 AI ASSISTANT",
   "set.assistantDesc": "When on, gives 5 move hints per game (use them when you want), warns when the board fills up, and shows a performance analysis at the end.",

@@ -6,10 +6,15 @@
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
-    <!-- Açıklama / SEO -->
+    <!--
+      SEO / paylaşım — VARSAYILAN (tr). Aktif dile göre başlık, açıklama ve OG
+      etiketleri çalışma zamanında SeoService ile güncellenir (sekme başlığı +
+      JS çalıştıran tarayıcılar). JS çalıştırmayan sosyal kazıyıcılar buradaki
+      varsayılanı görür; İngilizce link için ?lang=en (hreflang aşağıda).
+    -->
     <meta
       name="description"
-      content="Klasik 2048 bulmacası. Kareleri kaydır, aynı sayıları birleştir ve 2048'e ulaş. Angular ile geliştirildi."
+      content="Klasik 2048 bulmacası: kareleri kaydır, aynı sayıları birleştir ve 2048'e ulaş. Seviyeler, günlük meydan okuma, çok oyunculu yarış ve YZ rakipler — ücretsiz, TR/EN."
     />
     <meta name="author" content="emre" />
 
@@ -17,13 +22,36 @@
     <meta name="theme-color" content="#faf8ef" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#1a1917" media="(prefers-color-scheme: dark)" />
 
-    <!-- Paylaşım önizlemesi -->
+    <!-- Kanonik + dil alternatifleri (hreflang; ?lang= ile taşınır) -->
+    <link rel="canonical" href="http://34.158.136.9/emre/2048/" />
+    <link rel="alternate" hreflang="tr" href="http://34.158.136.9/emre/2048/?lang=tr" />
+    <link rel="alternate" hreflang="en" href="http://34.158.136.9/emre/2048/?lang=en" />
+    <link rel="alternate" hreflang="x-default" href="http://34.158.136.9/emre/2048/" />
+
+    <!-- Open Graph (paylaşım önizlemesi) -->
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="2048" />
     <meta property="og:title" content="2048 — Sayı Birleştirme Bulmacası" />
     <meta
       property="og:description"
+      content="Kareleri kaydır, aynı sayıları birleştir, 2048'e ulaş! Seviyeler · günlük meydan okuma · çok oyunculu · YZ rakipler."
+    />
+    <meta property="og:url" content="http://34.158.136.9/emre/2048/" />
+    <meta property="og:locale" content="tr_TR" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:image" content="http://34.158.136.9/emre/2048/og-image.png" />
+    <meta property="og:image:width" content="2560" />
+    <meta property="og:image:height" content="1600" />
+    <meta property="og:image:alt" content="2048 oyun ekranı" />
+
+    <!-- Twitter kartı -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="2048 — Sayı Birleştirme Bulmacası" />
+    <meta
+      name="twitter:description"
       content="Kareleri kaydır, aynı sayıları birleştir, 2048'e ulaş!"
     />
+    <meta name="twitter:image" content="http://34.158.136.9/emre/2048/og-image.png" />
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />

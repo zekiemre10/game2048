@@ -25,6 +25,7 @@ import { FriendsPanel } from './components/friends-panel/friends-panel';
 import { MultiplayerPanel } from './components/multiplayer-panel/multiplayer-panel';
 import { GameService } from './services/game.service';
 import { I18nService } from './services/i18n.service';
+import { SeoService } from './services/seo.service';
 import { AuthService } from './services/auth.service';
 import { FriendsService } from './services/friends.service';
 import { ChatService } from './services/chat.service';
@@ -71,6 +72,8 @@ export class App {
   private readonly game = inject(GameService);
   private readonly sfx = inject(SfxService);
   private readonly i18n = inject(I18nService);
+  // SEO/paylaşım meta servisini örnekle (dil değişince başlık/açıklama/OG tazeler).
+  private readonly seo = inject(SeoService);
   private readonly auth = inject(AuthService);
   private readonly friends = inject(FriendsService);
   private readonly chat = inject(ChatService);

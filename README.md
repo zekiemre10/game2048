@@ -615,3 +615,6 @@ web sunucusuyla servis edilebilir. Canlı sürüm bu dosyaların
       yıllık takvim; istemci+sunucu birebir, belirleyici; takvim bitince formül yedeği)
 - [x] i18n altyapısı (dil başına ayrı JSON + tembel yükleme; model metinleri tek
       sistemde; varsayılan dil yedeği; eksik/fazla/ölü/tanımsız anahtar kontrolü CI'da)
+- [x] Çok dilli SEO (dile göre başlık/açıklama/OG çalışma zamanı güncellenir;
+      og:image + og:locale + twitter card + canonical + hreflang; ?lang= ile
+      paylaşım; robots.txt + sitemap.xml)

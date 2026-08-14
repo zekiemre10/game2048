@@ -4,6 +4,11 @@ import { I18nService } from './i18n.service';
 describe('I18nService — tembel yükleme + yedek', () => {
   beforeEach(() => {
     localStorage.clear();
+    try {
+      history.replaceState(null, '', '/'); // ?lang= testler arasına sızmasın
+    } catch {
+      /* jsdom yoksa yoksay */
+    }
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({});
   });
@@ -63,5 +68,21 @@ describe('I18nService — tembel yükleme + yedek', () => {
     expect(document.documentElement.getAttribute('lang')).toBe('en');
     s.set('tr');
     expect(document.documentElement.getAttribute('lang')).toBe('tr');
+  });
+
+  it('set() dili URL ?lang= olarak yansıtır (paylaşılan link doğru dilde açılır)', () => {
+    const s = fresh();
+    s.set('en');
+    expect(new URLSearchParams(location.search).get('lang')).toBe('en');
+    s.set('tr');
+    expect(new URLSearchParams(location.search).get('lang')).toBe('tr');
+  });
+
+  it('URL ?lang= başlangıç dilini belirler (kayıtlı tercihi ezer)', () => {
+    localStorage.setItem('game2048.lang', 'tr');
+    history.replaceState(null, '', '/?lang=en');
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    expect(TestBed.inject(I18nService).lang()).toBe('en');
   });
 });

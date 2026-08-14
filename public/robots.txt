@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: http://34.158.136.9/emre/2048/sitemap.xml

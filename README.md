@@ -64,6 +64,16 @@ bu tek motordan gelir:
   edilemez), insanla **aynı tohumlu** diziyi oynar; yarışta kişilikli **laf atar**
   (TR/EN). Karakter bazlı galibiyetin profilde tutulur. (İç zorluk kademeleri
   Kolay/Orta/Zor/Uzman ipucu + YZ gösterimi için korunur.)
+- 🧩 **Bulmaca modu** — motorun yeni bir yönü: bugün yalnızca oynuyor/değerlendiriyor,
+  burada **içerik üretiyor**. `scripts/gen-puzzles.mjs` rastgele oyunlar oynatıp
+  ilginç pozisyonları yakalar, her birinin **çözülebilirliğini + asgari çözüm
+  hamlesini tam aramayla (BFS/DFS) doğrular** ve hedef koyar. Bulmacalar
+  **deterministiktir** (taş üretimi yok → "asgari hamle" iyi tanımlı, çözüm
+  garanti). Üç tür: **hedef kare · en yüksek skor · kurtarma**. 42 bulmaca 7
+  bölümde, artan zorlukta; ilerleme + en iyi derece kaydedilir, ilk çözümde altın
+  (mükemmel derecede bonus). Derleme zamanında üretilir; **çalışma zamanı üretimi
+  yok** (yalnızca ipucu için mevcut tahtayı çözer). Doğrulama tam arama olduğundan
+  Uzman botun kalitesinden **bağımsız** güvenilirdir
 - 🎯 **Bana uygun rakip** — elle seçimin yanında **uyarlanabilir** bir seçenek:
   son N oyunundaki (tahta **boyutu bazında**) ortalama skoruna göre sana **kıl
   payı** yarışacak bir rung eşlenir. Zorluk **kademeli** değişir (kayan pencere +
@@ -591,3 +601,5 @@ web sunucusuyla servis edilebilir. Canlı sürüm bu dosyaların
       ölçülmüş güç + yarış içi laf atma + karakter bazlı galibiyet; TS↔Python parite)
 - [x] Uyarlanabilir zorluk ("Bana uygun rakip": son N skorun kayan penceresi,
       boyut bazında eşleştirme, kademeli değişim; elle seçim korunur)
+- [x] Bulmaca modu (YZ üretimli + tam-arama doğrulamalı 42 bulmaca, 3 tür/7 bölüm;
+      derleme zamanı üretimi, ilerleme + en iyi derece + altın ödül + ipucu)

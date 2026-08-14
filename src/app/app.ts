@@ -14,6 +14,7 @@ import { GameView } from './components/game-view/game-view';
 import { MissionsPanel } from './components/missions-panel/missions-panel';
 import { AchievementsPanel } from './components/achievements-panel/achievements-panel';
 import { DailyPanel } from './components/daily-panel/daily-panel';
+import { PuzzlePanel } from './components/puzzle-panel/puzzle-panel';
 import { LeaderboardPanel } from './components/leaderboard-panel/leaderboard-panel';
 import { StorePanel } from './components/store-panel/store-panel';
 import { ProfilePanel } from './components/profile-panel/profile-panel';
@@ -53,6 +54,7 @@ const KEY_TO_DIRECTION: Record<string, Direction> = {
     MissionsPanel,
     AchievementsPanel,
     DailyPanel,
+    PuzzlePanel,
     LeaderboardPanel,
     StorePanel,
     ProfilePanel,
@@ -136,6 +138,18 @@ export class App {
 
   onCloseDaily(): void {
     this.dailyOpen.set(false);
+  }
+
+  // --- Bulmaca modu ------------------------------------------
+  protected readonly puzzlesOpen = signal(false);
+
+  onOpenPuzzles(): void {
+    this.closeAllPanels();
+    this.puzzlesOpen.set(true);
+  }
+
+  onClosePuzzles(): void {
+    this.puzzlesOpen.set(false);
   }
 
   /** Aynı oyun sonucunun iki kez gönderilmesini önleyen işaret. */
@@ -511,6 +525,7 @@ export class App {
     this.achievementsOpen.set(false);
     this.leaderboardOpen.set(false);
     this.dailyOpen.set(false);
+    this.puzzlesOpen.set(false);
   }
 
   /** Ayarlar panelini kapat. */

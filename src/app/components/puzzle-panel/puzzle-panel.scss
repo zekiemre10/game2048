@@ -1,0 +1,96 @@
+@use '../../../styles/variables' as v;
+
+// Bulmaca seçim paneli (chrome global _panels.scss'ten). Buradakiler özel.
+.puzzle-panel {
+  text-align: left;
+}
+
+.puzzle-progress {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin: 0.2rem 0 0.6rem;
+}
+
+.puzzle-section {
+  margin-bottom: 0.8rem;
+}
+
+.puzzle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.4rem;
+}
+
+.puzzle-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border, rgba(128, 128, 128, 0.3));
+  border-left-width: 4px;
+  background: var(--panel-bg, rgba(255, 255, 255, 0.6));
+  cursor: pointer;
+  text-align: left;
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.15s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+  }
+
+  // Tür aksan rengi
+  &.type-tile {
+    border-left-color: #6f9ceb;
+  }
+  &.type-score {
+    border-left-color: #f0b429;
+  }
+  &.type-clear {
+    border-left-color: #3fb950;
+  }
+
+  &.solved {
+    background: linear-gradient(
+      135deg,
+      rgba(63, 169, 107, 0.16),
+      var(--panel-bg, rgba(255, 255, 255, 0.6))
+    );
+  }
+}
+
+.puzzle-card-top {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.puzzle-num {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.55;
+  min-width: 1.4em;
+}
+
+.puzzle-icon {
+  font-size: 1.1rem;
+}
+
+.puzzle-tick {
+  margin-left: auto;
+  color: #2ea043;
+  font-weight: 900;
+}
+
+.puzzle-goal {
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.puzzle-best {
+  font-size: 0.7rem;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}

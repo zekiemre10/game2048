@@ -25,6 +25,7 @@ const STATS_KEY = 'game2048.stats';
 const CHARWINS_KEY = 'game2048.charwins'; // karakter bazlı yarış galibiyeti
 const RECENT_SCORES_KEY = 'game2048.recentScores'; // uyarlanabilir eşleştirme için kayan pencere
 const LAST_ADAPTIVE_KEY = 'game2048.lastAdaptive'; // son eşlenen rung (yumuşatma için)
+const PUZZLES_KEY = 'game2048.puzzles'; // bulmaca ilerlemesi (id → en iyi hamle derecesi)
 const STREAK_KEY = 'game2048.streak';
 const DAILY_KEY = 'game2048.dailyDay';
 const ACHIEVEMENTS_KEY = 'game2048.achievements';
@@ -372,6 +373,28 @@ export function loadRecentScores(): RecentScoresBlob {
 export function saveRecentScores(blob: RecentScoresBlob): void {
   try {
     localStorage?.setItem(RECENT_SCORES_KEY, JSON.stringify(blob));
+  } catch {
+    /* yoksay */
+  }
+}
+
+// --- Bulmaca ilerlemesi: id → en iyi (en az) hamle derecesi ------------------
+export type PuzzleProgressBlob = Record<string, number>;
+
+export function loadPuzzleProgress(): PuzzleProgressBlob {
+  try {
+    if (typeof localStorage === 'undefined') return {};
+    const raw = localStorage.getItem(PUZZLES_KEY);
+    const obj = raw ? JSON.parse(raw) : {};
+    return obj && typeof obj === 'object' ? obj : {};
+  } catch {
+    return {};
+  }
+}
+
+export function savePuzzleProgress(blob: PuzzleProgressBlob): void {
+  try {
+    localStorage?.setItem(PUZZLES_KEY, JSON.stringify(blob));
   } catch {
     /* yoksay */
   }

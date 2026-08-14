@@ -122,6 +122,23 @@ export class BoardStore {
     return tile;
   }
 
+  /**
+   * Hazır bir değer ızgarasını (ValueGrid) taşlara yükler (bulmaca modu için).
+   * Sıfır olmayan her hücre yeni id'li bir taş olur; boyut da ızgaradan alınır.
+   */
+  loadGrid(g: ValueGrid): void {
+    const n = g.length;
+    this.boardSize.set(n);
+    const tiles: Tile[] = [];
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        const v = g[r][c];
+        if (v > 0) tiles.push({ id: this.nextId++, value: v, row: r, col: c });
+      }
+    }
+    this.tiles.set(tiles);
+  }
+
   /** Mevcut taşları YZ için değer ızgarasına (number[][]) çevirir. */
   toValueGrid(): ValueGrid {
     const n = this.boardSize();

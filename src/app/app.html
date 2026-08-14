@@ -114,6 +114,11 @@
   <app-daily-panel (close)="onCloseDaily()" (openAuth)="onOpenAuth()" />
 }
 
+<!-- Bulmaca seçim paneli (ayrı bileşen: components/puzzle-panel) -->
+@if (puzzlesOpen()) {
+  <app-puzzle-panel (close)="onClosePuzzles()" />
+}
+
 <!-- Skor tablosu paneli (ayrı bileşen: components/leaderboard-panel) -->
 @if (leaderboardOpen()) {
   <app-leaderboard-panel
@@ -154,7 +159,15 @@
 }
 
 @if (status() === GameStatus.Idle) {
-  <app-start-screen (openAchievements)="onOpenAchievements()" (openDaily)="onOpenDaily()" />
+  <app-start-screen
+    (openAchievements)="onOpenAchievements()"
+    (openDaily)="onOpenDaily()"
+    (openPuzzles)="onOpenPuzzles()"
+  />
 } @else {
-  <app-game-view (goHome)="onGoHome()" (openMultiplayer)="onOpenMultiplayer()" />
+  <app-game-view
+    (goHome)="onGoHome()"
+    (openMultiplayer)="onOpenMultiplayer()"
+    (openPuzzles)="onOpenPuzzles()"
+  />
 }

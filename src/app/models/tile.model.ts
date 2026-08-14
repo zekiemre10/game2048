@@ -56,6 +56,8 @@ export enum GameMode {
   Race = 'race',
   /** Günlük meydan okuma: günün tohumu, sabit süre, günlük sıralama. */
   Daily = 'daily',
+  /** Bulmaca: hazır pozisyon + somut hedef, DETERMİNİSTİK (taş üretimi yok). */
+  Puzzle = 'puzzle',
 }
 
 /** Zaman Yarışı modunun süresi (saniye). */

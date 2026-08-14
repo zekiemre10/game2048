@@ -44,6 +44,21 @@
         </div>
       }
 
+      <!-- Bulmaca modu: hedef + kalan hamle + ipucu -->
+      @if (mode() === GameMode.Puzzle && currentPuzzle(); as pz) {
+        <div class="puzzle-bar">
+          <span class="puzzle-bar-goal">🧩 {{ puzzleGoal() }}</span>
+          <span class="puzzle-bar-moves" [class.low]="puzzleMovesLeft() <= 1">
+            {{ t('puzzle.movesLeft', { n: puzzleMovesLeft() }) }}
+          </span>
+          @if (status() === GameStatus.Playing) {
+            <button class="puzzle-hint-btn" type="button" (click)="onPuzzleHint()">
+              💡 {{ t('assist.ask') }}
+            </button>
+          }
+        </div>
+      }
+
       <!-- Süre ve hamle sayacı (oyun alanının üstünde) -->
       <div class="stats">
         @if (
@@ -289,7 +304,16 @@
               <!-- Başlık + alt metin (duruma göre) -->
               @switch (status()) {
                 @case (GameStatus.Won) {
-                  @if (mode() === GameMode.Level) {
+                  @if (mode() === GameMode.Puzzle) {
+                    <h2 class="overlay-title">🧩 {{ t('puzzle.solvedTitle') }}</h2>
+                    <p class="overlay-sub">
+                      {{
+                        puzzlePerfect()
+                          ? t('puzzle.perfect', { n: moves() })
+                          : t('puzzle.solvedSub', { n: moves() })
+                      }}
+                    </p>
+                  } @else if (mode() === GameMode.Level) {
                     <h2 class="overlay-title">{{ t('ov.wonAllTitle') }}</h2>
                     <p class="overlay-sub">{{ t('ov.wonAllSub') }}</p>
                   } @else {
@@ -302,10 +326,15 @@
                   <p class="overlay-sub">{{ t('ov.levelDoneSub', { x: levelTarget() }) }}</p>
                 }
                 @case (GameStatus.Failed) {
-                  <h2 class="overlay-title">{{ t('ov.failTitle') }}</h2>
-                  <p class="overlay-sub">
-                    {{ remainingSeconds() <= 0 ? t('ov.timeUp') : t('ov.noMoves') }}
-                  </p>
+                  @if (mode() === GameMode.Puzzle) {
+                    <h2 class="overlay-title">{{ t('puzzle.failTitle') }}</h2>
+                    <p class="overlay-sub">{{ t('puzzle.failSub') }}</p>
+                  } @else {
+                    <h2 class="overlay-title">{{ t('ov.failTitle') }}</h2>
+                    <p class="overlay-sub">
+                      {{ remainingSeconds() <= 0 ? t('ov.timeUp') : t('ov.noMoves') }}
+                    </p>
+                  }
                 }
                 @default {
                   <h2 class="overlay-title">
@@ -363,8 +392,8 @@
                 </div>
               }
 
-              <!-- YZ oyun sonu analizi (algoritmik) -->
-              @if (mode() !== GameMode.Race) {
+              <!-- YZ oyun sonu analizi (algoritmik) — bulmaca/yarış hariç -->
+              @if (mode() !== GameMode.Race && mode() !== GameMode.Puzzle) {
                 @if (analysisText()) {
                   <div class="overlay-analysis">{{ analysisText() }}</div>
                 } @else {
@@ -401,8 +430,8 @@
                 }
               }
 
-              <!-- Hamle zaman çizelgesi: "oyunu nerede kaybettin?" (yarış hariç) -->
-              @if (mode() !== GameMode.Race) {
+              <!-- Hamle zaman çizelgesi: "oyunu nerede kaybettin?" (yarış/bulmaca hariç) -->
+              @if (mode() !== GameMode.Race && mode() !== GameMode.Puzzle) {
                 <app-move-timeline />
               }
 
@@ -420,7 +449,7 @@
                     </button>
                   }
                   <!-- Seviye başarısız → tekrar dene -->
-                  @if (status() === GameStatus.Failed) {
+                  @if (status() === GameStatus.Failed && mode() === GameMode.Level) {
                     <button class="btn-primary" type="button" (click)="onRetryLevel()">
                       {{ t('ov.retry') }}
                     </button>
@@ -438,7 +467,14 @@
                     </button>
                   }
                   <!-- Her durumda: yeniden başla (moda uygun) -->
-                  @if (mode() === GameMode.Level) {
+                  @if (mode() === GameMode.Puzzle) {
+                    <button class="btn-primary ghost" type="button" (click)="onRestart()">
+                      {{ t('btn.restart') }}
+                    </button>
+                    <button class="btn-primary" type="button" (click)="openPuzzles.emit()">
+                      🧩 {{ t('puzzle.backToList') }}
+                    </button>
+                  } @else if (mode() === GameMode.Level) {
                     <button class="btn-primary ghost" type="button" (click)="onStartLevelMode()">
                       {{ t('btn.restart') }}
                     </button>

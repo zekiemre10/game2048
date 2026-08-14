@@ -1,0 +1,46 @@
+<div class="settings-backdrop" (click)="close.emit()">
+  <div
+    class="settings-panel puzzle-panel"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="t('puzzle.title')"
+    (click)="$event.stopPropagation()"
+  >
+    <h2 class="settings-title">🧩 {{ t('puzzle.title') }}</h2>
+    <p class="settings-note">{{ t('puzzle.intro') }}</p>
+    <p class="puzzle-progress">{{ t('puzzle.solved', { a: solvedCount(), b: total }) }}</p>
+
+    @for (sec of sections(); track sec.section) {
+      <section class="puzzle-section">
+        <h3 class="settings-heading">{{ t('puzzle.section', { n: sec.section }) }}</h3>
+        <div class="puzzle-grid">
+          @for (p of sec.list; track p.id) {
+            <button
+              type="button"
+              class="puzzle-card type-{{ p.type }}"
+              [class.solved]="isSolved(p.id)"
+              (click)="onPlay(p)"
+              [attr.aria-label]="num(p) + '. ' + goalText(p)"
+            >
+              <span class="puzzle-card-top">
+                <span class="puzzle-num">{{ num(p) }}</span>
+                <span class="puzzle-icon" aria-hidden="true">{{ icon(p) }}</span>
+                @if (isSolved(p.id)) {
+                  <span class="puzzle-tick" aria-hidden="true">✓</span>
+                }
+              </span>
+              <span class="puzzle-goal">{{ goalText(p) }}</span>
+              @if (isSolved(p.id)) {
+                <span class="puzzle-best">{{ t('puzzle.best', { n: bestMoves(p.id) ?? 0 }) }}</span>
+              }
+            </button>
+          }
+        </div>
+      </section>
+    }
+
+    <button class="btn-primary ghost settings-close" type="button" (click)="close.emit()">
+      {{ t('btn.close') }}
+    </button>
+  </div>
+</div>

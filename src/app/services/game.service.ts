@@ -13,6 +13,8 @@ import { AutoplayService } from './autoplay.service';
 import { ModesService } from './modes.service';
 import { PowerEffectsService } from './power-effects.service';
 import { CloudSyncService } from './cloud-sync.service';
+import { PuzzleService } from './puzzle.service';
+import { Puzzle } from '../logic/puzzle.model';
 import { BOARD_SIZE, Cell, Direction, GameMode, Grid, Tile } from '../models/tile.model';
 import { AiLevel, ValueGrid, pickAdaptiveRung } from '../logic/ai';
 import { PowerId } from '../models/power.model';
@@ -70,6 +72,9 @@ export class GameService {
 
   /** Güç efektleri (bomba/karıştır/ipucu/+30sn) ayrı serviste (façade). */
   private readonly effects = inject(PowerEffectsService);
+
+  /** Bulmaca modu durumu ayrı serviste (façade). */
+  private readonly puzzles = inject(PuzzleService);
 
   /** Bulut senkron köprüsü (hesap anlık görüntüsü + geri uygulama). */
   private readonly cloud = inject(CloudSyncService);
@@ -322,6 +327,35 @@ export class GameService {
   /** Seviye modunu 1. seviyeden başlatır. */
   startLevelMode(): void {
     this.modes.startLevelMode();
+  }
+
+  // --- Bulmaca modu (PuzzleService'e delege) -----------------
+
+  /** Bölümlere göre gruplanmış bulmacalar (seçim ekranı). */
+  readonly puzzleSections = this.puzzles.sections;
+  /** Anlık oynanan bulmaca (yoksa null). */
+  readonly currentPuzzle = this.puzzles.current;
+  /** Çözülen bulmaca sayısı. */
+  readonly puzzleSolvedCount = this.puzzles.solvedCount;
+  /** Toplam bulmaca sayısı. */
+  readonly puzzleTotal = this.puzzles.puzzles.length;
+
+  isPuzzleSolved(id: string): boolean {
+    return this.puzzles.isSolved(id);
+  }
+  puzzleBestMoves(id: string): number | null {
+    return this.puzzles.bestMoves(id);
+  }
+
+  /** Bir bulmacayı başlatır (hazır pozisyon + hedef). */
+  startPuzzle(p: Puzzle): void {
+    this.modes.startPuzzle(p);
+  }
+
+  /** Bulmaca ipucu iste: hedefe götüren en kısa çözümün ilk hamlesini göster. */
+  requestPuzzleHint(): void {
+    const dir = this.puzzles.hint();
+    if (dir) this.assistant.assistHintDir.set(dir);
   }
 
   /** Ana (başlık) ekrana döner. */

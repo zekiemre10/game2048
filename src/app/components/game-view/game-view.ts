@@ -93,6 +93,35 @@ export class GameView {
   /** Oyun sonu YZ (algoritmik) değerlendirme metni. */
   protected readonly analysisText = signal('');
 
+  // --- Bulmaca modu ------------------------------------------
+  /** App'in bulmaca seçim panelini açması için (overlay "Bulmacalara dön"). */
+  readonly openPuzzles = output<void>();
+
+  protected readonly currentPuzzle = this.game.currentPuzzle;
+
+  /** Bulmaca hedefinin metni (tür + hedef + bütçe). */
+  protected puzzleGoal(): string {
+    const p = this.currentPuzzle();
+    return p ? this.t('puzzle.goal.' + p.type, { n: p.moveBudget, t: p.target }) : '';
+  }
+
+  /** Kalan hamle (bütçe − yapılan). */
+  protected readonly puzzleMovesLeft = computed(() => {
+    const p = this.currentPuzzle();
+    return p ? Math.max(0, p.moveBudget - this.moves()) : 0;
+  });
+
+  /** Bulmaca çözüldü mü asgari hamlede (mükemmel)? */
+  protected readonly puzzlePerfect = computed(() => {
+    const p = this.currentPuzzle();
+    return !!p && this.status() === GameStatus.Won && this.moves() <= p.minMoves;
+  });
+
+  /** Bulmaca ipucu iste (hedefe götüren ilk hamleyi göster). */
+  onPuzzleHint(): void {
+    this.game.requestPuzzleHint();
+  }
+
   /** Kişisel LLM koç metni (istek üzerine yüklenir; yeni oyunda temizlenir). */
   protected readonly coachText = signal('');
 
@@ -111,6 +140,7 @@ export class GameView {
     () =>
       this.auth.isLoggedIn() &&
       this.mode() !== GameMode.Race &&
+      this.mode() !== GameMode.Puzzle &&
       (this.status() === GameStatus.Won ||
         this.status() === GameStatus.Lost ||
         this.status() === GameStatus.Failed ||

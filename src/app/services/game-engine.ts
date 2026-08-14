@@ -14,6 +14,7 @@ import { ProfileService } from './profile.service';
 import { AchievementsService, AchievementStats } from './achievements.service';
 import { RewardsService } from './rewards.service';
 import { PowersService } from './powers.service';
+import { PuzzleService } from './puzzle.service';
 import { loadRewardedLevels, saveRewardedLevels } from './game-storage';
 
 /** Kutlama türü — arayüz hangi sesi/mesajı göstereceğini seçer. */
@@ -21,6 +22,10 @@ export type CelebrationKind = 'win' | 'level' | 'achievement';
 
 /** Kazanma değeri. */
 const WIN_VALUE = 2048;
+
+/** Bulmaca çözme ödülü (ilk çözümde) + asgari hamlede (mükemmel) bonus. */
+const PUZZLE_GOLD = 30;
+const PUZZLE_PERFECT_BONUS = 20;
 
 /**
  * Oyun motoru: hamle akışı + oyun-sonu kuralları + skor/rekor + başarım/görev/
@@ -42,6 +47,7 @@ export class GameEngine {
   private readonly achievements = inject(AchievementsService);
   private readonly rewards = inject(RewardsService);
   private readonly powers = inject(PowersService);
+  private readonly puzzles = inject(PuzzleService);
 
   /** Son seviye tamamlamada kazanılan altın (0 → zaten alınmıştı). */
   readonly lastReward = signal<number>(0);
@@ -193,29 +199,39 @@ export class GameEngine {
     this.board.moves.update((m) => m + 1);
     this.board.tiles.set(result.tiles);
 
-    // Görev takibi: hamle + birleşme + kare hedefleri
-    this.trackMission('moves', 1);
-    const mergedTiles = result.tiles.filter((t) => t.merged);
-    if (mergedTiles.length > 0) {
-      this.trackMission('merges', mergedTiles.length);
-      const maxMerged = Math.max(...mergedTiles.map((t) => t.value));
-      if (maxMerged >= 256) this.trackMission('reach256', 1);
-      if (maxMerged >= 512) this.trackMission('reach512', 1);
-      if (maxMerged >= 1024) this.trackMission('reach1024', 1);
+    // Bulmaca modu izole edilir: taş üretimi + rekor/görev/çizelge YOK (deterministik
+    // taktik; puanı yalnızca skor-bulmacası + gösterim için güncellenir).
+    const isPuzzle = this.board.mode() === GameMode.Puzzle;
+
+    if (!isPuzzle) {
+      // Görev takibi: hamle + birleşme + kare hedefleri
+      this.trackMission('moves', 1);
+      const mergedTiles = result.tiles.filter((t) => t.merged);
+      if (mergedTiles.length > 0) {
+        this.trackMission('merges', mergedTiles.length);
+        const maxMerged = Math.max(...mergedTiles.map((t) => t.value));
+        if (maxMerged >= 256) this.trackMission('reach256', 1);
+        if (maxMerged >= 512) this.trackMission('reach512', 1);
+        if (maxMerged >= 1024) this.trackMission('reach1024', 1);
+      }
     }
 
     if (result.gained > 0) {
       this.board.score.update((s) => s + result.gained);
-      this.updateBestScore();
+      if (!isPuzzle) this.updateBestScore();
     }
 
-    this.board.spawnRandomTile(); // her geçerli hamleden sonra yeni bir kare
-    this.updateBestTile();
-
-    // Oyun sonu zaman çizelgesi: sağlık (hamle sonrası) + karar-anı tahtası.
-    this.assistant.recordTimelinePoint(preGrid, direction, review);
+    if (!isPuzzle) {
+      this.board.spawnRandomTile(); // her geçerli hamleden sonra yeni bir kare
+      this.updateBestTile();
+      // Oyun sonu zaman çizelgesi: sağlık (hamle sonrası) + karar-anı tahtası.
+      this.assistant.recordTimelinePoint(preGrid, direction, review);
+    }
 
     switch (this.board.mode()) {
+      case GameMode.Puzzle:
+        this.checkPuzzleEnd();
+        break;
       case GameMode.Level:
         this.checkLevelEnd();
         break;
@@ -226,6 +242,32 @@ export class GameEngine {
         this.checkEndlessEnd(); // Zen & Zaman Yarışı: 2048'de durmaz
     }
     return true;
+  }
+
+  /**
+   * Bulmaca modu sonu: hedef sağlandıysa ÇÖZÜLDÜ (kaydet + ilk çözümde ödül),
+   * hamle bütçesi dolduysa BAŞARISIZ (yeniden dene). PuzzleService yönetir.
+   */
+  private checkPuzzleEnd(): void {
+    if (this.puzzles.goalReached()) {
+      this.timer.stopTimer();
+      this.board.status.set(GameStatus.Won);
+      const moves = this.board.moves();
+      const { firstSolve, perfect } = this.puzzles.recordSolved(moves);
+      if (firstSolve) {
+        // İlk çözüm → altın; mükemmel derece (asgari hamle) bonus.
+        this.addGold(perfect ? PUZZLE_GOLD + PUZZLE_PERFECT_BONUS : PUZZLE_GOLD);
+      }
+      this.checkAchievements();
+      this.celebrate('win');
+      return;
+    }
+    // Hedefe ulaşılmadan bütçe doldu → başarısız (tahta da tıkanmış olabilir).
+    const budget = this.puzzles.current()?.moveBudget ?? 0;
+    if (this.board.moves() >= budget || !hasAnyMove(this.board.tiles(), this.board.boardSize())) {
+      this.timer.stopTimer();
+      this.board.status.set(GameStatus.Failed);
+    }
   }
 
   /** Klasik mod: 2048'e ulaşınca kazanma, hamle kalmayınca kaybetme. */

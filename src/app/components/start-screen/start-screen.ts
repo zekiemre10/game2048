@@ -32,6 +32,12 @@ export class StartScreen {
   /** Günlük meydan okuma kartı → App günlük panelini açar. */
   readonly openDaily = output<void>();
 
+  /** Bulmaca kartı → App bulmaca seçim panelini açar. */
+  readonly openPuzzles = output<void>();
+
+  protected readonly puzzleSolved = this.game.puzzleSolvedCount;
+  protected readonly puzzleTotal = this.game.puzzleTotal;
+
   protected readonly ACHIEVEMENTS = ACHIEVEMENTS;
   protected readonly totalCount = ACHIEVEMENTS.length;
   protected readonly unlockedCount = computed(() => this.game.unlockedAchievements().size);

@@ -9,6 +9,8 @@ import { AutoplayService } from './autoplay.service';
 import { PowersService } from './powers.service';
 import { ProfileService } from './profile.service';
 import { GameEngine } from './game-engine';
+import { PuzzleService } from './puzzle.service';
+import { Puzzle } from '../logic/puzzle.model';
 
 /**
  * Oyun modları + yaşam döngüsü: beş modun (Klasik/Zen/Zaman Yarışı/Seviye/Günlük)
@@ -27,6 +29,7 @@ export class ModesService {
   private readonly powers = inject(PowersService);
   private readonly profile = inject(ProfileService);
   private readonly engine = inject(GameEngine);
+  private readonly puzzles = inject(PuzzleService);
 
   /** Oynanan günlük meydan okumanın gün anahtarı (sonuç gönderimi için). */
   readonly dailyDay = signal<string>('');
@@ -161,6 +164,28 @@ export class ModesService {
     this.profile.reportBestLevel(this.board.level());
   }
 
+  /**
+   * Bulmaca modunu başlatır: hazır pozisyonu yükler, DETERMİNİSTİK oynatır
+   * (taş üretimi YOK — motor `move()` bulmaca modunda üretmez). Süre yukarı
+   * sayar (bilgi amaçlı); kazanma/kaybetme PuzzleService hedefine göre.
+   */
+  startPuzzle(puzzle: Puzzle): void {
+    this.autoplay.cancel();
+    this.timer.paused.set(false);
+    this.assistant.startNewGame();
+    this.puzzles.setCurrent(puzzle);
+    this.board.mode.set(GameMode.Puzzle);
+    this.board.score.set(0);
+    this.board.moves.set(0);
+    this.board.keepPlaying.set(false);
+    this.board.history.set(null);
+    this.powers.clearFx();
+    this.board.loadGrid(puzzle.grid.map((row) => row.slice())); // boyut + taşları yükle
+    this.board.status.set(GameStatus.Playing);
+    this.timer.startUp(0);
+    this.engine.registerActivity();
+  }
+
   /** Ana (başlık) ekrana döner: oyunu durdurur, durumu Idle'a alır. */
   goHome(): void {
     this.autoplay.cancel(); // ana ekrana dönerken geri yüklenecek bir şey yok
@@ -176,6 +201,12 @@ export class ModesService {
     if (this.board.mode() === GameMode.Race) return;
     if (this.board.mode() === GameMode.Daily) {
       this.startDaily();
+      return;
+    }
+    // Bulmaca: aynı bulmacayı baştan yükle.
+    if (this.board.mode() === GameMode.Puzzle) {
+      const p = this.puzzles.current();
+      if (p) this.startPuzzle(p);
       return;
     }
     if (this.board.mode() === GameMode.Level) {

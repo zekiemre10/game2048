@@ -26,6 +26,37 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'mode.timeAttackDesc': { tr: '3 dakika · en yüksek skor', en: '3 minutes · best score' },
   'mode.level': { tr: 'Seviye', en: 'Level' },
   'mode.levelDesc': { tr: 'Hedef · geri sayım', en: 'Target · countdown' },
+  'mode.puzzle': { tr: 'Bulmaca', en: 'Puzzle' },
+  'mode.puzzleDesc': { tr: 'Pozisyonu kurtar · YZ üretimli', en: 'Rescue the board · AI-made' },
+
+  // Bulmaca modu (YZ üretimli "bu pozisyonu kurtar" görevleri)
+  'puzzle.title': { tr: 'Bulmacalar', en: 'Puzzles' },
+  'puzzle.intro': {
+    tr: 'YZ üretimli, çözülebilirliği kanıtlanmış pozisyonlar. Hedefe en az hamlede ulaş!',
+    en: 'AI-generated, solvability-proven positions. Reach the goal in the fewest moves!',
+  },
+  'puzzle.solved': { tr: 'Çözülen: {a}/{b}', en: 'Solved: {a}/{b}' },
+  'puzzle.section': { tr: 'Bölüm {n}', en: 'Section {n}' },
+  'puzzle.best': { tr: 'En iyi: {n} hamle', en: 'Best: {n} moves' },
+  'puzzle.goal.tile': { tr: '{n} hamlede {t} yap', en: 'Make {t} in {n} moves' },
+  'puzzle.goal.score': { tr: '{n} hamlede {t} puan', en: 'Score {t} in {n} moves' },
+  'puzzle.goal.clear': {
+    tr: '{n} hamlede {t} boş hücre aç',
+    en: 'Open {t} empty cells in {n} moves',
+  },
+  'puzzle.movesLeft': { tr: 'Kalan: {n} hamle', en: '{n} moves left' },
+  'puzzle.solvedTitle': { tr: 'Çözüldü!', en: 'Solved!' },
+  'puzzle.solvedSub': { tr: '{n} hamlede tamamladın', en: 'Completed in {n} moves' },
+  'puzzle.perfect': {
+    tr: '⭐ Mükemmel — {n} hamle (asgari)!',
+    en: '⭐ Perfect — {n} moves (optimal)!',
+  },
+  'puzzle.failTitle': { tr: 'Çözülemedi', en: 'Not solved' },
+  'puzzle.failSub': {
+    tr: 'Hamle bütçesi doldu. Baştan dene — bir çözümü mutlaka var.',
+    en: 'Out of moves. Try again — a solution definitely exists.',
+  },
+  'puzzle.backToList': { tr: 'Bulmacalar', en: 'Puzzles' },
   'start.totalGold': { tr: '💰 Toplam altın:', en: '💰 Total gold:' },
   'start.bestLevel': { tr: '🏅 Ulaşılan en yüksek seviye:', en: '🏅 Highest level reached:' },
   'start.hint': {

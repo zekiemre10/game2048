@@ -53,6 +53,11 @@
           <span class="mode-name">{{ t('mode.level') }}</span>
           <span class="mode-desc">{{ t('mode.levelDesc') }}</span>
         </button>
+        <button class="mode-card puzzle" type="button" (click)="openPuzzles.emit()">
+          <span class="mode-icon">🧩</span>
+          <span class="mode-name">{{ t('mode.puzzle') }}</span>
+          <span class="mode-desc">{{ t('mode.puzzleDesc') }}</span>
+        </button>
       </div>
 
       <!-- Günlük meydan okuma: herkes aynı tahtayı oynar -->

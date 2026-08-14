@@ -145,6 +145,13 @@ export class MultiplayerPanel {
     if (!r.ok) this.mpError.set(`mp.err.${r.error}`);
   }
 
+  /** "Bana uygun rakip": son performansa göre eşlenen botu ekle (host). */
+  async onAddMatchedBot(): Promise<void> {
+    this.mpError.set('');
+    const r = await this.mp.addMatchedBot();
+    if (!r.ok) this.mpError.set(`mp.err.${r.error}`);
+  }
+
   /** Botu çıkar (host). */
   async onRemoveBot(botId: number): Promise<void> {
     await this.mp.removeBot(botId);

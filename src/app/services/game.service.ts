@@ -14,7 +14,7 @@ import { ModesService } from './modes.service';
 import { PowerEffectsService } from './power-effects.service';
 import { CloudSyncService } from './cloud-sync.service';
 import { BOARD_SIZE, Cell, Direction, GameMode, Grid, Tile } from '../models/tile.model';
-import { AiLevel, ValueGrid } from '../logic/ai';
+import { AiLevel, ValueGrid, pickAdaptiveRung } from '../logic/ai';
 import { PowerId } from '../models/power.model';
 import { MissionMetric } from '../models/mission.model';
 
@@ -162,6 +162,23 @@ export class GameService {
   /** Bir çok oyunculu yarış bitince karakter sonuçlarını işler. */
   recordCharacterResults(results: { id: string; beaten: boolean }[]): void {
     this.profile.recordCharacterResults(results);
+  }
+
+  /**
+   * "Bana uygun rakip": verilen tahta boyutundaki son performansa göre bota bir
+   * rung (mevcut kademe/karakter anahtarı) seçer. Yumuşatma için son eşlenen
+   * rung dikkate alınır (tek oyundan sonra sert sıçrama olmaz).
+   */
+  matchedRung(size: number): string {
+    return pickAdaptiveRung(
+      this.profile.recentAvg(size),
+      this.profile.lastAdaptiveKey() || undefined,
+    );
+  }
+
+  /** Seçilen uyarlanabilir rung'ı kalıcılaştırır (bir sonraki eşleşmede yumuşatma). */
+  commitAdaptiveKey(key: string): void {
+    this.profile.setLastAdaptiveKey(key);
   }
 
   /** Bugün günlük ödül alınabilir mi? (RewardsService'te) */

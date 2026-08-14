@@ -2,23 +2,31 @@ import { Injectable, computed, signal } from '@angular/core';
 import {
   AVATARS,
   CharacterWinsBlob,
+  RecentScoresBlob,
   loadAvatar,
   loadBestLevel,
   loadBestScore,
   loadChampionships,
   loadCharacterWins,
+  loadLastAdaptive,
   loadName,
   loadPrefsAt,
+  loadRecentScores,
   loadStat,
   saveAvatar,
   saveBestLevel,
   saveBestScore,
   saveChampionships,
   saveCharacterWins,
+  saveLastAdaptive,
   saveName,
   savePrefsAt,
+  saveRecentScores,
   saveStats,
 } from './game-storage';
+
+/** Uyarlanabilir eşleştirme için tutulan son oyun sayısı (kayan pencere). */
+const RECENT_WINDOW = 5;
 
 /**
  * Oyuncu profili: kimlik (ad/avatar/şampiyonluk), rekorlar (en yüksek skor/
@@ -58,6 +66,41 @@ export class ProfileService {
 
   /** Karakter bazlı yarış galibiyeti (id → {faced, beaten}). Cihaz-yerel. */
   readonly characterWins = signal<CharacterWinsBlob>(loadCharacterWins());
+
+  // --- Uyarlanabilir eşleştirme (kayan pencere + son rung) ---
+  /** Tahta boyutuna göre son oyun skorları (kayan pencere). Cihaz-yerel. */
+  readonly recentScores = signal<RecentScoresBlob>(loadRecentScores());
+  /** Son eşlenen uyarlanabilir rung anahtarı (basamak yumuşatması için). */
+  readonly lastAdaptiveKey = signal<string>(loadLastAdaptive());
+
+  /**
+   * Bir oyun bitince skoru boyut penceresine ekler (en fazla RECENT_WINDOW).
+   * Yarış + YZ oynanan oyunlar HARİÇ (oyuncu becerisini yansıtmalı). Boyut,
+   * skoru çok etkilediği için ayrı tutulur.
+   */
+  recordRecentScore(size: number, score: number): void {
+    if (score <= 0) return;
+    const key = String(size);
+    this.recentScores.update((prev) => {
+      const list = [...(prev[key] ?? []), score].slice(-RECENT_WINDOW);
+      const next = { ...prev, [key]: list };
+      saveRecentScores(next);
+      return next;
+    });
+  }
+
+  /** Bir tahta boyutundaki son oyunların ortalama skoru (yoksa 0). */
+  recentAvg(size: number): number {
+    const list = this.recentScores()[String(size)] ?? [];
+    if (!list.length) return 0;
+    return Math.round(list.reduce((a, b) => a + b, 0) / list.length);
+  }
+
+  /** Son eşlenen rung'ı kaydeder (yumuşatma bir sonraki eşleşmede kullanır). */
+  setLastAdaptiveKey(key: string): void {
+    this.lastAdaptiveKey.set(key);
+    saveLastAdaptive(key);
+  }
 
   /**
    * Bir yarış bitince karakter sonuçlarını işler: her karşılaşılan karakterin

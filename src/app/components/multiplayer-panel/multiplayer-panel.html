@@ -90,6 +90,13 @@
       @if (room.status === 'lobby' && mpIsHost()) {
         <div class="mp-addbots">
           <span class="mp-addbots-label">{{ t('mp.addBot') }}</span>
+
+          <!-- Uyarlanabilir: son performansa göre eşlenen rakip (elle seçimin yanı sıra) -->
+          <button type="button" class="mp-matchedbot" (click)="onAddMatchedBot()">
+            <span class="mp-matchedbot-title">🎯 {{ t('mp.matchedBot') }}</span>
+            <span class="mp-matchedbot-desc">{{ t('mp.matchedBotDesc') }}</span>
+          </button>
+
           <div class="mp-botchars">
             @for (ch of characters; track ch.id) {
               <button

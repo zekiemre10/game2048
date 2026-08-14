@@ -64,6 +64,12 @@ bu tek motordan gelir:
   edilemez), insanla **aynı tohumlu** diziyi oynar; yarışta kişilikli **laf atar**
   (TR/EN). Karakter bazlı galibiyetin profilde tutulur. (İç zorluk kademeleri
   Kolay/Orta/Zor/Uzman ipucu + YZ gösterimi için korunur.)
+- 🎯 **Bana uygun rakip** — elle seçimin yanında **uyarlanabilir** bir seçenek:
+  son N oyunundaki (tahta **boyutu bazında**) ortalama skoruna göre sana **kıl
+  payı** yarışacak bir rung eşlenir. Zorluk **kademeli** değişir (kayan pencere +
+  tek basamak sınırı → tek oyundan sonra sıçramaz); üst üste kayıplarda gözle
+  görülür kolaylaşır. Eşleme ölçülen güç merdivenine oturur
+  (`scripts/adaptive-ladder-bench.mjs`), yeni oyuncuya makul bir başlangıç verir.
 - ✨ **Hamle kalitesi** — her hamlen YZ'nin seçimiyle kıyaslanır: _Mükemmel · İyi ·
   Daha iyisi vardı (↑)_ — oyun sonunda **doğruluk yüzdesi** özeti
 - 🟢 **Canlı pozisyon göstergesi** — tahtanın sağlığı (İyi / Riskli / Tehlikeli);
@@ -583,3 +589,5 @@ web sunucusuyla servis edilebilir. Canlı sürüm bu dosyaların
       sunucuda; maliyet sınırlı; sunucu/anahtar yoksa şablon analize düşer)
 - [x] Bot karakterleri (isimli rakipler: Köşeci/Dengeli/Alan Açan/Acelesi Var;
       ölçülmüş güç + yarış içi laf atma + karakter bazlı galibiyet; TS↔Python parite)
+- [x] Uyarlanabilir zorluk ("Bana uygun rakip": son N skorun kayan penceresi,
+      boyut bazında eşleştirme, kademeli değişim; elle seçim korunur)

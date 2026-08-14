@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { API_BASE, AuthService } from './auth.service';
 import { GameService } from './game.service';
-import { GameMode, GameStatus } from '../models/tile.model';
+import { BOARD_SIZE, GameMode, GameStatus } from '../models/tile.model';
 import { AiLevel, BotCharacterId, isAiLevel, isBotCharacter } from '../logic/ai';
 
 // ============================================================
@@ -130,6 +130,23 @@ export class MultiplayerService {
   async addBotCharacter(character: BotCharacterId): Promise<MpResult> {
     if (!isBotCharacter(character)) return { ok: false, error: 'invalid_character' };
     return this.botAction('/rooms/addbot', { character });
+  }
+
+  /**
+   * "Bana uygun rakip": oyuncunun 4×4 son performansına göre EŞLENEN bir bot
+   * ekler (uyarlanabilir zorluk). Eşlenen rung mevcut bir kademe/karakter
+   * anahtarıdır → sunucu zaten çözer. Başarılıysa yumuşatma için kaydedilir.
+   * Yarış her zaman 4×4 olduğundan eşleştirme 4×4 penceresini kullanır.
+   */
+  async addMatchedBot(): Promise<MpResult> {
+    const key = this.game.matchedRung(BOARD_SIZE);
+    const r = isBotCharacter(key)
+      ? await this.addBotCharacter(key)
+      : isAiLevel(key)
+        ? await this.addBot(key)
+        : await this.addBot('medium');
+    if (r.ok) this.game.commitAdaptiveKey(key);
+    return r;
   }
 
   /** Botu çıkar (host, lobide). */

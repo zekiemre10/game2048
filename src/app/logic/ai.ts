@@ -768,6 +768,73 @@ export function playBotGameByKey(seed: number, key: string, maxMoves: number): B
   return playBotGameCfg(seed, resolveBotConfig(key), maxMoves);
 }
 
+// --- Uyarlanabilir zorluk: "Bana uygun rakip" --------------------
+//
+// Oyuncuyu her zaman KIL PAYI yarışacağı bir rakiple eşleştirir. Rung'lar MEVCUT
+// anahtarlardır (kademe/karakter — sunucu zaten çözer, yeni config/parite YOK).
+// Güçler scripts/adaptive-ladder-bench.mjs ile 4×4 yarış yolunda ÖLÇÜLÜR.
+//
+// NOT (granülerlik): derinlik-1 ~3.5k'da, derinlik-2 tabanı ~13-19k'da olduğundan
+// düşük-orta (3.5k↔19k) aralığı seyrektir — bu, kalibrasyonun kapatması gereken
+// yapısal bir boşluktur (bkz. ticket). Eşleme yine EN YAKIN rung'ı seçer.
+
+/** Bir uyarlanabilir merdiven basamağı: anahtar + ölçülen ort. skor. */
+export interface AdaptiveRung {
+  key: string;
+  avg: number;
+}
+
+/** Artan güç sıralı merdiven (yinelenen güçler ayıklandı). */
+export const ADAPTIVE_LADDER: readonly AdaptiveRung[] = [
+  { key: 'hasty', avg: 3472 },
+  { key: 'medium', avg: 18843 },
+  { key: 'space', avg: 24232 },
+  { key: 'balanced', avg: 32231 },
+  { key: 'corner', avg: 41500 },
+  { key: 'expert', avg: 60946 },
+];
+
+/** Yeni oyuncu (geçmiş yok) için makul başlangıç basamağı (orta-alt). */
+const ADAPTIVE_START_INDEX = 1; // 'medium' (~18.8k)
+/** Hedef, oyuncu ortalamasının biraz ÜSTÜ (kıl payı ama hafif zorlayıcı). */
+const ADAPTIVE_TARGET_MULT = 1.1;
+
+/** Bir basamağı en çok ±1 kaydırır (tek oyundan sonra sert sıçrama olmasın). */
+function clampAdaptiveStep(targetIdx: number, prevKey?: string): number {
+  const n = ADAPTIVE_LADDER.length;
+  const t = Math.max(0, Math.min(n - 1, targetIdx));
+  if (!prevKey) return t;
+  const prevIdx = ADAPTIVE_LADDER.findIndex((r) => r.key === prevKey);
+  if (prevIdx < 0) return t; // önceki basamak merdivende değil → doğrudan hedef
+  if (t > prevIdx) return Math.min(prevIdx + 1, t);
+  if (t < prevIdx) return Math.max(prevIdx - 1, t);
+  return prevIdx;
+}
+
+/**
+ * Oyuncunun son-N ORTALAMA skoruna göre bota bir rung seçer (saf fonksiyon).
+ *  - recentAvg ≤ 0 (geçmiş yok) → makul başlangıç.
+ *  - hedef = recentAvg × 1.1; merdivende ölçülen skoru en yakın rung.
+ *  - YUMUŞATMA: prevKey verilirse yeni basamak ondan en çok ±1 uzaklaşır.
+ * Dönen: rung anahtarı (mevcut kademe/karakter anahtarı).
+ */
+export function pickAdaptiveRung(recentAvg: number, prevKey?: string): string {
+  if (!(recentAvg > 0)) {
+    return ADAPTIVE_LADDER[clampAdaptiveStep(ADAPTIVE_START_INDEX, prevKey)].key;
+  }
+  const target = recentAvg * ADAPTIVE_TARGET_MULT;
+  let best = 0;
+  let bestDiff = Infinity;
+  for (let i = 0; i < ADAPTIVE_LADDER.length; i++) {
+    const d = Math.abs(ADAPTIVE_LADDER[i].avg - target);
+    if (d < bestDiff) {
+      bestDiff = d;
+      best = i;
+    }
+  }
+  return ADAPTIVE_LADDER[clampAdaptiveStep(best, prevKey)].key;
+}
+
 // --- Hamle kalitesi -----------------------------------------
 
 /** Oynanan hamlenin YZ'ye göre kalitesi. */

@@ -133,6 +133,11 @@ export class GameEngine {
   recordGameEnd(won: boolean): void {
     if (this.assistant.aiPlayed()) return; // YZ oynadıysa ilerleme sayılmaz
     this.profile.recordGame(won, this.board.moves());
+    // Uyarlanabilir eşleştirme için skoru kayan pencereye ekle (boyut bazında).
+    // Yarış HARİÇ: yarış eşleştirmenin KENDİSİdir → geri besleme döngüsü olmasın.
+    if (this.board.mode() !== GameMode.Race) {
+      this.profile.recordRecentScore(this.board.boardSize(), this.board.score());
+    }
     this.checkAchievements();
     this.trackMission('games', 1);
     if (won) this.trackMission('wins', 1);

@@ -459,6 +459,11 @@ const DICT: Record<string, { tr: string; en: string }> = {
   'mp.host': { tr: 'kurucu', en: 'host' },
   'mp.waiting': { tr: 'Kurucunun başlatması bekleniyor…', en: 'Waiting for host to start…' },
   'mp.addBot': { tr: '🤖 Bot Ekle', en: '🤖 Add Bot' },
+  'mp.matchedBot': { tr: 'Bana uygun rakip', en: 'Matched opponent' },
+  'mp.matchedBotDesc': {
+    tr: 'Son oyunlarına göre ayarlanır — kıl payı yarış',
+    en: 'Tuned to your recent games — a close race',
+  },
   'mp.botEasy': { tr: 'Kolay', en: 'Easy' },
   'mp.botMedium': { tr: 'Orta', en: 'Medium' },
   'mp.botHard': { tr: 'Zor', en: 'Hard' },

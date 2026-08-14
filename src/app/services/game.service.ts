@@ -8,6 +8,7 @@ import { PowersService } from './powers.service';
 import { BoardStore, GameSnapshot } from './board-store';
 import { TimerService } from './timer.service';
 import { ASSIST_HINT_QUOTA, AssistantStore } from './assistant-store';
+import { GameEngine } from './game-engine';
 import {
   BOARD_SIZE,
   Cell,
@@ -18,17 +19,16 @@ import {
   TIME_ATTACK_SECONDS,
   Tile,
 } from '../models/tile.model';
-import { applyMove, hasAnyMove } from '../logic/board-logic';
+import { hasAnyMove } from '../logic/board-logic';
 import { AiLevel, ValueGrid, bestMove } from '../logic/ai';
-import { rankFor, rankPoints } from '../logic/rank';
 import { DAILY_DURATION, dailySeed, utcDayKey } from '../logic/daily-challenge';
-
-/** Kutlama türü — arayüz hangi sesi/mesajı göstereceğini seçer. */
-export type CelebrationKind = 'win' | 'level' | 'achievement';
 import { MAX_LEVEL, levelConfig } from '../models/level.model';
 import { PowerId } from '../models/power.model';
-import { MissionMetric, MissionProgress } from '../models/mission.model';
-import { AVATARS, loadRewardedLevels, saveRewardedLevels } from './game-storage';
+import { MissionMetric } from '../models/mission.model';
+import { AVATARS } from './game-storage';
+
+/** Kutlama türü — GameEngine'de tanımlı; eski içe aktarımlar için yeniden dışa aç. */
+export type { CelebrationKind } from './game-engine';
 
 /** Avatar listesi kalıcılık katmanında; eski içe aktarımlar için yeniden dışa aç. */
 export { AVATARS } from './game-storage';
@@ -88,6 +88,9 @@ export class GameService {
   /** YZ asistanı durumu ayrı serviste (değerlendirme/sağlık/öneri/bayraklar). */
   private readonly assistant = inject(AssistantStore);
 
+  /** Oyun motoru: hamle akışı + oyun-sonu + skor/başarım/görev/ödül orkestrasyonu. */
+  private readonly engine = inject(GameEngine);
+
   // --- Durum sinyalleri (BoardStore'da; buradan delege) -------
 
   /** Tahtadaki taşların listesi (kaynak gerçeği). */
@@ -124,11 +127,8 @@ export class GameService {
   /** Bugüne kadar kazanılan toplam altın (EconomyService'te). */
   readonly totalGoldEarned = this.economy.totalGoldEarned;
 
-  /** Ödülü zaten alınmış seviyeler (tekrar tamamlamada altın verilmez). */
-  private readonly rewardedLevels = new Set<number>(loadRewardedLevels());
-
-  /** Son seviye tamamlamada kazanılan altın (0 → zaten alınmıştı). */
-  readonly lastReward = signal<number>(0);
+  /** Son seviye tamamlamada kazanılan altın (GameEngine'de). */
+  readonly lastReward = this.engine.lastReward;
 
   /** Güç envanteri (PowersService'te; API sabit kalsın diye delege). */
   readonly powers = this.powersSvc.inventory;
@@ -224,7 +224,7 @@ export class GameService {
   constructor() {
     this.missions.ensureFresh();
     // Geri sayım bitince oyun-sonu kararını çekirdek verir (döngüsüz geri çağrı).
-    this.timer.onExpire = () => this.onCountdownExpire();
+    this.timer.onExpire = () => this.engine.onCountdownExpire();
   }
 
   // --- Fabrika / kurulum fonksiyonları ------------------------
@@ -366,17 +366,8 @@ export class GameService {
 
   // --- Kutlama (ses + konfeti tetikleyici) --------------------
 
-  /**
-   * Kutlama olayı: her yeni başarı anında `id` artar; arayüz bunu izleyip
-   * konfeti + ses oynatır. YZ oynadıysa kutlama YOK (gerçek başarı değil).
-   */
-  readonly celebration = signal<{ id: number; kind: CelebrationKind } | null>(null);
-  private celebrationId = 0;
-
-  private celebrate(kind: CelebrationKind): void {
-    if (this.aiPlayed()) return;
-    this.celebration.set({ id: ++this.celebrationId, kind });
-  }
+  /** Kutlama olayı (GameEngine tetikler; arayüz konfeti + ses için izler). */
+  readonly celebration = this.engine.celebration;
 
   private autoplayTimer: ReturnType<typeof setTimeout> | null = null;
   private autoplayLevel: AiLevel = 'expert';
@@ -686,16 +677,14 @@ export class GameService {
 
   // --- Altın ekonomisi ----------------------------------------
 
-  /** Altın ekler (kazanç sayılır → toplam kazanç + görev). Altın durumu EconomyService'te. */
+  /** Altın ekler (kazanç → toplam kazanç + görev) — GameEngine. */
   addGold(amount: number): void {
-    if (amount <= 0) return;
-    this.economy.add(amount);
-    this.trackMission('gold', amount); // görev: altın kazan (orkestrasyon çekirdekte)
+    this.engine.addGold(amount);
   }
 
   /** Altın harcar. Yeterli değilse harcamaz. @returns başarılıysa true. */
   spendGold(amount: number): boolean {
-    return this.economy.spend(amount);
+    return this.engine.spendGold(amount);
   }
 
   // --- Güçler (mağaza + kullanım) -----------------------------
@@ -940,24 +929,12 @@ export class GameService {
    * ilerletir); ardından seri-başarımlarını kontrol eder (orkestrasyon).
    */
   private registerActivity(): void {
-    this.rewards.registerActivity();
-    this.checkAchievements();
+    this.engine.registerActivity();
   }
 
-  /**
-   * Günlük ödülü alır (günde bir kez). Seri + ödül durumunu RewardsService
-   * işler; altın/güç envantere ekleme, seri-başarımı ve kutlama çekirdekte.
-   * @returns ödül alındıysa true.
-   */
+  /** Günlük ödülü alır (günde bir kez) — GameEngine. */
   claimDailyReward(): boolean {
-    const reward = this.rewards.claimDaily();
-    if (!reward) return false; // bugün alınmış
-
-    this.checkAchievements(); // seri güncellendi → seri başarımları
-    if (reward.gold > 0) this.addGold(reward.gold);
-    if (reward.power) this.powersSvc.add(reward.power, reward.powerCount);
-    this.celebrate('achievement'); // ödül alındı 🎉
-    return true;
+    return this.engine.claimDailyReward();
   }
 
   /** Bugün alınan ödülün ayrıntısı (RewardsService'te). */
@@ -969,14 +946,7 @@ export class GameService {
    * altın ve güçler eklenir (ardından bulut senkronu devreye girer).
    */
   grantChampionPrize(gold: number, powers: Record<string, number>): void {
-    if (gold > 0) this.addGold(gold);
-    const inv = this.powers();
-    for (const [id, count] of Object.entries(powers ?? {})) {
-      if (id in inv && typeof count === 'number' && count > 0) {
-        this.powersSvc.add(id as PowerId, count);
-      }
-    }
-    this.profile.addChampionship();
+    this.engine.grantChampionPrize(gold, powers);
   }
 
   /** Kazanılan ay sonu şampiyonluğu sayısı (ProfileService'te). */
@@ -992,234 +962,37 @@ export class GameService {
   /** 7 günlük ödül takvimi (RewardsService'te). */
   readonly rewardCalendar = this.rewards.rewardCalendar;
 
-  /** Oyun sonunda istatistikleri günceller (istatistik ProfileService'te). */
+  /** Oyun sonu istatistik güncellemesi (GameEngine; güç efektleri kullanır). */
   private recordGameEnd(won: boolean): void {
-    if (this.aiPlayed()) return; // YZ oynadıysa ilerleme sayılmaz
-    this.profile.recordGame(won, this.moves());
-    this.checkAchievements();
-    this.trackMission('games', 1);
-    if (won) this.trackMission('wins', 1);
+    this.engine.recordGameEnd(won);
   }
 
-  /** Tahtadaki en yüksek kareyi izler (başarım için). */
-  private updateBestTile(): void {
-    if (this.aiPlayed()) return; // YZ oynadıysa istatistik sayılmaz
-    let max = this.bestTile();
-    for (const t of this.tiles()) if (t.value > max) max = t.value;
-    if (this.profile.reportBestTile(max)) this.checkAchievements();
-  }
-
-  /**
-   * Bir başarımın ilerlemesi: `{ current, target }`.
-   * Profilde "ne kadar yaklaştım" çubuğunu çizmek için kullanılır;
-   * kilitli başarımlar artık sadece gri bir kutu değil.
-   */
+  /** Bir başarımın ilerlemesi: `{ current, target }` — GameEngine. */
   achievementProgress(id: string): { current: number; target: number } {
-    return this.achievements.progress(id, this.achStats());
+    return this.engine.achievementProgress(id);
   }
 
-  /** Başarım koşullarının okuduğu anlık ilerleme görüntüsü (profil+ekonomi+seri). */
-  private achStats(): AchievementStats {
-    return {
-      bestTile: this.bestTile(),
-      bestLevel: this.bestLevel(),
-      gamesPlayed: this.gamesPlayed(),
-      bestStreak: this.bestStreak(),
-      bombUsed: this.profile.bombUsed(),
-      totalGoldEarned: this.totalGoldEarned(),
-    };
-  }
+  /** Oyuncu ünvanı (GameEngine'de). */
+  readonly rankInfo = this.engine.rankInfo;
 
-  /** Oyuncu ünvanı: toplam ilerlemeyi tek bir rütbeye indirger. */
-  readonly rankInfo = computed(() =>
-    rankFor(
-      rankPoints({
-        gamesPlayed: this.gamesPlayed(),
-        bestScore: this.bestScore(),
-        bestLevel: this.bestLevel(),
-        achievements: this.unlockedAchievements().size,
-      }),
-    ),
-  );
-
-  /**
-   * Koşulu sağlanan yeni başarımları açar (AchievementsService) ve ödül altınını
-   * verip kutlamayı tetikler (orkestrasyon çekirdekte). Altın ödülü ayrıca "altın
-   * kazan" görevini de ilerletir (addGold davranışı korunur).
-   */
+  /** Yeni başarımları açar + ödül/kutlama (GameEngine; güç efektleri kullanır). */
   private checkAchievements(): void {
-    const newly = this.achievements.unlockNew(this.achStats());
-    if (newly.length === 0) return;
-    for (const a of newly) this.addGold(a.gold);
-    this.celebrate('achievement'); // yeni başarım açıldı 🎉
+    this.engine.checkAchievements();
   }
 
-  // --- Görevler (façade → MissionsService) --------------------
-
-  /**
-   * Bir metrik için görev ilerlemesini bildirir. YZ oynadıysa (`aiPlayed`)
-   * ilerleme sayılmaz — bu bayrağı MissionsService'e çekirdek geçer.
-   */
+  /** Bir metrik için görev ilerlemesini bildirir (GameEngine; güç efektleri kullanır). */
   private trackMission(metric: MissionMetric, amount: number): void {
-    this.missions.track(metric, amount, this.aiPlayed());
+    this.engine.trackMission(metric, amount);
   }
 
-  /** Tamamlanmış bir görevin ödülünü alır. */
+  /** Tamamlanmış bir görevin ödülünü alır — GameEngine. */
   claimMission(id: string, type: 'daily' | 'weekly'): boolean {
-    return this.missions.claim(id, type, this.aiPlayed());
+    return this.engine.claimMission(id, type);
   }
 
-  /**
-   * Verilen yöne hamle yapar.
-   * - Izgara değişmediyse (geçersiz hamle) hiçbir şey yapmaz, yeni kare üretmez.
-   * - Değiştiyse: skoru günceller ve yeni bir rastgele kare ekler.
-   * @returns hamle geçerli olduysa true.
-   */
+  /** Verilen yöne hamle yapar — GameEngine. */
   move(direction: Direction): boolean {
-    if (this.status() !== GameStatus.Playing) return false;
-
-    const result = applyMove(this.tiles(), direction, this.boardSize());
-    if (!result.moved) return false; // geçersiz hamle → sayaç ARTMAZ
-
-    // Doğrulama transkriptine ekle (yalnızca UYGULANAN hamleler).
-    // Sunucu bu diziyi yeniden oynatıp skoru kendisi hesaplar.
-    this.board.recordMove(direction);
-
-    // Hamle kalitesi: YALNIZCA insan hamleleri, asistan açıkken ve tahta
-    // henüz DEĞİŞMEDEN değerlendirilir (kıyas hamle öncesi pozisyona göre).
-    this.assistant.recordReview(direction);
-
-    this.assistHintDir.set(null); // öneri yalnızca gösterildiği tahta içindi
-
-    // Geçerli hamle → hamle ÖNCESİ durumu sakla (geri al için).
-    // applyMove saf olduğundan this.tiles() hâlâ hamle öncesi listedir.
-    // NOT: anlık görüntü hamle sayacı ARTMADAN alınır, böylece geri alınca
-    // sayaç da doğru değere döner (istatistik şişmesi olmaz).
-    this.history.set({
-      tiles: this.tiles(),
-      score: this.score(),
-      moves: this.moves(),
-      status: this.status(),
-      keepPlayingAfterWin: this.board.keepPlaying(),
-    });
-
-    // Geçerli hamle → hamle sayısını artır.
-    this.moves.update((m) => m + 1);
-
-    // Yeni durum (birleşenlerde `merged` işaretli; `isNew` temizlenmiş olur)
-    this.tiles.set(result.tiles);
-
-    // Görev takibi: hamle + birleşme + kare hedefleri
-    this.trackMission('moves', 1);
-    const mergedTiles = result.tiles.filter((t) => t.merged);
-    if (mergedTiles.length > 0) {
-      this.trackMission('merges', mergedTiles.length);
-      const maxMerged = Math.max(...mergedTiles.map((t) => t.value));
-      if (maxMerged >= 256) this.trackMission('reach256', 1);
-      if (maxMerged >= 512) this.trackMission('reach512', 1);
-      if (maxMerged >= 1024) this.trackMission('reach1024', 1);
-    }
-
-    if (result.gained > 0) {
-      this.score.update((s) => s + result.gained);
-      this.updateBestScore();
-    }
-
-    // Her geçerli hamleden sonra yeni bir kare
-    this.spawnRandomTile();
-    this.updateBestTile(); // en yüksek kare istatistiği
-
-    switch (this.mode()) {
-      case GameMode.Level:
-        this.checkLevelEnd();
-        break;
-      case GameMode.Classic:
-        this.checkClassicEnd();
-        break;
-      // Zen & Zaman Yarışı: 2048'de durmaz; sadece hamle kalmayınca biter.
-      // (Zaman Yarışı'nda süre dolması geri sayım içinde yönetilir.)
-      default:
-        this.checkEndlessEnd();
-    }
-
-    return true;
-  }
-
-  /** Klasik mod: 2048'e ulaşınca kazanma, hamle kalmayınca kaybetme. */
-  private checkClassicEnd(): void {
-    if (!this.board.keepPlaying() && this.tiles().some((t) => t.value >= WIN_VALUE)) {
-      this.stopTimer(); // süre "tamamlama" anında donar
-      this.status.set(GameStatus.Won);
-      this.recordGameEnd(true);
-      this.celebrate('win'); // 2048'e ulaşıldı 🎉
-      return;
-    }
-    if (!hasAnyMove(this.tiles(), this.boardSize())) {
-      this.stopTimer();
-      this.status.set(GameStatus.Lost);
-      this.recordGameEnd(false);
-    }
-  }
-
-  /** Zen / Zaman Yarışı: kazanma yok; hamle kalmayınca oyun biter. */
-  private checkEndlessEnd(): void {
-    if (!hasAnyMove(this.tiles(), this.boardSize())) {
-      this.stopTimer();
-      this.status.set(GameStatus.Lost);
-      this.recordGameEnd(false);
-    }
-  }
-
-  /**
-   * Seviye modu:
-   * - Hedefe ulaşıldıysa → seviye tamamlandı (son seviyeyse tüm oyun kazanıldı).
-   * - Hamle kalmadıysa → başarısız (süre dolması sayaç içinde yönetilir).
-   */
-  private checkLevelEnd(): void {
-    if (this.tiles().some((t) => t.value >= this.levelTarget())) {
-      this.stopTimer();
-      // Ödül YALNIZCA ilk tamamlamada verilir; görev de yalnızca o zaman
-      // ilerler (aynı seviyeyi tekrar bitirip görev çiftlemek engellenir).
-      const firstTime = this.awardGold(this.level());
-      if (firstTime) this.trackMission('levels', 1); // görev: seviye tamamla
-      if (this.level() >= MAX_LEVEL) {
-        this.status.set(GameStatus.Won);
-        this.recordGameEnd(true); // tüm seviyeler bitti = kazanılmış oyun
-        this.celebrate('win'); // tüm seviyeler tamamlandı 🎉
-      } else {
-        this.status.set(GameStatus.LevelComplete);
-        this.celebrate('level'); // seviye geçildi 🎉
-      }
-      return;
-    }
-    if (!hasAnyMove(this.tiles(), this.boardSize())) {
-      this.stopTimer();
-      this.status.set(GameStatus.Failed); // Başarısız → altın YOK
-      this.recordGameEnd(false);
-    }
-  }
-
-  /**
-   * Seviye tamamlanınca altın verir.
-   * KURAL: Her seviyenin ödülü YALNIZCA İLK tamamlamada verilir.
-   * Aynı seviye tekrar tamamlanırsa altın verilmez (farming önlenir).
-   * `lastReward` = bu tamamlamada kazanılan altın (0 → zaten alınmıştı).
-   */
-  private awardGold(level: number): boolean {
-    if (this.aiPlayed()) {
-      this.lastReward.set(0); // YZ oynadıysa altın verilmez
-      return false;
-    }
-    const reward = levelConfig(level).gold;
-    if (this.rewardedLevels.has(level)) {
-      this.lastReward.set(0); // ödül zaten alınmış
-      return false;
-    }
-    this.rewardedLevels.add(level);
-    this.addGold(reward);
-    this.lastReward.set(reward);
-    saveRewardedLevels(this.rewardedLevels);
-    return true;
+    return this.engine.move(direction);
   }
 
   // --- Süre sayacı (TimerService'e delege) --------------------
@@ -1234,18 +1007,6 @@ export class GameService {
 
   private stopTimer(): void {
     this.timer.stopTimer();
-  }
-
-  /** Geri sayım bittiğinde (TimerService çağırır): moda göre oyun-sonu. */
-  private onCountdownExpire(): void {
-    // Seviye modunda başarısız; Zaman Yarışı'nda oyun biter (skor kalır).
-    if (this.mode() === GameMode.Level) {
-      this.status.set(GameStatus.Failed);
-    } else {
-      this.status.set(GameStatus.Lost);
-    }
-    // Süreden kaybetmek de oynanmış bir oyundur: istatistik/görev sayılır.
-    this.recordGameEnd(false);
   }
 
   // --- Duraklat / Devam (TimerService'e delege) ---------------
@@ -1275,11 +1036,5 @@ export class GameService {
   /** Rastgele boş bir hücreye yeni bir taş ekler. Boş hücre yoksa null döner. */
   spawnRandomTile(): Tile | null {
     return this.board.spawnRandomTile();
-  }
-
-  /** Anlık skor en yüksek skoru geçtiyse güncelle (ProfileService). */
-  private updateBestScore(): void {
-    if (this.aiPlayed()) return; // YZ oynadıysa rekor sayılmaz
-    this.profile.reportBestScore(this.score());
   }
 }

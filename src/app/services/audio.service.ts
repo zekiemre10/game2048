@@ -11,8 +11,20 @@ import { Injectable, signal } from '@angular/core';
 const MUSIC_ON_KEY = 'game2048.musicOn';
 const VOLUME_KEY = 'game2048.musicVolume';
 
-/** Müzik dosyası — <base href> (artık kök `/`) göre çözülür → /audio/calm-mind.mp3. */
-const TRACK_SRC = 'audio/calm-mind.mp3';
+/**
+ * Müzik dosyaları (yol <base href>'e göre çözülür). Modern tarayıcıya küçük
+ * **Opus** (Ogg), desteklemeyene **mp3** yedeği sunulur → ilk indirilen veri en aza iner.
+ */
+const TRACK_OPUS = 'audio/calm-mind.ogg'; // Ogg/Opus — en küçük
+const TRACK_MP3 = 'audio/calm-mind.mp3'; // evrensel yedek
+
+/**
+ * Tarayıcının çalabildiği en küçük biçimi seçer (Opus varsa onu, yoksa mp3).
+ * canPlayType '' (çalamaz) / 'maybe' / 'probably' döner; boş değilse destekli sayılır.
+ */
+export function pickTrackSrc(canPlay: (type: string) => string): string {
+  return canPlay('audio/ogg; codecs=opus') ? TRACK_OPUS : TRACK_MP3;
+}
 
 /** Varsayılan ses seviyesi (0..1). */
 const DEFAULT_VOLUME = 0.4;
@@ -37,14 +49,21 @@ export class AudioService {
     }
   }
 
-  /** <audio> öğesini tembel oluşturur. */
+  /**
+   * <audio> öğesini tembel oluşturur. `preload='none'` → öğe oluşturmak veri
+   * İNDİRMEZ; müzik dosyası yalnızca çalmaya başlayınca (play → kullanıcı müziği
+   * açınca) in/er. Böylece ilk açılışta müzik indirilmez.
+   */
   private ensureAudio(): HTMLAudioElement | null {
     if (typeof Audio === 'undefined') return null; // SSR/test ortamı
     if (!this.audio) {
-      this.audio = new Audio(TRACK_SRC);
+      const src = pickTrackSrc((t) =>
+        typeof document !== 'undefined' ? new Audio().canPlayType(t) : '',
+      );
+      this.audio = new Audio(src);
       this.audio.loop = true;
       this.audio.volume = this.volume();
-      this.audio.preload = 'auto';
+      this.audio.preload = 'none'; // ilk açılışta indirme; play() olunca yükle
       // DOM'a ekle (bazı tarayıcılarda daha güvenilir + test edilebilir)
       if (typeof document !== 'undefined' && document.body) {
         document.body.appendChild(this.audio);

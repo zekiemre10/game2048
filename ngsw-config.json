@@ -15,7 +15,15 @@
       "installMode": "lazy",
       "updateMode": "prefetch",
       "resources": {
-        "files": ["/icons/**", "/audio/**", "/og-image.png", "/robots.txt"]
+        "files": ["/icons/**", "/og-image.png", "/robots.txt"]
+      }
+    },
+    {
+      "name": "media",
+      "installMode": "lazy",
+      "updateMode": "lazy",
+      "resources": {
+        "files": ["/audio/**"]
       }
     }
   ],

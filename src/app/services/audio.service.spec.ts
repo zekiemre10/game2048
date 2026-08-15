@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { AudioService } from './audio.service';
+import { AudioService, pickTrackSrc } from './audio.service';
 
 describe('AudioService', () => {
   beforeEach(() => {
@@ -49,5 +49,17 @@ describe('AudioService', () => {
     const s = fresh();
     expect(s.musicOn()).toBe(false);
     expect(s.volume()).toBeCloseTo(0.25);
+  });
+});
+
+describe('pickTrackSrc — müzik biçimi seçimi (Opus tercih, mp3 yedek)', () => {
+  it('Opus destekleniyorsa küçük .ogg (Opus) dosyasını seçer', () => {
+    expect(pickTrackSrc(() => 'probably')).toBe('audio/calm-mind.ogg');
+    // Yalnızca opus sorusuna 'maybe' dönse de destekli sayılır
+    expect(pickTrackSrc((t) => (t.includes('opus') ? 'maybe' : ''))).toBe('audio/calm-mind.ogg');
+  });
+
+  it('Opus desteklenmiyorsa evrensel mp3 yedeğine düşer', () => {
+    expect(pickTrackSrc(() => '')).toBe('audio/calm-mind.mp3');
   });
 });

@@ -247,10 +247,7 @@ Nasıl:
 - ↶ **Geri al** — son hamleyi geri al (kaybettiren hamle dahil)
 - 🏆 **Kalıcı rekor** — en yüksek skor `localStorage`'da saklanır
 - ⚙️ **Ayarlar paneli** — müzik, ses seviyeleri, tema, dil, rehber ve **Hesap** (giriş/kayıt · çıkış · hesabı sil) — tercihler kalıcı
-- 🎵 **Arka plan müziği** — "Calm Mind – Chill Lofi Beat" (Pixabay). **Opus (~1.2 MB)
-  - mp3 yedeği (~~1.3 MB)** — eski 3.6 MB'lık mp3'ten **~~%65 küçük**; ilk açılışta
-    **indirilmez** (`preload="none"`, yalnız müzik çalınca yüklenir), sondaki sessizlik
-    kırpılıp kesintisiz döngüye sokuldu
+- 🎵 **Arka plan müziği** — "Calm Mind – Chill Lofi Beat" (Pixabay). Opus **1.17 MB** (modern tarayıcı) veya mp3 yedeği **1.27 MB**; eski 3.6 MB'lık mp3'ten **%65 küçük**. İlk açılışta **indirilmez** (`preload="none"`, yalnız müzik çalınca yüklenir); sondaki sessizlik kırpılıp kesintisiz döngüye sokuldu
 - 🔊 **Ses efektleri** — Web Audio ile prosedürel (hamle / birleşme)
 - 🌙 **Açık/koyu tema** — tercih kalıcı, sistem tercihini varsayılan alır
 - ✨ **Akıcı animasyonlar** — kayma, pop-in, birleşme "bump"ı

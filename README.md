@@ -514,14 +514,46 @@ npm run check:i18n
 python3 server/app.py     # 127.0.0.1:8092 (GAME2048_PORT ile değiştirilebilir)
 ```
 
-**Dağıtım (sunucu):** systemd servisi (otomatik başlatma + çökünce yeniden
-başlatma), nginx yapılandırması, otomatik SQLite yedekleme + geri yükleme, bakım
-(VACUUM) ve sağlık kontrolü — tümü [`server/deploy/`](server/deploy/) altında,
-adımlar [`server/deploy/README.md`](server/deploy/README.md)'de.
+**Backend belgeleri:** yerel çalıştırma, ortam değişkenleri ve **tam uç nokta
+listesi** [`server/README.md`](server/README.md)'de. **Dağıtım (sunucu):** systemd
+servisi (otomatik başlatma + çökünce yeniden başlatma), nginx yapılandırması,
+otomatik SQLite yedekleme + geri yükleme, bakım (VACUUM) ve sağlık kontrolü —
+tümü [`server/deploy/`](server/deploy/) altında, adımlar
+[`server/deploy/README.md`](server/deploy/README.md)'de.
 
 **Mimari not:** Oyun mantığı (`logic/`) Angular'dan tamamen bağımsızdır —
 saf fonksiyonlar, girdiyi değiştirmez. Bu sayede hızlı ve güvenilir test edilir.
 Kare **id'leri** hamleler arasında korunur; kayma animasyonu bunun üzerine kurulur.
+
+## 🔐 Gizlilik ve veri
+
+Hesap **isteğe bağlıdır**: giriş yapmadan (misafir) oynayabilirsin — bu durumda
+tüm ilerlemen yalnızca **tarayıcının `localStorage`'ında**, cihazında kalır;
+sunucuya hiçbir şey gitmez.
+
+Giriş/kayıt olursan sunucuda (**uygulamanın kendi sunucusu**, üçüncü taraf yok)
+şunlar tutulur:
+
+| Veri | Nerede / nasıl |
+|------|----------------|
+| Kullanıcı adı + e-posta | `users` tablosu |
+| Parola | **PBKDF2 ile hash'lenir + salt** — düz metin **asla** saklanmaz |
+| Oyun ilerlemesi (skor, altın, başarım, istatistik) | `users.data` (JSON), cihazlar arası senkron |
+| Sosyal | Arkadaşlıklar, birebir mesajlar |
+| Skorlar | Aylık/günlük sıralama kayıtları |
+
+- **Üçüncü taraf yok:** reklam, analitik veya izleyici **yok**. Veri yalnızca
+  oyunun kendi sunucusunda.
+- **🧠 Kişisel koç:** yalnızca oyunun **özeti** (mod, skor, doğruluk, dönüm
+  noktası) `/analysis`'e gider; LLM API anahtarı **yalnız sunucuda**, istemci
+  paketine asla girmez. Girişli değilsen bu özellik çalışmaz.
+- **Hesabını silme:** **Ayarlar → 👤 Hesap → 🗑️ Hesabı sil** (şifre onaylı).
+  Bu, hesabını ve **tüm** verini (ilerleme, arkadaşlıklar, mesajlar, skorlar)
+  sunucudan **kalıcı** siler ve kullanıcı adını serbest bırakır — geri alınamaz.
+  Yalnızca oturumu kapatmak için **Çıkış**.
+- **Yedekler:** Operasyonel güvenlik için veritabanının şifreli olmayan günlük
+  yedekleri 14 gün tutulur (bkz. [`server/deploy/README.md`](server/deploy/README.md));
+  silme sonrası bu pencerede yedeklerden de düşer.
 
 ## Hızlı başlat (Windows)
 

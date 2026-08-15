@@ -398,9 +398,12 @@ skoru **kendisi hesaplar** ("kural tek yerde"). Böylece konsoldan uydurma bir
 skor göndermek imkânsızdır — bozuk/sahte transkript reddedilir ve
 `flagged_submissions` tablosuna kaydedilir.
 
-- **Determinizm garantisi:** İstemci (`src/app/logic/replay.ts`) ve sunucu
-  (`server/replay.py`) mantığı **birebir aynı** sonucu verir; parite testleriyle
-  (150 fixture + gerçek oyun transkriptleri) doğrulanır.
+- **Determinizm garantisi:** İstemci (`src/app/logic/replay.ts`), Python sunucu
+  (`server/replay.py`) ve çerçevesiz TypeScript sunucu portu (`server/replay.ts`,
+  NestJS backend'i içindir) mantığı **birebir aynı** sonucu verir; her üçü de
+  parite testleriyle (150 fixture + gerçek oyun transkriptleri) doğrulanır.
+  `server/replay.ts` Angular'a bağımlı değildir — `Direction`/`CHAR_MOVE`/
+  `mulberry32` gömülüdür, düz `node server/test_replay_parity.ts` ile koşulur.
 - **Çok oyunculu oda skorları da doğrulanır:** `/rooms/progress` artık istemcinin
   skorunu kabul etmez; canlı yarışta gönderilen **hamle transkripti** odanın
   tohumuyla her bildirimde yeniden oynatılıp skoru sunucu hesaplar. Böylece bir
@@ -485,6 +488,8 @@ toleranslıdır → **mevcut hesaplar göçte bozulmaz** (testle doğrulandı).
 ```bash
 # Sunucu tarafı replay parite testi (istemci = sunucu skoru)
 python3 server/test_replay_parity.py
+# Aynı paritenin TypeScript (NestJS) portu — altyapısız, düz node
+node server/test_replay_parity.ts   # veya: npm run test:replay
 # Uçtan uca: uydurma skor reddi + meşru oyun kabulü
 python3 server/test_submit_integration.py
 # Bulut senkronu birleştirme: iki cihaz + rekor/başarım/altın + göç

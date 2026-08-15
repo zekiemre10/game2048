@@ -1109,6 +1109,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._login()
         if p == "/logout":
             return self._logout()
+        if p == "/account/delete":
+            return self._delete_account()
         if p == "/sync":
             return self._sync()
         if p == "/friends/request":
@@ -1278,6 +1280,44 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 data = {}
             return self._send(200, {"user": user_public(row), "data": data})
+        finally:
+            conn.close()
+
+    def _delete_account(self):
+        """Kullanıcının KENDİ hesabını KALICI siler (şifre onaylı).
+
+        Tüm kullanıcıya bağlı satırlar temizlenir (kimlik + PII), en son users
+        satırı → kullanıcı adı yeniden serbest kalır. Ayarlar'daki "Hesabı sil"
+        bunu çağırır; 401=oturum yok, 403=şifre yanlış, 200=silindi.
+        """
+        conn = db()
+        try:
+            row = user_from_token(conn, self._token())
+            if not row:
+                return self._send(401, {"error": "unauthorized"})
+            password = self._body().get("password") or ""
+            if not check_pw(conn, row, password):
+                return self._send(403, {"error": "wrong_password"})
+            uid = row["id"]
+            # Host olunan odalardaki oyuncular da düşsün (yetim satır kalmasın).
+            conn.execute(
+                "DELETE FROM room_players WHERE code IN "
+                "(SELECT code FROM rooms WHERE host_id = ?)", (uid,))
+            conn.execute("DELETE FROM rooms WHERE host_id = ?", (uid,))
+            conn.execute("DELETE FROM room_players WHERE user_id = ?", (uid,))
+            conn.execute(
+                "DELETE FROM friendships WHERE requester_id = ? OR addressee_id = ?", (uid, uid))
+            conn.execute("DELETE FROM messages WHERE from_id = ? OR to_id = ?", (uid, uid))
+            conn.execute("DELETE FROM monthly_scores WHERE user_id = ?", (uid,))
+            conn.execute("DELETE FROM monthly_prizes WHERE user_id = ?", (uid,))
+            conn.execute("DELETE FROM daily_scores WHERE user_id = ?", (uid,))
+            conn.execute("DELETE FROM flagged_submissions WHERE user_id = ?", (uid,))
+            conn.execute("DELETE FROM reports WHERE reporter_id = ? OR target_id = ?", (uid, uid))
+            conn.execute("DELETE FROM sessions WHERE user_id = ?", (uid,))  # tüm oturumları kapat
+            conn.execute("DELETE FROM users WHERE id = ?", (uid,))
+            conn.commit()
+            print(f"[account] deleted user id={uid} username={row['username']}", flush=True)
+            return self._send(200, {"ok": True})
         finally:
             conn.close()
 

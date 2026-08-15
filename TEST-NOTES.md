@@ -1,15 +1,20 @@
 # 2048 — Test Notları
 
-Son güncelleme: 2026-07-13
+Son güncelleme: 2026-08-15
 
 ## Özet
 
 | Alan | Durum |
 |------|-------|
-| Otomatik birim/bileşen testleri | ✅ **81/81 geçiyor** (`ng test`) |
-| Production build | ✅ Hatasız (`ng build`, ~138 kB) |
-| Bulunan kritik hata | ✅ Kalmadı (aşağıda 3 hata bulundu ve giderildi) |
+| Otomatik birim/bileşen testleri | ✅ **333/333 geçiyor** (`ng test`, 41 dosya) |
+| Python backend testleri | ✅ **13 dosya geçiyor** (`python server/run_tests.py`) — kayıt/giriş/sync/skor/oda/**hesap silme** + bot paritesi, yedek-geri yükleme, sertleştirme |
+| Production build | ✅ Hatasız (`ng build`) |
+| Bulunan kritik hata | ✅ Kalmadı (aşağıda giderilen hatalar) |
 | Gerçek cihaz/tarayıcı testi | ⏳ Kısmen — aşağıdaki kontrol listesi elle yapılmalı |
+
+> **Not:** Aşağıdaki `## 1.` bölümündeki dosya-bazlı döküm ilk çekirdeği (85
+> test) anlatır; sonraki iş paketleri (çevrimiçi, YZ koç, bulmaca, i18n, PWA…)
+> çok daha fazla spec ekledi → toplam **41 dosya / 333 test**.
 
 ---
 
@@ -77,6 +82,11 @@ Son güncelleme: 2026-07-13
 **Belirti:** Aynı kare iki hamlede arka arkaya birleşirse ikinci "bump" animasyonu oynamıyordu.
 **Neden:** CSS sınıfı zaten ekli kaldığı için tarayıcı animasyonu yeniden başlatmıyordu.
 **Çözüm:** Sınıf kaldırılıp reflow tetiklenerek yeniden ekleniyor. Ayrıca renkler `[class]` bağlaması yerine `[data-value]` attribute'una taşındı (bağlama, imperatif eklenen sınıfı ezmesin diye).
+
+### 🐛 #4 — "Hesabı sil" 404'e gidiyordu (uç 2048 backend'inde yoktu)
+**Belirti:** Ayarlar → "Hesabı sil", istemciden `/api/account/delete` çağırıyor ama **2048 backend'inde (`game2048/server/app.py`) bu uç yoktu** → 404 → silme hiç çalışmıyordu. (Uç yalnızca ayrı bir backend'de vardı; özellik eklenirken yanlış `app.py` doğrulanmıştı.)
+**Çözüm:** `/account/delete` 2048 backend'ine eklendi — **şifre onaylı**; kullanıcıya bağlı tüm satırları (oturum, arkadaşlık, mesaj, oda/oda-oyuncu, aylık/günlük skor, ödül, şikayet) temizler, kullanıcı adını **serbest bırakır**. 401=oturum yok, 403=şifre yanlış, 200=silindi.
+**Nasıl yakalandı:** Backend kapsamını genişletirken yazılan **`server/test_account_delete.py`** ilk koşuda 404 döndürdü → eksik uç anında ortaya çıktı. (Test yatırımının değeri: yeni özellik, testle korunmadan önce kırıktı.)
 
 ### ℹ️ Hata sanılan ama hata olmayan
 Tarayıcıda görünen `TS2339: Property 'updateBestScore' does not exist` overlay'i, geliştirme sırasında oluşan **anlık bir ara duruma** ait bayat bir mesajdı. Kod doğruydu; sayfa yenilenince kayboldu. (`ng build` temiz.)

@@ -46,7 +46,7 @@
                 }
               ],
               "outputHashing": "all",
-              "baseHref": "/emre/2048/",
+              "baseHref": "/",
               "serviceWorker": "ngsw-config.json"
             },
             "development": {

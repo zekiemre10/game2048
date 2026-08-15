@@ -11,12 +11,12 @@ mimarisi, signal tabanlı durum yönetimi, saf ve test edilebilir oyun mantığ�
 
 Bilgisayarda **ok tuşlarıyla**, telefonda **parmakla kaydırarak** oynanır.
 
-> **URL notu:** 2048 şu an **`…/emre/2048/`** alt yolunda (base href `/emre/2048/`)
-> HTTPS ile yayınlanır; `https://2048.aicirkit.com/` bağlantısı oraya yönlendirir.
-> API **base href'e göre same-origin** çözülür (`document.baseURI` → `…/emre/2048/api`)
-> → sayfa HTTPS ise API de HTTPS, **mixed-content yok** ve giriş/kayıt çalışır. Köke
-> taşımak için önce nginx (kök serve + `/api` proxy + eski yol 301), sonra
-> `angular.json` `baseHref: "/"` gerekir; kod her iki yolu da otomatik destekler.
+> **URL notu:** 2048 **alan adı kökünde** (`https://2048.aicirkit.com/`, base href
+> `/`) HTTPS ile yayınlanır; eski alt yol `…/emre/2048/*` **301** ile köke taşınır
+> (sorgu dizesi korunur). API **base href'e göre same-origin** çözülür
+> (`document.baseURI` → `…/api`) → sayfa HTTPS ise API de HTTPS, **mixed-content
+> yok** ve giriş/kayıt çalışır. Kod base href'e bağlı olduğundan, ileride bir alt
+> yola taşınsa da (nginx + `baseHref`) uçları otomatik doğru hedefler.
 >
 > **PWA:** oyun **kurulabilir** (📱 ana ekrana eklenir, kendi penceresinde
 > açılır) ve **çevrimdışı oynanır** (tek kişilik modlar). `manifest.webmanifest`,

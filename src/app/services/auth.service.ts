@@ -9,10 +9,11 @@ import { GameService } from './game.service';
 /**
  * Backend kök adresi. API her zaman uygulamanın YAYIN YOLUNA (base href) göre
  * çözülür → same-origin, ve nginx uygulamayı nerede sunuyorsa API de orada:
- *  • DAĞITIMDA **base-href göreli**: `new URL('api', document.baseURI)`. Uygulama
- *    `/emre/2048/` alt yolunda ise API `…/emre/2048/api`; köke (`/`) taşınırsa
- *    otomatik `…/api`. Sayfa HTTPS ise API de HTTPS → **mixed-content YOK**.
- *    (Sabit `origin + '/api'` alt yol dağıtımında 302→HTML dönüyor, giriş kırılıyordu.)
+ *  • DAĞITIMDA **base-href göreli**: `new URL('api', document.baseURI)`. Canlı
+ *    yayın alan adı KÖKÜNDE (base href `/`) → API `…/api`; ileride bir alt yola
+ *    (örn. `/emre/2048/`) taşınırsa otomatik `…/emre/2048/api`. Sayfa HTTPS ise
+ *    API de HTTPS → **mixed-content YOK**. (Base href'e bağlamak, hangi yolda
+ *    sunulursa sunulsun giriş/kayıt uçlarını doğru hedefler.)
  *  • YEREL geliştirmede (ng serve → localhost/127.0.0.1) canlı backend'e (alan adı,
  *    HTTPS) mutlak URL — localhost:4200'de backend yok; CORS localhost'a izinli.
  */

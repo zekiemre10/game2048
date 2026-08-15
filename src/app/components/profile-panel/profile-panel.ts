@@ -15,7 +15,7 @@ import { BOT_CHARACTERS, BOT_CHARACTER_IDS } from '../../logic/ai';
  * Profil paneli (ünvan + avatar + 7 günlük ödül takvimi + istatistikler).
  * Monolit app bileşeninden ayrıştırıldı: kendi şablonu + stili + mantığı.
  * Açık/kapalı durumunu ana bileşen yönetir; kapatma `close` ile bildirilir.
- * Misafirken giriş çağrısı `openAuth` ile ana bileşenden hesap panelini açar.
+ * Hesap işlemleri (giriş/kayıt · çıkış · hesabı sil) Ayarlar panelindedir.
  */
 @Component({
   selector: 'app-profile-panel',
@@ -31,8 +31,6 @@ export class ProfilePanel {
 
   /** Panel kapatıldığında bildirilir. */
   readonly close = output<void>();
-  /** Misafirken giriş çağrısı → ana bileşen hesap panelini açar. */
-  readonly openAuth = output<void>();
 
   protected readonly t = (key: string, params?: Record<string, string | number>) =>
     this.i18n.t(key, params);

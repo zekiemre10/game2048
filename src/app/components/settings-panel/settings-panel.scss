@@ -142,6 +142,90 @@
   font-size: 1.1rem;
 }
 
+// Misafire giriş/kayıt daveti
+.account-cta {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+// Hesabı sil — tehlikeli işlem (kırmızı, ana çıkıştan görsel olarak ayrık)
+.del-acc-btn {
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 10px;
+  background: transparent;
+  color: #c0392b;
+  border: 1px solid rgba(192, 57, 43, 0.5);
+  font-weight: 700;
+  font-size: 0.9rem;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+
+  &:hover {
+    background: rgba(192, 57, 43, 0.1);
+  }
+
+  &.confirm {
+    margin-top: 0;
+    background: #c0392b;
+    color: #fff;
+    border-color: #c0392b;
+
+    &:hover {
+      background: #a93226;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+// Silme onay kutusu
+.del-confirm {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid rgba(192, 57, 43, 0.4);
+  border-radius: 10px;
+  background: rgba(192, 57, 43, 0.06);
+}
+
+.del-warn {
+  margin: 0 0 0.5rem;
+  color: #c0392b;
+  font-weight: 600;
+}
+
+.del-input {
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-cell-empty);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.95rem;
+}
+
+.del-error {
+  margin: 0.4rem 0 0;
+  color: #c0392b;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.del-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+
+  > button {
+    flex: 1;
+  }
+}
+
 .settings-credit {
   margin: 0 0 1.25rem;
   font-size: 0.78rem;

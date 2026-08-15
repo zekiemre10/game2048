@@ -181,17 +181,9 @@
     }
 
     <!--
-      Giriş yapılmışsa burada bir şey gösterilmez: kullanıcı adı zaten
-      panelin başlığında yazıyor, çıkış da Ayarlar'da. Yalnızca misafire
-      giriş çağrısı gösterilir.
+      Hesap işlemleri (giriş/kayıt · çıkış · hesabı sil) artık YALNIZCA
+      Ayarlar'da. Profil paneli sadece kimlik + ilerleme + istatistik gösterir.
     -->
-    @if (!authUser()) {
-      <div class="account-box">
-        <button class="btn-primary account-cta" type="button" (click)="openAuth.emit()">
-          {{ t('auth.signInCta') }}
-        </button>
-      </div>
-    }
 
     <button class="btn-primary settings-close" type="button" (click)="close.emit()">
       {{ t('btn.close') }}

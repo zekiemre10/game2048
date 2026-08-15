@@ -494,6 +494,19 @@ export class App {
     this.friends.refresh(); // listeyi temizle
   }
 
+  /**
+   * Hesap kalıcı silindi (Ayarlar'daki "Hesabı sil"). Oturum AuthService'te
+   * zaten kapatıldı; burada yalnızca eski hesabın açık izlerini temizleriz.
+   */
+  onAccountDeleted(): void {
+    this.chat.close();
+    this.chat.clearUnread();
+    void this.mp.leaveRoom();
+    this.friendsOpen.set(false);
+    this.settingsOpen.set(false);
+    this.friends.refresh();
+  }
+
   // --- Arkadaşlar --------------------------------------------
 
   onOpenFriends(): void {

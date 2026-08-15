@@ -11,13 +11,16 @@ mimarisi, signal tabanlı durum yönetimi, saf ve test edilebilir oyun mantığ�
 
 Bilgisayarda **ok tuşlarıyla**, telefonda **parmakla kaydırarak** oynanır.
 
-> **URL notu:** 2048 **alan adı kökünde** (`https://2048.aicirkit.com/`, base href
-> `/`) yayınlanır — eski alt yol `…/emre/2048/*` **301** ile köke taşınır (kalan yol
-> + sorgu dizesi korunur). API kökte **same-origin** (`/api`) → HTTPS'te mixed-content yok.
+> **URL notu:** 2048 şu an **`…/emre/2048/`** alt yolunda (base href `/emre/2048/`)
+> HTTPS ile yayınlanır; `https://2048.aicirkit.com/` bağlantısı oraya yönlendirir.
+> API **base href'e göre same-origin** çözülür (`document.baseURI` → `…/emre/2048/api`)
+> → sayfa HTTPS ise API de HTTPS, **mixed-content yok** ve giriş/kayıt çalışır. Köke
+> taşımak için önce nginx (kök serve + `/api` proxy + eski yol 301), sonra
+> `angular.json` `baseHref: "/"` gerekir; kod her iki yolu da otomatik destekler.
 >
-> **PWA:** oyun artık **kurulabilir** (📱 ana ekrana eklenir, kendi penceresinde
-> açılır) ve **çevrimdışı oynanır** (tek kişilik modlar). `manifest.webmanifest`
-> (`id: "/"` — ilk kimlik, kök taşımayla uyumlu), Angular service worker (kabuk +
+> **PWA:** oyun **kurulabilir** (📱 ana ekrana eklenir, kendi penceresinde
+> açılır) ve **çevrimdışı oynanır** (tek kişilik modlar). `manifest.webmanifest`,
+> Angular service worker (kabuk +
 > ses önbelleği; **`/api` asla önbelleğe alınmaz**), çevrimdışı çevrimiçi
 > özellikleri kapatır + nedenini açıklar, yeni sürümde güncelleme bildirimi verir.
 > Çevrimdışı kazanılan altın/başarım, bağlanınca **alan-bazlı bulut senkronuyla**
@@ -223,7 +226,7 @@ Nasıl:
 - 🎯 **Görevler** — günlük ve haftalık görevler; oynadıkça ilerler, altın verir
 - 🌍 **Dil (TR/EN)** — Ayarlar'dan geçiş; arayüzün tamamı iki dilde
 - 🎮 **Modlar** — Klasik · Zen (süresiz) · Zaman Yarışı (3dk) · Seviye · Günlük + tahta boyutu (3×3/4×4/5×5)
-- 👤 **Hesap** — kayıt/giriş (kullanıcı adı + e-posta), ilerleme buluta kaydı, cihazlar arası senkron
+- 👤 **Hesap** — kayıt/giriş (kullanıcı adı + e-posta), ilerleme buluta kaydı, cihazlar arası senkron; tüm hesap işlemleri (giriş/kayıt · çıkış · **şifre onaylı kalıcı hesap silme**) **Ayarlar → Hesap** altında toplanır
 - 👥 **Arkadaşlar** — kullanıcı ara, istek gönder/kabul et, arkadaş listesi (skor/seviye özeti)
 - 💬 **Sohbet** — arkadaşlar arası mesajlaşma, emoji seçici, okunmamış rozeti (yakın-gerçek zamanlı)
 - 🏁 **Çok oyunculu yarış** — oda kur, 4 haneli kodla davet, ortak tohumla adil yarış + canlı skor tablosu
@@ -243,7 +246,7 @@ Nasıl:
   (süre, güçler, YZ, kontroller); dar ekranda tek sütuna iner
 - ↶ **Geri al** — son hamleyi geri al (kaybettiren hamle dahil)
 - 🏆 **Kalıcı rekor** — en yüksek skor `localStorage`'da saklanır
-- ⚙️ **Ayarlar paneli** — müzik, ses seviyeleri, tema (tercihler kalıcı)
+- ⚙️ **Ayarlar paneli** — müzik, ses seviyeleri, tema, dil, rehber ve **Hesap** (giriş/kayıt · çıkış · hesabı sil) — tercihler kalıcı
 - 🎵 **Arka plan müziği** — "Calm Mind – Chill Lofi Beat" (Pixabay)
 - 🔊 **Ses efektleri** — Web Audio ile prosedürel (hamle / birleşme)
 - 🌙 **Açık/koyu tema** — tercih kalıcı, sistem tercihini varsayılan alır

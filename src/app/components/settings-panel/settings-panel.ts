@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  output,
+  signal,
+} from '@angular/core';
 import { GameService } from '../../services/game.service';
 import { I18nService, Lang } from '../../services/i18n.service';
 import { ThemeService } from '../../services/theme.service';
@@ -12,6 +19,8 @@ import { THEMES } from '../../models/theme.model';
  * Monolit app bileşeninden ayrıştırıldı: kendi şablonu + stili + mantığı.
  * Açık/kapalı durumunu ana bileşen yönetir; kapatma `close` ile bildirilir.
  * `showTutorial` rehberi (ana bileşende) yeniden açar; `logout` çıkışı yaptırır.
+ * Tüm hesap erişimi burada toplanır: misafire `openAuth` (giriş/kayıt), girişliye
+ * çıkış + `accountDeleted` (şifre onaylı kalıcı silme).
  */
 @Component({
   selector: 'app-settings-panel',
@@ -34,6 +43,10 @@ export class SettingsPanel {
   readonly showTutorial = output<void>();
   /** Çıkış yap (ana bileşen sohbet/oda/arkadaş durumunu da temizler). */
   readonly logout = output<void>();
+  /** Misafirken giriş/kayıt paneli aç (giriş erişimi artık profilde değil, burada). */
+  readonly openAuth = output<void>();
+  /** Hesap KALICI silindi → ana bileşen açık sohbet/oda/arkadaş durumunu temizler. */
+  readonly accountDeleted = output<void>();
 
   protected readonly t = (key: string, params?: Record<string, string | number>) =>
     this.i18n.t(key, params);
@@ -87,5 +100,58 @@ export class SettingsPanel {
   /** Temayı seç (sahip olunanlar arasından). */
   onSelectTheme(id: string): void {
     this.themeService.select(id);
+  }
+
+  // --- Hesabı sil (şifre onaylı, kalıcı) ----------------------
+
+  /** Silme onay bölümü açık mı (butona basınca açılır). */
+  protected readonly deleteOpen = signal(false);
+  /** Onay için girilen şifre. */
+  protected readonly delPassword = signal('');
+  /** Silme sürüyor mu (buton kilidi). */
+  protected readonly delBusy = signal(false);
+  /** Son silme hatası (yerelleştirilmiş) — yoksa boş. */
+  protected readonly delError = signal('');
+
+  /** Silme onayını aç. */
+  onOpenDelete(): void {
+    this.delPassword.set('');
+    this.delError.set('');
+    this.deleteOpen.set(true);
+  }
+
+  /** Silmekten vazgeç. */
+  onCancelDelete(): void {
+    this.deleteOpen.set(false);
+    this.delPassword.set('');
+    this.delError.set('');
+  }
+
+  /** Şifre kutusu değişti. */
+  onDelPasswordInput(event: Event): void {
+    this.delPassword.set((event.target as HTMLInputElement).value);
+    if (this.delError()) this.delError.set('');
+  }
+
+  /** Hesabı kalıcı sil (şifre onaylı). Başarılıysa ana bileşene bildir. */
+  async onConfirmDelete(): Promise<void> {
+    const pw = this.delPassword();
+    if (!pw || this.delBusy()) return;
+    this.delBusy.set(true);
+    this.delError.set('');
+    const res = await this.auth.deleteAccount(pw);
+    this.delBusy.set(false);
+    if (res.ok) {
+      this.deleteOpen.set(false);
+      this.accountDeleted.emit();
+      return;
+    }
+    // Hata kodu → yerelleştirilmiş mesaj (sunucunun serbest metni değil).
+    const map: Record<string, string> = {
+      'wrong-password': 'set.deleteErrWrongPw',
+      session: 'set.deleteErrSession',
+      network: 'set.deleteErrNetwork',
+    };
+    this.delError.set(this.t(map[res.error ?? 'error'] ?? 'set.deleteErrGeneric'));
   }
 }

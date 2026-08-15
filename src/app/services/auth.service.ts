@@ -245,6 +245,38 @@ export class AuthService {
     this.clear();
   }
 
+  /**
+   * Hesabı KALICI olarak sil (şifre onaylı). Sunucu tüm ilişkili veriyi temizler;
+   * başarılıysa yerel oturum kapatılır (misafire dönülür, yerel ilerleme kalır).
+   * Hata kodu dile çevrilebilsin diye HTTP durumuna göre sabit kod döner
+   * (sunucunun serbest metnini kullanıcıya göstermek yerine).
+   */
+  async deleteAccount(password: string): Promise<AuthResult> {
+    if (!this.token) return { ok: false, error: 'session' };
+    this.busy.set(true);
+    try {
+      const res = await fetch(`${API}/account/delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.token}`,
+        },
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        this.clear(); // kullanıcı artık yok → oturumu temizle
+        return { ok: true };
+      }
+      if (res.status === 403) return { ok: false, error: 'wrong-password' };
+      if (res.status === 401) return { ok: false, error: 'session' };
+      return { ok: false, error: 'error' };
+    } catch {
+      return { ok: false, error: 'network' };
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   private setToken(t: string): void {
     this.token = t;
     try {

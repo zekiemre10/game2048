@@ -126,18 +126,59 @@
       </button>
     </section>
 
-    <!-- HESAP: çıkış YALNIZCA burada -->
-    @if (authUser(); as u) {
-      <section class="settings-section">
-        <h3 class="settings-heading">{{ t('set.account') }}</h3>
+    <!-- HESAP: giriş/kayıt + çıkış + hesabı sil YALNIZCA burada -->
+    <section class="settings-section">
+      <h3 class="settings-heading">{{ t('set.account') }}</h3>
+      @if (authUser(); as u) {
         <div class="settings-row">
           <span class="account-user">👤 {{ u.username }}</span>
           <button class="btn-primary ghost logout-btn" type="button" (click)="logout.emit()">
             {{ t('auth.logout') }}
           </button>
         </div>
-      </section>
-    }
+
+        <!-- Hesabı sil (şifre onaylı, kalıcı) -->
+        @if (!deleteOpen()) {
+          <button class="del-acc-btn" type="button" (click)="onOpenDelete()">
+            {{ t('set.deleteAccount') }}
+          </button>
+        } @else {
+          <div class="del-confirm">
+            <p class="settings-note del-warn">{{ t('set.deleteWarn') }}</p>
+            <input
+              class="del-input"
+              type="password"
+              autocomplete="current-password"
+              [value]="delPassword()"
+              (input)="onDelPasswordInput($event)"
+              [placeholder]="t('set.deletePlaceholder')"
+              [attr.aria-label]="t('set.deletePlaceholder')"
+            />
+            @if (delError()) {
+              <p class="del-error" role="alert">{{ delError() }}</p>
+            }
+            <div class="del-actions">
+              <button class="btn-primary ghost" type="button" (click)="onCancelDelete()">
+                {{ t('btn.cancel') }}
+              </button>
+              <button
+                class="del-acc-btn confirm"
+                type="button"
+                [disabled]="delBusy() || !delPassword()"
+                (click)="onConfirmDelete()"
+              >
+                {{ delBusy() ? t('set.deleting') : t('set.deleteConfirm') }}
+              </button>
+            </div>
+          </div>
+        }
+      } @else {
+        <p class="settings-note">{{ t('set.accountGuestNote') }}</p>
+        <button class="btn-primary account-cta" type="button" (click)="openAuth.emit()">
+          {{ t('auth.signInCta') }}
+        </button>
+      }
+    </section>
 
     <p class="settings-credit">{{ t('set.credit') }}</p>
 

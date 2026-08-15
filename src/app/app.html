@@ -126,6 +126,8 @@
     (close)="onCloseSettings()"
     (showTutorial)="onShowTutorial()"
     (logout)="onLogout()"
+    (openAuth)="onOpenAuth()"
+    (accountDeleted)="onAccountDeleted()"
   />
 }
 
@@ -136,7 +138,7 @@
 
 <!-- Profil paneli (ayrı bileşen: components/profile-panel) -->
 @if (profileOpen()) {
-  <app-profile-panel (close)="onCloseProfile()" (openAuth)="onOpenAuth()" />
+  <app-profile-panel (close)="onCloseProfile()" />
 }
 
 <!-- Günlük meydan okuma paneli (ayrı bileşen: components/daily-panel) -->

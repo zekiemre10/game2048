@@ -7,26 +7,35 @@ import { GameService } from './game.service';
 // ============================================================
 
 /**
- * Backend kök adresi. 2048 artık alan adı KÖKÜNDE yayınlanır (2048.aicirkit.com/);
- * API de kökte same-origin (`/api`) → gömülü IP + alt yol adresi kalmadı.
- *  • DAĞITIMDA **same-origin**: `location.origin + '/api'`. Sayfa HTTPS ise API de
- *    HTTPS → **mixed-content YOK**, giriş/kayıt HTTPS üzerinden çalışır.
+ * Backend kök adresi. API her zaman uygulamanın YAYIN YOLUNA (base href) göre
+ * çözülür → same-origin, ve nginx uygulamayı nerede sunuyorsa API de orada:
+ *  • DAĞITIMDA **base-href göreli**: `new URL('api', document.baseURI)`. Uygulama
+ *    `/emre/2048/` alt yolunda ise API `…/emre/2048/api`; köke (`/`) taşınırsa
+ *    otomatik `…/api`. Sayfa HTTPS ise API de HTTPS → **mixed-content YOK**.
+ *    (Sabit `origin + '/api'` alt yol dağıtımında 302→HTML dönüyor, giriş kırılıyordu.)
  *  • YEREL geliştirmede (ng serve → localhost/127.0.0.1) canlı backend'e (alan adı,
  *    HTTPS) mutlak URL — localhost:4200'de backend yok; CORS localhost'a izinli.
  */
 /** Canlı backend'in mutlak adresi (yerel geliştirme + SSR yedeği). */
 const DEV_API_BASE = 'https://2048.aicirkit.com/api';
 
-/** Saf: verilen host/origin için API kökü (same-origin dağıtım · mutlak dev). */
-export function apiBaseFor(hostname: string | undefined | null, origin: string): string {
+/**
+ * Saf: verilen host + base href için API kökü.
+ *  • dağıtım → base href'e göre same-origin (alt yol VEYA kök, fark etmez)
+ *  • yerel geliştirme (localhost/127.0.0.1) → canlı backend'e mutlak
+ * @param baseUri `document.baseURI` (origin + <base href>), sonu `/` ile biter.
+ */
+export function apiBaseFor(hostname: string | undefined | null, baseUri: string): string {
   if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
-    return origin + '/api'; // dağıtım: alan adı KÖKÜNDE same-origin
+    return new URL('api', baseUri).href.replace(/\/+$/, ''); // dağıtım: base href göreli
   }
   return DEV_API_BASE; // yerel geliştirme: canlı backend (alan adı, HTTPS)
 }
 
 function resolveApiBase(): string {
-  if (typeof location !== 'undefined') return apiBaseFor(location.hostname, location.origin);
+  if (typeof document !== 'undefined' && typeof location !== 'undefined') {
+    return apiBaseFor(location.hostname, document.baseURI);
+  }
   return DEV_API_BASE;
 }
 

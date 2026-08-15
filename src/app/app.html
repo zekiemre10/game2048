@@ -6,6 +6,33 @@
   <app-tutorial (closed)="onCloseTutorial()" />
 }
 
+<!-- PWA şeridi: yeni sürüm > çevrimdışı > kuruluma davet (öncelik sırası) -->
+@if (pwaUpdateReady() || !online() || pwaInstallable()) {
+  <div class="pwa-bar" [class.pwa-offline]="!online() && !pwaUpdateReady()">
+    @if (pwaUpdateReady()) {
+      <span class="pwa-msg">🔄 {{ t('pwa.updateReady') }}</span>
+      <button class="pwa-act" type="button" (click)="onPwaUpdate()">
+        {{ t('pwa.updateBtn') }}
+      </button>
+    } @else if (!online()) {
+      <span class="pwa-msg">📴 {{ t('pwa.offline') }}</span>
+    } @else if (pwaInstallable()) {
+      <span class="pwa-msg">📲 {{ t('pwa.installHint') }}</span>
+      <button class="pwa-act" type="button" (click)="onPwaInstall()">
+        {{ t('pwa.installBtn') }}
+      </button>
+      <button
+        class="pwa-dismiss"
+        type="button"
+        [attr.aria-label]="t('btn.close')"
+        (click)="onPwaDismissInstall()"
+      >
+        ✕
+      </button>
+    }
+  </div>
+}
+
 <!-- Sol üst: profil -->
 <button
   class="profile-btn"
@@ -40,8 +67,9 @@
   <button
     class="round-btn friends-btn"
     type="button"
+    [disabled]="!online()"
     [attr.aria-label]="t('nav.friends')"
-    [attr.title]="t('nav.friends')"
+    [attr.title]="online() ? t('nav.friends') : t('pwa.offlineFeature')"
     (click)="onOpenFriends()"
   >
     👥
@@ -52,8 +80,9 @@
   <button
     class="round-btn lb-btn"
     type="button"
+    [disabled]="!online()"
     [attr.aria-label]="t('nav.leaderboard')"
-    [attr.title]="t('nav.leaderboard')"
+    [attr.title]="online() ? t('nav.leaderboard') : t('pwa.offlineFeature')"
     (click)="onOpenLeaderboard()"
   >
     🏆
@@ -61,8 +90,9 @@
   <button
     class="round-btn mp-btn"
     type="button"
+    [disabled]="!online()"
     [attr.aria-label]="t('nav.multiplayer')"
-    [attr.title]="t('nav.multiplayer')"
+    [attr.title]="online() ? t('nav.multiplayer') : t('pwa.offlineFeature')"
     (click)="onOpenMultiplayer()"
   >
     🏁

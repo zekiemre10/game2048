@@ -26,6 +26,7 @@ import { MultiplayerPanel } from './components/multiplayer-panel/multiplayer-pan
 import { GameService } from './services/game.service';
 import { I18nService } from './services/i18n.service';
 import { SeoService } from './services/seo.service';
+import { PwaService } from './services/pwa.service';
 import { AuthService } from './services/auth.service';
 import { FriendsService } from './services/friends.service';
 import { ChatService } from './services/chat.service';
@@ -74,6 +75,7 @@ export class App {
   private readonly i18n = inject(I18nService);
   // SEO/paylaşım meta servisini örnekle (dil değişince başlık/açıklama/OG tazeler).
   private readonly seo = inject(SeoService);
+  private readonly pwa = inject(PwaService);
   private readonly auth = inject(AuthService);
   private readonly friends = inject(FriendsService);
   private readonly chat = inject(ChatService);
@@ -103,6 +105,26 @@ export class App {
   protected readonly canClaimDaily = this.game.canClaimDaily;
   protected readonly claimableMissions = this.game.claimableMissions;
   protected readonly avatar = this.game.avatar;
+
+  // --- PWA (çevrimdışı / kurulum / güncelleme) ---------------
+  protected readonly online = this.pwa.online;
+  protected readonly pwaUpdateReady = this.pwa.updateReady;
+  /** "Ana ekrana ekle" gösterilebilir mi (uygun + kapatılmadı). */
+  protected readonly pwaInstallable = computed(
+    () => this.pwa.installable() && !this.installDismissed(),
+  );
+  private readonly installDismissed = signal(false);
+
+  onPwaInstall(): void {
+    void this.pwa.promptInstall();
+  }
+  onPwaUpdate(): void {
+    void this.pwa.applyUpdate();
+  }
+  /** Kurulum istemini kapat (ısrarcı olmasın — bu oturumda bir daha gösterme). */
+  onPwaDismissInstall(): void {
+    this.installDismissed.set(true);
+  }
 
   /** Ayarlar paneli açık mı? */
   protected readonly settingsOpen = signal(false);

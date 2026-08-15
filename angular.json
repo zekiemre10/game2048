@@ -48,7 +48,8 @@
                 }
               ],
               "outputHashing": "all",
-              "baseHref": "/"
+              "baseHref": "/",
+              "serviceWorker": "ngsw-config.json"
             },
             "development": {
               "optimization": false,

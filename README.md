@@ -11,12 +11,17 @@ mimarisi, signal tabanlı durum yönetimi, saf ve test edilebilir oyun mantığ�
 
 Bilgisayarda **ok tuşlarıyla**, telefonda **parmakla kaydırarak** oynanır.
 
-> **URL / PWA notu:** 2048 artık **alan adı kökünde** (`https://2048.aicirkit.com/`,
-> base href `/`) yayınlanır — eski alt yol `…/emre/2048/*` **301** ile köke taşınır
-> (kalan yol + sorgu dizesi korunur). API kökte **same-origin** (`/api`) → HTTPS'te
-> mixed-content yok. **PWA manifest'i YOKTUR** (uygulama yüklenebilir bir PWA değil,
-> `manifest.webmanifest` bulunmaz); dolayısıyla köke taşımanın "kurulu PWA'yı yeni
-> uygulama sayma" riski **yoktur** — manifest id kararı gerekmez.
+> **URL notu:** 2048 **alan adı kökünde** (`https://2048.aicirkit.com/`, base href
+> `/`) yayınlanır — eski alt yol `…/emre/2048/*` **301** ile köke taşınır (kalan yol
+> + sorgu dizesi korunur). API kökte **same-origin** (`/api`) → HTTPS'te mixed-content yok.
+>
+> **PWA:** oyun artık **kurulabilir** (📱 ana ekrana eklenir, kendi penceresinde
+> açılır) ve **çevrimdışı oynanır** (tek kişilik modlar). `manifest.webmanifest`
+> (`id: "/"` — ilk kimlik, kök taşımayla uyumlu), Angular service worker (kabuk +
+> ses önbelleği; **`/api` asla önbelleğe alınmaz**), çevrimdışı çevrimiçi
+> özellikleri kapatır + nedenini açıklar, yeni sürümde güncelleme bildirimi verir.
+> Çevrimdışı kazanılan altın/başarım, bağlanınca **alan-bazlı bulut senkronuyla**
+> kayıpsız birleşir (bkz. sync merge + `server/test_sync_merge.py`).
 
 ## Ekran Görüntüleri
 
@@ -628,4 +633,7 @@ altına kopyalanıp **alan adı kökünden** (`https://2048.aicirkit.com/`) serv
       og:image + og:locale + twitter card + canonical + hreflang; ?lang= ile
       paylaşım; robots.txt + sitemap.xml)
 - [x] Alan adı köküne taşıma (base href `/`; API kökte same-origin `/api`; SEO/
-      robots/sitemap → `https://2048.aicirkit.com/`; eski alt yol 301; PWA manifest yok)
+      robots/sitemap → `https://2048.aicirkit.com/`; eski alt yol 301)
+- [x] PWA (kurulabilir + çevrimdışı: manifest + ikonlar 192/512/maskable + Angular
+      service worker; kabuk/ses önbelleği, `/api` asla; çevrimdışı çevrimiçi
+      özellikleri kapatır; güncelleme + "ana ekrana ekle" istemi)

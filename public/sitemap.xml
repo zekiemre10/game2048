@@ -4,10 +4,10 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml"
 >
   <url>
-    <loc>http://34.158.136.9/emre/2048/</loc>
-    <xhtml:link rel="alternate" hreflang="tr" href="http://34.158.136.9/emre/2048/?lang=tr" />
-    <xhtml:link rel="alternate" hreflang="en" href="http://34.158.136.9/emre/2048/?lang=en" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="http://34.158.136.9/emre/2048/" />
+    <loc>https://2048.aicirkit.com/</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://2048.aicirkit.com/?lang=tr" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://2048.aicirkit.com/?lang=en" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://2048.aicirkit.com/" />
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>

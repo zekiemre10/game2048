@@ -7,9 +7,16 @@ mimarisi, signal tabanlı durum yönetimi, saf ve test edilebilir oyun mantığ�
 
 ## 🎮 Canlı Oyna
 
-### **http://34.158.136.9/emre/2048/**
+### **https://2048.aicirkit.com/**
 
 Bilgisayarda **ok tuşlarıyla**, telefonda **parmakla kaydırarak** oynanır.
+
+> **URL / PWA notu:** 2048 artık **alan adı kökünde** (`https://2048.aicirkit.com/`,
+> base href `/`) yayınlanır — eski alt yol `…/emre/2048/*` **301** ile köke taşınır
+> (kalan yol + sorgu dizesi korunur). API kökte **same-origin** (`/api`) → HTTPS'te
+> mixed-content yok. **PWA manifest'i YOKTUR** (uygulama yüklenebilir bir PWA değil,
+> `manifest.webmanifest` bulunmaz); dolayısıyla köke taşımanın "kurulu PWA'yı yeni
+> uygulama sayma" riski **yoktur** — manifest id kararı gerekmez.
 
 ## Ekran Görüntüleri
 
@@ -541,16 +548,18 @@ düzeltildikten sonra bir daha geri gelmesin diye kilitlendi.
 ## Derleme ve deploy
 
 ```bash
-# Üretim derlemesi (kök dizine kurulacaksa)
+# Üretim derlemesi — base href '/' (angular.json production'da tanımlı).
 npm run build
-
-# Alt dizine kurulacaksa base-href gerekir
-npx ng build --base-href /emre/2048/
 ```
 
+> ⚠️ `--base-href` bayrağını **Git-Bash/MSYS'de VERME**: `/` → `C:/Program Files/Git/…`
+> olarak bozulur (boş ekran). PowerShell kullan ya da `angular.json`'daki `baseHref: "/"`
+> varsayılanına güven.
+
 Çıktı `dist/game2048/browser/` klasörüne yazılır — statik dosyalar, herhangi bir
-web sunucusuyla servis edilebilir. Canlı sürüm bu dosyaların
-`/var/www/emre/2048/` altına kopyalanmasıyla yayınlanmıştır.
+web sunucusuyla servis edilebilir. Canlı sürüm bu dosyalar `/var/www/emre/2048/`
+altına kopyalanıp **alan adı kökünden** (`https://2048.aicirkit.com/`) servis edilir
+(nginx `root /var/www/emre/2048; location / {…}`, bkz. `airport-app/deploy/nginx/`).
 
 ## Yol haritası
 
@@ -618,3 +627,5 @@ web sunucusuyla servis edilebilir. Canlı sürüm bu dosyaların
 - [x] Çok dilli SEO (dile göre başlık/açıklama/OG çalışma zamanı güncellenir;
       og:image + og:locale + twitter card + canonical + hreflang; ?lang= ile
       paylaşım; robots.txt + sitemap.xml)
+- [x] Alan adı köküne taşıma (base href `/`; API kökte same-origin `/api`; SEO/
+      robots/sitemap → `https://2048.aicirkit.com/`; eski alt yol 301; PWA manifest yok)

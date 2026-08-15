@@ -11,7 +11,7 @@ import { Injectable, signal } from '@angular/core';
 const MUSIC_ON_KEY = 'game2048.musicOn';
 const VOLUME_KEY = 'game2048.musicVolume';
 
-/** Müzik dosyası — <base href> göre çözülür (dev'de /, canlıda /emre/2048/). */
+/** Müzik dosyası — <base href> (artık kök `/`) göre çözülür → /audio/calm-mind.mp3. */
 const TRACK_SRC = 'audio/calm-mind.mp3';
 
 /** Varsayılan ses seviyesi (0..1). */

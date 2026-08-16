@@ -46,6 +46,17 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PBKDF2_ITERS = 600_000  # OWASP 2024 önerisi (PBKDF2-SHA256)
 LEGACY_ITERS = 120_000  # eski hesapların hash'i (girişte yükseltilir)
 TOKEN_TTL = 60 * 60 * 24 * 90  # 90 gün
+
+# --- Yönetici (admin) ---------------------------------------------------
+# Yönetici oturumu normal oturumdan KISA ömürlü: jeton çalınırsa hasar
+# penceresi dar olsun. Admin uçları bu tazelikte oturum ister (yoksa yeniden
+# giriş gerekir). Normal oyun oturumları etkilenmez (TOKEN_TTL geçerli).
+ADMIN_SESSION_TTL = int(os.environ.get("GAME2048_ADMIN_SESSION_TTL", str(60 * 60 * 12)))  # 12 saat
+# İlk yöneticiyi GÜVENLİ tanımlama: bu env'e mevcut bir KULLANICI ADI yaz →
+# açılışta o kullanıcı admin yapılır (idempotent). Alternatif: elle SQL
+#   UPDATE users SET role='admin' WHERE username_lower = lower('<ad>');
+# Ayrıntı: server/ADMIN.md.
+ADMIN_BOOTSTRAP = os.environ.get("GAME2048_ADMIN_BOOTSTRAP", "").strip()
 MAX_BODY = 256 * 1024  # istek gövdesi üst sınırı (bellek koruması)
 MAX_DATA = 64 * 1024  # /sync ile saklanabilecek en büyük ilerleme kaydı
 MAX_SCORE = 10_000_000  # makul üst sınır (uydurma skorları ele)
@@ -510,6 +521,19 @@ def init_db():
             context TEXT,                   -- chat | profile | game
             created INTEGER NOT NULL
         );
+        -- Yönetici denetim kaydı: HER yönetim işlemi + yetkisiz erişim denemesi
+        -- buraya yazılır (kim, ne zaman, ne yaptı, hangi kayıt, hangi IP).
+        CREATE TABLE IF NOT EXISTS admin_audit (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            admin_id INTEGER,               -- yetkisiz denemede giriş yoksa NULL
+            admin_username TEXT,
+            action TEXT NOT NULL,           -- unauthorized_admin_access | set_role | ...
+            target_type TEXT,               -- user | endpoint | score | ...
+            target_id TEXT,
+            detail TEXT,
+            ip TEXT,
+            created INTEGER NOT NULL
+        );
         """
     )
     # Şema göçü: users.email kolonu (eski DB'de yoksa ekle)
@@ -523,7 +547,22 @@ def init_db():
         conn.execute("ALTER TABLE room_players ADD COLUMN level TEXT")
     except Exception:
         pass  # zaten var
+    # Şema göçü: users.role (yetki katmanı). Varsayılan 'user'; 'admin' yönetici.
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'")
+    except Exception:
+        pass  # zaten var
     conn.commit()
+    # İlk yönetici tanımı (env): GAME2048_ADMIN_BOOTSTRAP=<kullanıcı adı>.
+    # İdempotent — kullanıcı varsa admin yapar, yoksa sessiz geçer.
+    if ADMIN_BOOTSTRAP:
+        cur = conn.execute(
+            "UPDATE users SET role='admin' WHERE username_lower = ?",
+            (ADMIN_BOOTSTRAP.lower(),),
+        )
+        conn.commit()
+        if cur.rowcount:
+            print(f"[admin] bootstrap: '{ADMIN_BOOTSTRAP}' -> role=admin", flush=True)
     conn.close()
 
 
@@ -798,6 +837,35 @@ def user_from_token(conn, token: str):
     return row
 
 
+def admin_from_token(conn, token: str):
+    """Admin + TAZE oturum ister → admin kullanıcı satırı, yoksa None.
+
+    Normal oturumdan KISA `ADMIN_SESSION_TTL` uygulanır (çalınan jetonun hasar
+    penceresi dar olsun). Rol 'admin' değilse ya da oturum eskimişse None döner
+    → çağıran 403 verir. Böylece yetki kontrolü tek yerde toplanır."""
+    if not token:
+        return None
+    cutoff = int(time.time()) - ADMIN_SESSION_TTL
+    return conn.execute(
+        "SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id "
+        "WHERE s.token = ? AND s.created > ? AND u.role = 'admin'",
+        (token, cutoff),
+    ).fetchone()
+
+
+def audit_log(conn, admin_id, admin_username, action, target_type=None,
+              target_id=None, ip=None, detail=None):
+    """Her yönetim işlemi + yetkisiz erişim denemesi denetim kaydına yazılır."""
+    conn.execute(
+        "INSERT INTO admin_audit "
+        "(admin_id, admin_username, action, target_type, target_id, detail, ip, created) "
+        "VALUES (?,?,?,?,?,?,?,?)",
+        (admin_id, admin_username, action, target_type,
+         None if target_id is None else str(target_id), detail, ip, int(time.time())),
+    )
+    conn.commit()
+
+
 def are_friends(conn, a: int, b: int) -> bool:
     row = conn.execute(
         "SELECT 1 FROM friendships WHERE status='accepted' AND "
@@ -1001,6 +1069,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+        # Yönetim uçları arama motorlarına kapalı (panel ayrı uygulama olsa da
+        # API yolları da indekslenmesin).
+        if "/admin/" in self.path:
+            self.send_header("X-Robots-Tag", "noindex, nofollow, noarchive")
         self.end_headers()
         if body:
             self.wfile.write(body)
@@ -1099,6 +1171,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._leaderboard()
         if p == "/daily":
             return self._daily_info()
+        if p == "/admin/whoami":
+            return self._admin_whoami()
+        if p == "/admin/audit":
+            return self._admin_audit()
         return self._send(404, {"error": "not_found"})
 
     def _route_post(self):
@@ -1111,6 +1187,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._logout()
         if p == "/account/delete":
             return self._delete_account()
+        if p == "/admin/users/role":
+            return self._admin_set_role()
         if p == "/sync":
             return self._sync()
         if p == "/friends/request":
@@ -1318,6 +1396,87 @@ class Handler(BaseHTTPRequestHandler):
             conn.commit()
             print(f"[account] deleted user id={uid} username={row['username']}", flush=True)
             return self._send(200, {"ok": True})
+        finally:
+            conn.close()
+
+    # --- Yönetici (admin) uçları ---------------------------------------
+    #
+    # Yönetim panelinin KODU/YOLLARI oyun paketinde YOKTUR; yönetim yalnızca bu
+    # rol-korumalı /admin/* API'siyle yapılır (ayrı bir yönetim uygulaması tüketir
+    # — bkz. server/ADMIN.md). Tüm /admin/* yanıtları arama motorlarına kapalıdır
+    # (X-Robots-Tag: noindex — _send içinde), yetki kontrolü tek noktada toplanır
+    # (_admin_row) ve her işlem + yetkisiz deneme denetim kaydına yazılır.
+
+    def _admin_row(self, conn):
+        """Admin + TAZE oturum doğrular. Değilse denetim kaydı yazar, 403 yollar,
+        None döner. Her /admin/* handler'ı ilk satırda bunu çağırır → korumasız
+        yönetim ucu kalmaz."""
+        row = admin_from_token(conn, self._token())
+        if row is None:
+            who = user_from_token(conn, self._token())  # kim denedi (varsa)?
+            audit_log(conn, who["id"] if who else None,
+                      who["username"] if who else None,
+                      "unauthorized_admin_access", "endpoint", self._path(), self._ip())
+            self._send(403, {"error": "forbidden"})
+            return None
+        return row
+
+    def _admin_whoami(self):
+        """GET /admin/whoami — oturumun admin olduğunu doğrular (panel açılışı)."""
+        conn = db()
+        try:
+            row = self._admin_row(conn)
+            if row is None:
+                return
+            return self._send(200, {"username": row["username"], "role": row["role"], "admin": True})
+        finally:
+            conn.close()
+
+    def _admin_audit(self):
+        """GET /admin/audit?limit= — denetim kaydını okur (admin)."""
+        conn = db()
+        try:
+            row = self._admin_row(conn)
+            if row is None:
+                return
+            try:
+                limit = max(1, min(500, int(self._query("limit", "100"))))
+            except (TypeError, ValueError):
+                limit = 100
+            rows = conn.execute(
+                "SELECT admin_id, admin_username, action, target_type, target_id, "
+                "detail, ip, created FROM admin_audit ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+            return self._send(200, {"entries": [dict(r) for r in rows]})
+        finally:
+            conn.close()
+
+    def _admin_set_role(self):
+        """POST /admin/users/role {username, role} — rol ata (admin). Denetlenir."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            b = self._body()
+            uname = (b.get("username") or "").strip().lower()
+            role = (b.get("role") or "").strip()
+            if role not in ("user", "admin"):
+                return self._send(400, {"error": "bad_role"})
+            target = conn.execute(
+                "SELECT id, username, role FROM users WHERE username_lower = ?", (uname,)
+            ).fetchone()
+            if not target:
+                return self._send(404, {"error": "user_not_found"})
+            conn.execute("UPDATE users SET role = ? WHERE id = ?", (role, target["id"]))
+            # Yetki düşürülünce (admin → user) o kullanıcının açık oturumları kapanır.
+            if role != "admin":
+                conn.execute("DELETE FROM sessions WHERE user_id = ?", (target["id"],))
+            conn.commit()
+            audit_log(conn, admin["id"], admin["username"], "set_role",
+                      "user", target["id"], f"{target['role']} -> {role}", self._ip())
+            return self._send(200, {"ok": True, "username": target["username"], "role": role})
         finally:
             conn.close()
 

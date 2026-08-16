@@ -104,6 +104,12 @@ Yetki: **(Bearer)** işaretli uçlar `Authorization: Bearer <token>` ister
 | GET | `/health` | `{ok}` (sağlık kontrolü) |
 | POST | `/analysis` (Bearer) | 🧠 Kişisel koç — oyun özetinden LLM değerlendirmesi (yalnız girişliye, günlük sınırlı) |
 
+### Yönetici (admin)
+
+`/admin/*` uçları **rol-korumalı** (admin + kısa ömürlü taze oturum), denetlenir
+ve arama motorlarına kapalıdır. Yetki modeli, ilk yönetici tanımı (`GAME2048_ADMIN_BOOTSTRAP`
+ya da elle SQL), uç listesi ve denetim kaydı: **[`ADMIN.md`](ADMIN.md)**.
+
 ## Veri modeli (tablolar)
 
 `users` (kimlik + PBKDF2 **hash**'li parola + `data` JSON ilerleme), `sessions`

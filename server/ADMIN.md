@@ -139,8 +139,76 @@ yönetici kuyruğu **ayrı panele** aittir — bkz. "panel AYRI bir uygulamadır
   Kullanıcı kapatınca (localStorage) tekrar çıkmaz. i18n anahtarları `mod.*`
   (TR+EN). Testler: `moderation.service.spec.ts`.
 
+## Skor tablosu moderasyonu (hileli kayıtları temizle)
+
+Faz-2 sunucu doğrulaması (`replay_game` + `flagged_submissions`) gelecekteki
+hileyi zorlaştırır ama iki şey için elle araç şart: **geçmiş** şüpheli kayıtlar ve
+hiçbir doğrulamanın %100 olmaması. Bu katman skor tablosunun güvenilirliğini korur.
+
+> **Neden kritik:** tablo üç sekmeli (Bu Ay · Tüm Zamanlar · Arkadaşlar) ve aylık
+> şampiyona **2000 altın + güçler** veriliyor. Tek hileli kayıt tüm ayın yarışını
+> değersizleştirir.
+
+### Tespit (`score_audit.py` — saf, test edilir)
+
+Kayıt başına açıklanabilir işaretler:
+- **`score_below_tile_min`** (imkânsız): 2^k karesine ulaşmak için asgari skor
+  (k−1)·2^k'nın altında skor. (2048 → asgari 20480.)
+- **`moves_below_tile_min`** (imkânsız, yalnız `daily` — hamle saklanır): 2^k için
+  asgari 2^(k−1)−1 hamlenin altında.
+- **`high_score_per_move`** (şüpheli): skor/hamle oranı aşırı.
+- **`field_outlier`** (şüpheli): skor, alandaki 2.'yi katbekat aşıyor.
+- **`sudden_jump`** (şüpheli): oyuncunun önceki en iyisinin katbekat üstünde.
+- **Bilinen sınır:** oyun **süresi** hiçbir tabloda saklanmıyor → "imkânsız kısa
+  süre" doğrudan ölçülemez; oran + asgari-hamle bunun vekilidir.
+
+`impossible` = matematiksel olarak olanaksız (güçlü kanıt); `suspect` = elle
+inceleme gerekir. **Otomatik SİLME yok** — işaret yalnızca yöneticiyi yönlendirir.
+
+### Geçersiz kılma (silme değil — işaretleme, geri alınabilir)
+
+`score_invalidations (scope, period, user_id UNIQUE, score, reason, admin, reverted…)`.
+Aktif (reverted=0) kayıt, ilgili skor tablosundan **düşürülür**; hiçbir skor verisi
+silinmez → **geri alınabilir** (`reverted=1` tarihçeyi korur). **Gerekçe zorunlu**
+(boşsa `400 reason_required`). Tablodan düşme koddan uygulanır:
+- `monthly` → `_leaderboard` aylık sorgusu aktif geçersizleri filtreler.
+- `alltime`/`friends` (skor `users.data`'da) → `leaderboard_rows(exclude_ids=…)`.
+- Sıra hesapları da geçersizleri saymaz.
+
+### Aylık şampiyonluk düzeltmesi
+
+`month_champion_row` her zaman **geçerli** 1.'yi seçer; `resettle_month` ödülü
+yeniden atar:
+- Ödül **talep edilmemişse** → doğrudan sıradaki geçerli oyuncuya geçer.
+- **Talep edilmişse** (`claimed=1`) → `monthly_prizes.revoked=1`, ödül doğru
+  kazanana (talep edilmemiş) yazılır, `prize_revoked_claimed` denetime düşer,
+  eski kazanan bilgilendirilir. **Geri alma politikası:** verilmiş 2000 altının
+  otomatik geri alınması YAPILMAZ (bakiye negatife düşebilir / yıkıcı) →
+  **elle** yönetici kararı. Bu bilinçli bir tasarım seçimidir.
+
+### Uç noktalar (hepsi admin + taze oturum + denetlenir)
+
+| Yöntem | Yol | Ne |
+|--------|-----|-----|
+| GET | `/admin/scores?scope=&period=&flagged=&sort=&limit=` | kayıtlar + işaretler (scope: monthly\|alltime\|daily; sort: score\|severity) |
+| GET | `/admin/scores/report` | **ilk temizlik raporu**: son 6 ay + tüm-zamanlar + bugün; yalnız işaretliler, scope'a gruplu + özet |
+| POST | `/admin/scores/invalidate` `{userId, scope, period?, reason}` | geçersiz kıl (gerekçe zorunlu); aylık şampiyonsa resettle; kullanıcıya bildirim |
+| POST | `/admin/scores/revert` `{userId, scope, period?}` | geçersiz kılmayı geri al; aylık ise resettle |
+
+### Bildirim ve itiraz
+
+Her işlem etkilenen kullanıcıya `mod_notices` ile **sebebiyle** bildirilir
+(`score_invalidated` / `score_restored`) → `GET /moderation/notices` (oyuncu
+banner'ı gösterir). İtiraz: kullanıcı sebebi görüp hesap e-postasından iletir;
+yönetici `admin_audit` + kayıtla yeniden değerlendirir (`revert`).
+
+Testler: `test_score_audit.py` (saf matematik) + `test_score_moderation.py`
+(düşürme/geri alma/şampiyonluk/bildirim/denetim/yetki).
+
 ## NestJS geçişi notu
 
 Canlı backend **Python** (`server/app.py`). NestJS'e (`api-nest/`) devirde bu
 katman **birebir taşınmalı**: `role` alanı + admin guard (kısa TTL) + `admin_audit`
-+ `/admin/*` uçları + yetkisiz-deneme loglama. Aksi hâlde yönetim yüzeyi devirde korumasız kalır.
++ `/admin/*` uçları + yetkisiz-deneme loglama + **skor moderasyonu**
+(`score_invalidations` + tablo filtreleme + `resettle_month`). Aksi hâlde yönetim
+yüzeyi devirde korumasız kalır.

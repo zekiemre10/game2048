@@ -33,6 +33,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from replay import replay_game, daily_seed
 # Çok oyunculu bot artık SUNUCUDA koşar (adil, kararlı, manipüle edilemez).
 from bot_ai import play_bot_game, BOT_SPEED_MS, BOT_CHARACTERS
+# Skor tutarlılık denetimi (şüpheli/imkânsız leaderboard kaydı tespiti).
+import score_audit
 
 # Zorluk kademeleri (istemci AI_LEVELS ile aynı) + oda başına bot sınırı.
 BOT_LEVELS = ("easy", "medium", "hard", "expert")
@@ -550,6 +552,25 @@ def init_db():
             until INTEGER,                  -- süreli susturmada bitiş (epoch), yoksa NULL
             created INTEGER NOT NULL
         );
+        -- Skor tablosu moderasyonu: hileli/imkânsız kaydı SİLMEDEN geçersiz kıl.
+        -- Aktif (reverted=0) kayıt, ilgili skor tablosundan DÜŞÜRÜLÜR; geri
+        -- alınabilir (reverted=1 tarihçeyi korur). Gerekçe ZORUNLU + denetlenir.
+        CREATE TABLE IF NOT EXISTS score_invalidations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            scope TEXT NOT NULL,            -- monthly | alltime | daily
+            period TEXT NOT NULL DEFAULT '',-- YYYY-MM | YYYY-MM-DD | '' (alltime)
+            score INTEGER,                 -- geçersiz kılınan skorun anlık değeri
+            reason TEXT NOT NULL,          -- zorunlu gerekçe
+            admin_id INTEGER,
+            admin_username TEXT,
+            created INTEGER NOT NULL,
+            reverted INTEGER NOT NULL DEFAULT 0,
+            reverted_by TEXT,
+            reverted_at INTEGER,
+            UNIQUE(scope, period, user_id)
+        );
         """
     )
     # Şema göçü: users.email kolonu (eski DB'de yoksa ekle)
@@ -574,6 +595,7 @@ def init_db():
         "ALTER TABLE reports ADD COLUMN status TEXT NOT NULL DEFAULT 'new'",  # new | reviewing | resolved
         "ALTER TABLE users ADD COLUMN muted_until INTEGER NOT NULL DEFAULT 0",  # susturma bitişi (epoch)
         "ALTER TABLE users ADD COLUMN suspended INTEGER NOT NULL DEFAULT 0",    # askıya alındı mı (0/1)
+        "ALTER TABLE monthly_prizes ADD COLUMN revoked INTEGER NOT NULL DEFAULT 0",  # şampiyonluk düzeltildi mi (hile)
     ):
         try:
             conn.execute(stmt)
@@ -712,12 +734,26 @@ def friend_public(row) -> dict:
     }
 
 
-def leaderboard_rows(conn, user_ids=None, limit: int = 50):
-    """En yüksek skora göre sıralı oyuncu listesi.
+def active_invalid_ids(conn, scope: str, period: str = ""):
+    """Belirtilen tablo+dönem için AKTİF (geri alınmamış) geçersiz kılma olan
+    kullanıcı kimlikleri kümesi. Skor tablosu bu kişileri hariç tutar."""
+    rows = conn.execute(
+        "SELECT user_id FROM score_invalidations "
+        "WHERE scope=? AND period=? AND reverted=0",
+        (scope, period),
+    ).fetchall()
+    return {r["user_id"] for r in rows}
+
+
+def leaderboard_rows(conn, user_ids=None, limit: int = 50, exclude_ids=None):
+    """En yüksek skora göre sıralı oyuncu listesi (Tüm Zamanlar / Arkadaşlar).
 
     Skor `users.data` JSON'unun içinde tutulduğundan SQL ile sıralanamaz;
     satırlar okunup Python'da sıralanır. Kullanıcı sayısı bu ölçekte küçük
     olduğu için yeterli (gerekirse ileride ayrı bir sütuna taşınabilir).
+
+    `exclude_ids`: skor moderasyonunda geçersiz kılınan (alltime) kullanıcılar —
+    tablodan tamamen düşürülür.
     """
     if user_ids is not None:
         if not user_ids:
@@ -731,6 +767,8 @@ def leaderboard_rows(conn, user_ids=None, limit: int = 50):
         rows = conn.execute("SELECT id, username, data FROM users").fetchall()
 
     people = [friend_public(r) for r in rows]
+    if exclude_ids:
+        people = [p for p in people if p["id"] not in exclude_ids]
     people.sort(
         key=lambda p: (-p["bestScore"], -p["bestTile"], p["username"].lower())
     )
@@ -776,11 +814,7 @@ def settle_finished_months(conn) -> None:
         ).fetchone()
         if exists:
             continue
-        top = conn.execute(
-            "SELECT user_id, username, score FROM monthly_scores "
-            "WHERE month = ? AND score > 0 ORDER BY score DESC, updated ASC LIMIT 1",
-            (month,),
-        ).fetchone()
+        top = month_champion_row(conn, month)
         if not top:
             continue
         conn.execute(
@@ -789,6 +823,70 @@ def settle_finished_months(conn) -> None:
             (month, top["user_id"], top["username"], top["score"], int(time.time())),
         )
     conn.commit()
+
+
+def month_champion_row(conn, month: str):
+    """O ayın GEÇERLİ (geçersiz kılınmamış) 1.'si — hile temizliğinden sonra da
+    doğru kazananı verir. Geçersiz kılınanlar atlanır."""
+    invalid = active_invalid_ids(conn, "monthly", month)
+    rows = conn.execute(
+        "SELECT user_id, username, score FROM monthly_scores "
+        "WHERE month = ? AND score > 0 ORDER BY score DESC, updated ASC LIMIT 200",
+        (month,),
+    ).fetchall()
+    for r in rows:
+        if r["user_id"] not in invalid:
+            return r
+    return None
+
+
+def resettle_month(conn, month: str):
+    """Bir ayın şampiyonluğunu YENİDEN değerlendir (hileli kazanan geçersiz
+    kılınınca ödül sıradaki GEÇERLİ oyuncuya geçsin).
+
+    Dönen: {changed, old, new, claimed_conflict} — old/new kazanan kaydı.
+    - Ödül henüz TALEP EDİLMEDİYSE: eski kayıt yeni kazananla değiştirilir.
+    - TALEP EDİLDİYSE (claimed=1): eski ödül `revoked=1` işaretlenir (geri alma
+      politikası: altın iadesi ELLE — bkz. ADMIN.md), doğru kazanana YENİ, talep
+      edilmemiş bir ödül kaydı yazılır; `claimed_conflict=True` döner.
+    """
+    now = int(time.time())
+    prize = conn.execute(
+        "SELECT * FROM monthly_prizes WHERE month=?", (month,)
+    ).fetchone()
+    champ = month_champion_row(conn, month)
+    new_id = champ["user_id"] if champ else None
+    old_id = prize["user_id"] if prize else None
+    if old_id == new_id:
+        return {"changed": False, "old": old_id, "new": new_id, "claimed_conflict": False}
+
+    if prize is None:
+        # Henüz ödül yoktu (ör. cari-öncesi hiç settle olmadı) → yaz.
+        if champ:
+            conn.execute(
+                "INSERT OR IGNORE INTO monthly_prizes "
+                "(month, user_id, username, score, claimed, created) VALUES (?,?,?,?,0,?)",
+                (month, champ["user_id"], champ["username"], champ["score"], now),
+            )
+        conn.commit()
+        return {"changed": bool(champ), "old": None, "new": new_id, "claimed_conflict": False}
+
+    # Ödül kaydı her zaman GEÇERLİ (doğru) kazananı tutar. Talep edilmişse
+    # revoked=1 işaretle (denetim + eski kazanana bildirim çağıran tarafta;
+    # altın iadesi ELLE — geri alma politikası ADMIN.md).
+    claimed_conflict = bool(prize["claimed"])
+    if champ:
+        conn.execute(
+            "UPDATE monthly_prizes SET user_id=?, username=?, score=?, "
+            "claimed=0, revoked=?, created=? WHERE month=?",
+            (champ["user_id"], champ["username"], champ["score"],
+             1 if claimed_conflict else 0, now, month),
+        )
+    else:
+        # Geriye geçerli kazanan kalmadı → ödülü tamamen kaldır.
+        conn.execute("DELETE FROM monthly_prizes WHERE month=?", (month,))
+    conn.commit()
+    return {"changed": True, "old": old_id, "new": new_id, "claimed_conflict": claimed_conflict}
 
 
 # YZ ile küratörlenmiş günlük tohum takvimi (scripts/gen-daily-calendar.mjs).
@@ -1213,6 +1311,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._admin_reports()
         if p == "/admin/reports/context":
             return self._admin_report_context()
+        if p == "/admin/scores":
+            return self._admin_scores()
+        if p == "/admin/scores/report":
+            return self._admin_scores_report()
         if p == "/blocks":
             return self._blocks_list()
         if p == "/moderation/notices":
@@ -1235,6 +1337,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._admin_moderate()
         if p == "/admin/reports/resolve":
             return self._admin_report_resolve()
+        if p == "/admin/scores/invalidate":
+            return self._admin_scores_invalidate()
+        if p == "/admin/scores/revert":
+            return self._admin_scores_revert()
         if p == "/block":
             return self._block()
         if p == "/unblock":
@@ -1666,6 +1772,288 @@ class Handler(BaseHTTPRequestHandler):
             audit_log(conn, admin["id"], admin["username"], f"moderate:{action}",
                       "user", target["id"], reason, self._ip())
             return self._send(200, {"ok": True, "action": action, "until": until})
+        finally:
+            conn.close()
+
+    # --- Skor tablosu moderasyonu -------------------------------
+    def _score_records(self, conn, scope, period):
+        """Bir tablo+dönemin skor kayıtları + tutarlılık işaretleri + geçersizlik
+        durumu. scope: monthly | alltime | daily."""
+        invalid = active_invalid_ids(conn, scope, period if scope != "alltime" else "")
+        recs = []
+        if scope == "monthly":
+            rows = conn.execute(
+                "SELECT user_id, username, score, best FROM monthly_scores "
+                "WHERE month=? ORDER BY score DESC, best DESC LIMIT 500",
+                (period,),
+            ).fetchall()
+            scores = [r["score"] for r in rows]
+            second = scores[1] if len(scores) > 1 else None
+            for r in rows:
+                flags = score_audit.analyze_record(
+                    r["score"], r["best"], moves=None, field_second=second,
+                )
+                recs.append(self._score_rec(r["user_id"], r["username"], r["score"],
+                                            r["best"], None, flags, invalid))
+        elif scope == "daily":
+            rows = conn.execute(
+                "SELECT user_id, username, score, best, moves FROM daily_scores "
+                "WHERE day=? ORDER BY score DESC LIMIT 500",
+                (period,),
+            ).fetchall()
+            scores = [r["score"] for r in rows]
+            second = scores[1] if len(scores) > 1 else None
+            for r in rows:
+                flags = score_audit.analyze_record(
+                    r["score"], r["best"], moves=r["moves"], field_second=second,
+                )
+                recs.append(self._score_rec(r["user_id"], r["username"], r["score"],
+                                            r["best"], r["moves"], flags, invalid))
+        else:  # alltime — skor users.data içinde
+            rows = conn.execute("SELECT id, username, data FROM users").fetchall()
+            people = [friend_public(r) for r in rows]
+            people.sort(key=lambda p: -p["bestScore"])
+            second = people[1]["bestScore"] if len(people) > 1 else None
+            for p in people[:500]:
+                if p["bestScore"] <= 0:
+                    continue
+                flags = score_audit.analyze_record(
+                    p["bestScore"], p["bestTile"], moves=None, field_second=second,
+                )
+                recs.append(self._score_rec(p["id"], p["username"], p["bestScore"],
+                                            p["bestTile"], None, flags, invalid))
+        return recs
+
+    def _score_rec(self, uid, uname, score, tile, moves, flags, invalid_ids):
+        return {
+            "userId": uid,
+            "username": uname,
+            "score": score,
+            "bestTile": tile,
+            "moves": moves,
+            "flags": flags,
+            "severity": score_audit.worst_severity(flags),
+            "invalidated": uid in invalid_ids,
+        }
+
+    def _admin_scores(self):
+        """GET /admin/scores?scope=&period=&flagged=&sort=&limit= -> skor kayıtları
+        + şüphe işaretleri (yönetici). scope: monthly|alltime|daily."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            scope = (self._query("scope") or "monthly").lower()
+            if scope not in ("monthly", "alltime", "daily"):
+                return self._send(400, {"error": "bad_scope"})
+            period = (self._query("period") or "").strip()
+            if scope == "monthly" and not period:
+                period = utc_month()
+            elif scope == "daily" and not period:
+                period = utc_day()
+            elif scope == "alltime":
+                period = ""
+            recs = self._score_records(conn, scope, period)
+            if self._query("flagged") in ("1", "true"):
+                recs = [r for r in recs if r["flags"]]
+            sort = (self._query("sort") or "score").lower()
+            if sort == "severity":
+                order = {"impossible": 0, "suspect": 1, "": 2}
+                recs.sort(key=lambda r: (order.get(r["severity"], 3), -r["score"]))
+            else:
+                recs.sort(key=lambda r: -r["score"])
+            try:
+                limit = max(1, min(int(self._query("limit") or 200), 500))
+            except ValueError:
+                limit = 200
+            return self._send(200, {"scope": scope, "period": period,
+                                    "records": recs[:limit]})
+        finally:
+            conn.close()
+
+    def _admin_scores_report(self):
+        """GET /admin/scores/report -> İLK TEMİZLİK RAPORU: tüm tablolarda
+        (aylık: mevcut+son 3 ay, tüm-zamanlar, günlük: bugün) yalnız İŞARETLİ
+        kayıtlar, scope'a göre gruplu + özet. Yönetici."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            groups = {}
+            # Aylık: mevcut + geçmiş aylar (skor tablosunda kaydı olanlar)
+            months = [r["month"] for r in conn.execute(
+                "SELECT DISTINCT month FROM monthly_scores ORDER BY month DESC LIMIT 6"
+            ).fetchall()]
+            monthly_flagged = []
+            for m in months:
+                for r in self._score_records(conn, "monthly", m):
+                    if r["flags"]:
+                        monthly_flagged.append({**r, "period": m})
+            groups["monthly"] = monthly_flagged
+            groups["alltime"] = [r for r in self._score_records(conn, "alltime", "")
+                                 if r["flags"]]
+            today = utc_day()
+            groups["daily"] = [{**r, "period": today}
+                               for r in self._score_records(conn, "daily", today)
+                               if r["flags"]]
+            summary = {
+                k: {
+                    "flagged": len(v),
+                    "impossible": sum(1 for r in v if r["severity"] == "impossible"),
+                    "suspect": sum(1 for r in v if r["severity"] == "suspect"),
+                }
+                for k, v in groups.items()
+            }
+            total = sum(s["flagged"] for s in summary.values())
+            audit_log(conn, admin["id"], admin["username"], "scores_cleanup_report",
+                      "score", None, f"flagged={total}", self._ip())
+            return self._send(200, {"summary": summary, "total_flagged": total,
+                                    "groups": groups, "months_scanned": months})
+        finally:
+            conn.close()
+
+    def _score_value(self, conn, scope, period, user_id):
+        """Bir kaydın anlık skoru (geçersiz kılma sırasında saklamak için)."""
+        if scope == "monthly":
+            row = conn.execute("SELECT score FROM monthly_scores WHERE month=? AND user_id=?",
+                               (period, user_id)).fetchone()
+            return row["score"] if row else None
+        if scope == "daily":
+            row = conn.execute("SELECT score FROM daily_scores WHERE day=? AND user_id=?",
+                               (period, user_id)).fetchone()
+            return row["score"] if row else None
+        row = conn.execute("SELECT data FROM users WHERE id=?", (user_id,)).fetchone()
+        if not row:
+            return None
+        try:
+            d = json.loads(row["data"] or "{}")
+        except Exception:
+            d = {}
+        return int(d.get("bestScore") or 0)
+
+    def _admin_scores_invalidate(self):
+        """POST /admin/scores/invalidate {userId, scope, period?, reason} -> skoru
+        GEÇERSİZ KIL (silme değil, işaretleme). Gerekçe ZORUNLU. Tablodan düşer,
+        aylık şampiyonsa ödül sıradakine geçer, kullanıcı bilgilendirilir, denetlenir."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            b = self._body()
+            scope = str(b.get("scope") or "").lower()
+            if scope not in ("monthly", "alltime", "daily"):
+                return self._send(400, {"error": "bad_scope"})
+            reason = str(b.get("reason") or "").strip()[:300]
+            if not reason:
+                return self._send(400, {"error": "reason_required"})
+            try:
+                user_id = int(b.get("userId"))
+            except (TypeError, ValueError):
+                return self._send(400, {"error": "bad_user"})
+            target = conn.execute("SELECT id, username, role FROM users WHERE id=?",
+                                  (user_id,)).fetchone()
+            if not target:
+                return self._send(404, {"error": "user_not_found"})
+            period = str(b.get("period") or "").strip()
+            if scope == "monthly" and not period:
+                period = utc_month()
+            elif scope == "daily" and not period:
+                period = utc_day()
+            elif scope == "alltime":
+                period = ""
+            now = int(time.time())
+            snap = self._score_value(conn, scope, period, user_id)
+            # UNIQUE(scope,period,user_id): tekrar → yeniden etkinleştir.
+            conn.execute(
+                "INSERT INTO score_invalidations "
+                "(user_id, username, scope, period, score, reason, admin_id, "
+                "admin_username, created, reverted) VALUES (?,?,?,?,?,?,?,?,?,0) "
+                "ON CONFLICT(scope, period, user_id) DO UPDATE SET "
+                "reason=excluded.reason, score=excluded.score, admin_id=excluded.admin_id, "
+                "admin_username=excluded.admin_username, created=excluded.created, "
+                "reverted=0, reverted_by=NULL, reverted_at=NULL",
+                (user_id, target["username"], scope, period, snap, reason,
+                 admin["id"], admin["username"], now),
+            )
+            conn.commit()
+            # Aylık şampiyonluk düzeltmesi (gerekiyorsa).
+            resettle = None
+            if scope == "monthly":
+                resettle = resettle_month(conn, period)
+            # Etkilenen kullanıcıya SEBEBİYLE bildir.
+            conn.execute(
+                "INSERT INTO mod_notices (user_id, action, reason, until, created) "
+                "VALUES (?,?,?,?,?)",
+                (user_id, "score_invalidated",
+                 f"[{scope} {period}] {reason}".strip(), None, now),
+            )
+            conn.commit()
+            audit_log(conn, admin["id"], admin["username"], "score_invalidate",
+                      "score", f"{scope}:{period}:{user_id}",
+                      f"score={snap} reason={reason}", self._ip())
+            if resettle and resettle.get("claimed_conflict"):
+                audit_log(conn, admin["id"], admin["username"],
+                          "prize_revoked_claimed", "score", f"monthly:{period}",
+                          f"old_winner={resettle.get('old')} new_winner={resettle.get('new')} "
+                          "gold_clawback=manual", self._ip())
+            return self._send(200, {"ok": True, "scope": scope, "period": period,
+                                    "resettle": resettle})
+        finally:
+            conn.close()
+
+    def _admin_scores_revert(self):
+        """POST /admin/scores/revert {userId, scope, period?} -> geçersiz kılmayı
+        GERİ AL (skor tabloya döner). Aylık ise şampiyonluk yeniden değerlendirilir.
+        Kullanıcı bilgilendirilir, denetlenir."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            b = self._body()
+            scope = str(b.get("scope") or "").lower()
+            if scope not in ("monthly", "alltime", "daily"):
+                return self._send(400, {"error": "bad_scope"})
+            try:
+                user_id = int(b.get("userId"))
+            except (TypeError, ValueError):
+                return self._send(400, {"error": "bad_user"})
+            period = str(b.get("period") or "").strip()
+            if scope == "monthly" and not period:
+                period = utc_month()
+            elif scope == "daily" and not period:
+                period = utc_day()
+            elif scope == "alltime":
+                period = ""
+            now = int(time.time())
+            row = conn.execute(
+                "SELECT id FROM score_invalidations "
+                "WHERE scope=? AND period=? AND user_id=? AND reverted=0",
+                (scope, period, user_id),
+            ).fetchone()
+            if not row:
+                return self._send(404, {"error": "not_invalidated"})
+            conn.execute(
+                "UPDATE score_invalidations SET reverted=1, reverted_by=?, reverted_at=? "
+                "WHERE id=?",
+                (admin["username"], now, row["id"]),
+            )
+            conn.commit()
+            resettle = resettle_month(conn, period) if scope == "monthly" else None
+            conn.execute(
+                "INSERT INTO mod_notices (user_id, action, reason, until, created) "
+                "VALUES (?,?,?,?,?)",
+                (user_id, "score_restored",
+                 f"[{scope} {period}] geçersiz kılma geri alındı".strip(), None, now),
+            )
+            conn.commit()
+            audit_log(conn, admin["id"], admin["username"], "score_revert",
+                      "score", f"{scope}:{period}:{user_id}", "", self._ip())
+            return self._send(200, {"ok": True, "scope": scope, "period": period,
+                                    "resettle": resettle})
         finally:
             conn.close()
 
@@ -2447,11 +2835,14 @@ class Handler(BaseHTTPRequestHandler):
 
             if scope == "monthly":
                 month = utc_month()
+                invalid = active_invalid_ids(conn, "monthly", month)
                 rows = conn.execute(
                     "SELECT user_id, username, score, best FROM monthly_scores "
-                    "WHERE month = ? ORDER BY score DESC, best DESC, updated ASC LIMIT 50",
+                    "WHERE month = ? ORDER BY score DESC, best DESC, updated ASC LIMIT 200",
                     (month,),
                 ).fetchall()
+                # Geçersiz kılınanları düş, sonra ilk 50'yi sırala.
+                rows = [r for r in rows if r["user_id"] not in invalid][:50]
                 top = [
                     {
                         "id": r["user_id"],
@@ -2464,17 +2855,18 @@ class Handler(BaseHTTPRequestHandler):
                     for i, r in enumerate(rows)
                 ]
                 mine = next((p for p in top if p["id"] == me["id"]), None)
-                if mine is None:
+                if mine is None and me["id"] not in invalid:
                     own = conn.execute(
                         "SELECT score, best FROM monthly_scores WHERE month=? AND user_id=?",
                         (month, me["id"]),
                     ).fetchone()
                     if own:
-                        rank = conn.execute(
-                            "SELECT COUNT(*) AS n FROM monthly_scores "
-                            "WHERE month=? AND score > ?",
+                        # Benden yüksek + GEÇERLİ kayıt sayısı → gerçek sıram.
+                        higher = conn.execute(
+                            "SELECT user_id FROM monthly_scores WHERE month=? AND score > ?",
                             (month, own["score"]),
-                        ).fetchone()["n"] + 1
+                        ).fetchall()
+                        rank = sum(1 for h in higher if h["user_id"] not in invalid) + 1
                         mine = {
                             "id": me["id"],
                             "username": me["username"],
@@ -2499,14 +2891,18 @@ class Handler(BaseHTTPRequestHandler):
                     (me["id"], me["id"], me["id"]),
                 ).fetchall()
                 ids = [r["other"] for r in rows] + [me["id"]]
-                top = leaderboard_rows(conn, user_ids=ids)
+                # Tüm Zamanlar/Arkadaşlar skoru users.data'dan gelir → alltime
+                # geçersiz kılınanları düş (kendim hariç: kendi skorumu görebilirim).
+                excl = active_invalid_ids(conn, "alltime") - {me["id"]}
+                top = leaderboard_rows(conn, user_ids=ids, exclude_ids=excl)
                 mine = next((p for p in top if p["id"] == me["id"]), None)
             else:
-                top = leaderboard_rows(conn)
+                excl = active_invalid_ids(conn, "alltime") - {me["id"]}
+                top = leaderboard_rows(conn, exclude_ids=excl)
                 mine = next((p for p in top if p["id"] == me["id"]), None)
                 if mine is None:
                     # İlk 50'de değilim → gerçek sıramı ayrıca hesapla
-                    everyone = leaderboard_rows(conn, limit=10_000_000)
+                    everyone = leaderboard_rows(conn, limit=10_000_000, exclude_ids=excl)
                     mine = next(
                         (p for p in everyone if p["id"] == me["id"]), None
                     )

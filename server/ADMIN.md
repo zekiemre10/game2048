@@ -76,6 +76,51 @@ action, target_type, target_id, detail, ip, created`. Okuma: `GET /admin/audit`.
 Yeni bir `/admin/*` ucu eklerken **ilk satır** `_admin_row(conn)` olmalı (None
 dönerse `return`), ve durum değiştiren her işlem `audit_log(...)` çağırmalı.
 
+## Sohbet moderasyonu ve şikayet
+
+Katmanlı koruma (arkadaşlar arası özel sohbet için):
+
+1. **Engelleme (kullanıcı düzeyi — en hızlı koruma, yönetici beklemez):**
+   `POST /block` · `POST /unblock` · `GET /blocks`. Engellenen kişi artık
+   engelleyene **mesaj ve arkadaş isteği gönderemez** (`_message_send` /
+   `_friend_request` içinde `is_blocked` kontrolü). Engelleme mevcut arkadaşlığı da kaldırır.
+2. **Şikayet:** `POST /report {targetId|targetUsername, reason, detail?, msgId?, context?}`
+   → `reports` tablosuna `status='new'` düşer. `msgId` verilirse panelde SINIRLI
+   bağlam o mesajın etrafında gösterilir.
+3. **Otomatik filtre:** yasaklı kelime listesi (`contains_banned`) mesaj + kullanıcı
+   adında zaten uygulanır (Faz-2 sertleştirme).
+4. **Yönetici müdahalesi:** `GET /admin/reports?status=` (kuyruk), `POST
+   /admin/reports/resolve {id,status}` (new/reviewing/resolved), `POST
+   /admin/users/moderate {username, action, minutes?, reason}` —
+   action: `warn | mute | unmute | suspend | unsuspend`.
+   - **mute:** süreli (1 dk–30 gün); susturulan **mesaj gönderemez**.
+   - **suspend:** hesap **giriş yapamaz**, açık oturumları kapatılır.
+   - Hepsi **denetim kaydına** (`admin_audit`) yazılır.
+
+### 🔐 Gizlilik (kodda uygulanır — sadece belgede değil)
+
+Bunlar **özel** mesajlar. Yönetici **serbest sohbet TARAYAMAZ**: rastgele iki
+kullanıcının konuşmasını çeken bir uç **yoktur**. Tek erişim
+`GET /admin/reports/context?id=<reportId>` ve o da **yalnızca** şikayet edilen
+mesajın (`msg_id`) **en çok ±3** komşusunu, **yalnızca** şikayet eden ile edilen
+arasında döndürür (`_admin_report_context`, `CTX=3`). `msg_id` yoksa sohbet
+içeriği hiç dönmez. Bu bağlam erişimi de denetim kaydına yazılır.
+
+### Bildirim ve itiraz
+
+Her moderasyon eylemi etkilenen kullanıcıya **sebebiyle** bildirilir
+(`mod_notices` → `GET /moderation/notices`; susturma bitişi + askı durumu dahil).
+**İtiraz:** kullanıcı bildirimdeki sebebi görüp itirazını hesap e-postasından
+iletir; yönetici `admin_audit` + şikayet bağlamıyla yeniden değerlendirir
+(gerekirse `unmute`/`unsuspend`).
+
+### Kullanıcılara duyurulacak politika
+
+"Özel mesajların gizlidir; **yalnızca hakkında şikayet gelirse**, şikayet edilen
+mesaj ve dar bir çevresi yöneticiye görünür. Yönetici sohbetlerini serbestçe
+okuyamaz." (Bkz. ana `README.md` → Gizlilik ve veri; arayüzde şikayet/engelle
+akışında da gösterilmeli.)
+
 ## NestJS geçişi notu
 
 Canlı backend **Python** (`server/app.py`). NestJS'e (`api-nest/`) devirde bu

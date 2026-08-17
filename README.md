@@ -544,6 +544,11 @@ Giriş/kayıt olursan sunucuda (**uygulamanın kendi sunucusu**, üçüncü tara
 
 - **Üçüncü taraf yok:** reklam, analitik veya izleyici **yok**. Veri yalnızca
   oyunun kendi sunucusunda.
+- **Özel sohbet + moderasyon:** Arkadaş mesajların **gizlidir**. Rahatsız eden
+  birini **engelleyebilir** (mesaj/istek kesilir) ya da **şikayet edebilirsin**.
+  Yönetici sohbetleri **serbestçe okuyamaz** — yalnızca **hakkında şikayet
+  gelirse**, şikayet edilen mesaj ve **dar bir çevresi** görünür (kodda kısıtlı).
+  Moderasyon işlemi (uyarı/susturma/askı) sana **sebebiyle bildirilir**.
 - **🧠 Kişisel koç:** yalnızca oyunun **özeti** (mod, skor, doğruluk, dönüm
   noktası) `/analysis`'e gider; LLM API anahtarı **yalnız sunucuda**, istemci
   paketine asla girmez. Girişli değilsen bu özellik çalışmaz.

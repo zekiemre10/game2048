@@ -534,6 +534,22 @@ def init_db():
             ip TEXT,
             created INTEGER NOT NULL
         );
+        -- Kullanıcı engelleme: engelleyen, engellenenin mesaj/isteğini almaz.
+        CREATE TABLE IF NOT EXISTS blocks (
+            blocker_id INTEGER NOT NULL,
+            blocked_id INTEGER NOT NULL,
+            created INTEGER NOT NULL,
+            PRIMARY KEY (blocker_id, blocked_id)
+        );
+        -- Moderasyon bildirimleri: etkilenen kullanıcıya SEBEBİYLE gösterilir.
+        CREATE TABLE IF NOT EXISTS mod_notices (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            action TEXT NOT NULL,           -- warn | mute | suspend | unmute | unsuspend
+            reason TEXT,
+            until INTEGER,                  -- süreli susturmada bitiş (epoch), yoksa NULL
+            created INTEGER NOT NULL
+        );
         """
     )
     # Şema göçü: users.email kolonu (eski DB'de yoksa ekle)
@@ -552,6 +568,17 @@ def init_db():
         conn.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'")
     except Exception:
         pass  # zaten var
+    # Şema göçü: moderasyon alanları.
+    for stmt in (
+        "ALTER TABLE reports ADD COLUMN msg_id INTEGER",              # şikayet edilen mesaj (opsiyonel)
+        "ALTER TABLE reports ADD COLUMN status TEXT NOT NULL DEFAULT 'new'",  # new | reviewing | resolved
+        "ALTER TABLE users ADD COLUMN muted_until INTEGER NOT NULL DEFAULT 0",  # susturma bitişi (epoch)
+        "ALTER TABLE users ADD COLUMN suspended INTEGER NOT NULL DEFAULT 0",    # askıya alındı mı (0/1)
+    ):
+        try:
+            conn.execute(stmt)
+        except Exception:
+            pass  # zaten var
     conn.commit()
     # İlk yönetici tanımı (env): GAME2048_ADMIN_BOOTSTRAP=<kullanıcı adı>.
     # İdempotent — kullanıcı varsa admin yapar, yoksa sessiz geçer.
@@ -875,6 +902,13 @@ def are_friends(conn, a: int, b: int) -> bool:
     return row is not None
 
 
+def is_blocked(conn, blocker: int, blocked: int) -> bool:
+    """blocker kullanıcısı blocked'ı engellemiş mi? (tek yön)"""
+    return conn.execute(
+        "SELECT 1 FROM blocks WHERE blocker_id=? AND blocked_id=?", (blocker, blocked)
+    ).fetchone() is not None
+
+
 # Oda kodunda karışması kolay karakterler yok (0/O, 1/I)
 ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
@@ -1175,6 +1209,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._admin_whoami()
         if p == "/admin/audit":
             return self._admin_audit()
+        if p == "/admin/reports":
+            return self._admin_reports()
+        if p == "/admin/reports/context":
+            return self._admin_report_context()
+        if p == "/blocks":
+            return self._blocks_list()
+        if p == "/moderation/notices":
+            return self._mod_notices()
         return self._send(404, {"error": "not_found"})
 
     def _route_post(self):
@@ -1189,6 +1231,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._delete_account()
         if p == "/admin/users/role":
             return self._admin_set_role()
+        if p == "/admin/users/moderate":
+            return self._admin_moderate()
+        if p == "/admin/reports/resolve":
+            return self._admin_report_resolve()
+        if p == "/block":
+            return self._block()
+        if p == "/unblock":
+            return self._unblock()
         if p == "/sync":
             return self._sync()
         if p == "/friends/request":
@@ -1329,6 +1379,9 @@ class Handler(BaseHTTPRequestHandler):
             if not row or not check_pw(conn, row, password):
                 return self._send(401, {"error": "bad_credentials"})
             login_succeeded(uname)
+            # Askıya alınmış hesap giriş yapamaz (moderasyon).
+            if row["suspended"]:
+                return self._send(403, {"error": "suspended"})
             token = make_token(conn, row["id"])
             return self._send(200, {"token": token, "user": user_public(row)})
         finally:
@@ -1480,6 +1533,142 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             conn.close()
 
+    def _admin_reports(self):
+        """GET /admin/reports?status= -> şikayet kuyruğu (yeni önce). Admin."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            status = (self._query("status") or "").strip().lower()
+            q = ("SELECT r.id, r.reason, r.detail, r.context, r.msg_id, r.status, r.created, "
+                 "ru.username AS reporter, tu.username AS target, r.target_id "
+                 "FROM reports r JOIN users ru ON ru.id=r.reporter_id "
+                 "JOIN users tu ON tu.id=r.target_id ")
+            args = ()
+            if status in ("new", "reviewing", "resolved"):
+                q += "WHERE r.status=? "
+                args = (status,)
+            q += "ORDER BY (r.status='new') DESC, r.id DESC LIMIT 200"
+            rows = conn.execute(q, args).fetchall()
+            return self._send(200, {"reports": [dict(r) for r in rows]})
+        finally:
+            conn.close()
+
+    def _admin_report_context(self):
+        """GET /admin/reports/context?id=<reportId> -> şikayet edilen mesaj + SINIRLI çevresi.
+
+        GİZLİLİK (kodda uygulanır): Yönetici serbest sohbet TARAYAMAZ. Yalnızca
+        şikayete bağlı mesajın (msg_id) en çok ±3'ü, YALNIZCA şikayet eden ile
+        edilen arasında döner. msg_id yoksa sohbet İÇERİĞİ hiç dönmez."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            rid = self._query("id")
+            if not str(rid).isdigit():
+                return self._send(400, {"error": "bad_id"})
+            rep = conn.execute(
+                "SELECT id, reporter_id, target_id, reason, detail, msg_id, status, created "
+                "FROM reports WHERE id=?", (int(rid),)
+            ).fetchone()
+            if not rep:
+                return self._send(404, {"error": "report_not_found"})
+            out = {"report": dict(rep), "context": []}
+            if rep["msg_id"]:
+                CTX = 3  # SINIR: şikayet edilen mesajın en çok ±3'ü
+                a, b = rep["reporter_id"], rep["target_id"]
+                pair = "((from_id=? AND to_id=?) OR (from_id=? AND to_id=?))"
+                pargs = (a, b, b, a)
+                before = conn.execute(
+                    f"SELECT id, from_id, to_id, body, created FROM messages "
+                    f"WHERE id <= ? AND {pair} ORDER BY id DESC LIMIT ?",
+                    (rep["msg_id"], *pargs, CTX + 1),
+                ).fetchall()
+                after = conn.execute(
+                    f"SELECT id, from_id, to_id, body, created FROM messages "
+                    f"WHERE id > ? AND {pair} ORDER BY id ASC LIMIT ?",
+                    (rep["msg_id"], *pargs, CTX),
+                ).fetchall()
+                out["context"] = list(reversed([dict(r) for r in before])) + [dict(r) for r in after]
+                audit_log(conn, admin["id"], admin["username"], "view_report_context",
+                          "report", rep["id"], f"msg={rep['msg_id']}", self._ip())
+            return self._send(200, out)
+        finally:
+            conn.close()
+
+    def _admin_report_resolve(self):
+        """POST /admin/reports/resolve {id, status} -> durum (new|reviewing|resolved). Denetlenir."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            b = self._body()
+            rid = b.get("id")
+            status = str(b.get("status") or "").strip().lower()
+            if not str(rid).isdigit() or status not in ("new", "reviewing", "resolved"):
+                return self._send(400, {"error": "bad_request"})
+            r = conn.execute("SELECT status FROM reports WHERE id=?", (int(rid),)).fetchone()
+            if not r:
+                return self._send(404, {"error": "report_not_found"})
+            conn.execute("UPDATE reports SET status=? WHERE id=?", (status, int(rid)))
+            conn.commit()
+            audit_log(conn, admin["id"], admin["username"], "resolve_report",
+                      "report", rid, f"{r['status']} -> {status}", self._ip())
+            return self._send(200, {"ok": True, "status": status})
+        finally:
+            conn.close()
+
+    def _admin_moderate(self):
+        """POST /admin/users/moderate {username, action, minutes?, reason} -> moderasyon.
+        action: warn | mute | unmute | suspend | unsuspend. Denetlenir + kullanıcıya bildirilir."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            b = self._body()
+            uname = (b.get("username") or "").strip().lower()
+            action = str(b.get("action") or "").strip().lower()
+            reason = str(b.get("reason") or "")[:300]
+            if action not in ("warn", "mute", "unmute", "suspend", "unsuspend"):
+                return self._send(400, {"error": "bad_action"})
+            target = conn.execute(
+                "SELECT id, username, role FROM users WHERE username_lower=?", (uname,)
+            ).fetchone()
+            if not target:
+                return self._send(404, {"error": "user_not_found"})
+            if target["role"] == "admin":
+                return self._send(403, {"error": "cannot_moderate_admin"})
+            now = int(time.time())
+            until = None
+            if action == "mute":
+                minutes = b.get("minutes")
+                minutes = int(minutes) if str(minutes or "").isdigit() else 60
+                minutes = max(1, min(minutes, 60 * 24 * 30))  # 1 dk .. 30 gün
+                until = now + minutes * 60
+                conn.execute("UPDATE users SET muted_until=? WHERE id=?", (until, target["id"]))
+            elif action == "unmute":
+                conn.execute("UPDATE users SET muted_until=0 WHERE id=?", (target["id"],))
+            elif action == "suspend":
+                conn.execute("UPDATE users SET suspended=1 WHERE id=?", (target["id"],))
+                conn.execute("DELETE FROM sessions WHERE user_id=?", (target["id"],))  # oturumları kapat
+            elif action == "unsuspend":
+                conn.execute("UPDATE users SET suspended=0 WHERE id=?", (target["id"],))
+            # Etkilenen kullanıcıya SEBEBİYLE bildir + denetim kaydı.
+            conn.execute(
+                "INSERT INTO mod_notices (user_id, action, reason, until, created) VALUES (?,?,?,?,?)",
+                (target["id"], action, reason, until, now),
+            )
+            conn.commit()
+            audit_log(conn, admin["id"], admin["username"], f"moderate:{action}",
+                      "user", target["id"], reason, self._ip())
+            return self._send(200, {"ok": True, "action": action, "until": until})
+        finally:
+            conn.close()
+
     def _sync(self):
         conn = db()
         try:
@@ -1567,6 +1756,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(404, {"error": "user_not_found"})
             if target["id"] == me["id"]:
                 return self._send(400, {"error": "cannot_add_self"})
+            # Taraflardan biri diğerini engellediyse istek gönderilemez.
+            if is_blocked(conn, target["id"], me["id"]) or is_blocked(conn, me["id"], target["id"]):
+                return self._send(403, {"error": "blocked"})
 
             # Zaten bir ilişki var mı? (her iki yön)
             existing = conn.execute(
@@ -1711,6 +1903,9 @@ class Handler(BaseHTTPRequestHandler):
             # Mesaj sağanağına karşı: kullanıcı başına dakikada 30 mesaj.
             if not rate_ok("msg", me["id"], 30, 60):
                 return self._send(429, {"error": "too_many_requests"})
+            # Susturulmuş kullanıcı mesaj gönderemez (moderasyon).
+            if me["muted_until"] and me["muted_until"] > int(time.time()):
+                return self._send(403, {"error": "muted", "until": me["muted_until"]})
             b = self._body()
             to = b.get("to")
             body = (b.get("body") or "").strip()
@@ -1723,6 +1918,9 @@ class Handler(BaseHTTPRequestHandler):
             # İçerik filtresi (TR+EN yasaklı kelime).
             if contains_banned(body):
                 return self._send(400, {"error": "banned_word"})
+            # Alıcı göndereni engellediyse mesaj GİTMEZ (engelleme) — arkadaşlıktan ÖNCE.
+            if is_blocked(conn, int(to), me["id"]):
+                return self._send(403, {"error": "blocked"})
             if not are_friends(conn, me["id"], int(to)):
                 return self._send(403, {"error": "not_friends"})
             now = int(time.time())
@@ -1800,8 +1998,99 @@ class Handler(BaseHTTPRequestHandler):
             conn.close()
 
     # --- Çok oyunculu (yarış odaları) --------------------------
+    def _find_user(self, conn, b):
+        """Gövdeden targetId veya targetUsername ile kullanıcı satırını bulur."""
+        if b.get("targetId"):
+            return conn.execute("SELECT * FROM users WHERE id=?", (int(b["targetId"]),)).fetchone()
+        if b.get("targetUsername"):
+            return conn.execute(
+                "SELECT * FROM users WHERE username_lower=?",
+                (str(b["targetUsername"]).strip().lower(),),
+            ).fetchone()
+        return None
+
+    def _block(self):
+        """POST /block {targetId|targetUsername} -> engelle. Engellenen artık mesaj/istek gönderemez."""
+        conn = db()
+        try:
+            me = self._auth_row(conn)
+            if not me:
+                return self._send(401, {"error": "unauthorized"})
+            target = self._find_user(conn, self._body())
+            if not target:
+                return self._send(404, {"error": "user_not_found"})
+            if target["id"] == me["id"]:
+                return self._send(400, {"error": "cannot_block_self"})
+            conn.execute(
+                "INSERT OR IGNORE INTO blocks (blocker_id, blocked_id, created) VALUES (?,?,?)",
+                (me["id"], target["id"], int(time.time())),
+            )
+            # Engellemede mevcut arkadaşlık/istek de kaldırılır.
+            conn.execute(
+                "DELETE FROM friendships WHERE (requester_id=? AND addressee_id=?) "
+                "OR (requester_id=? AND addressee_id=?)",
+                (me["id"], target["id"], target["id"], me["id"]),
+            )
+            conn.commit()
+            return self._send(200, {"ok": True})
+        finally:
+            conn.close()
+
+    def _unblock(self):
+        """POST /unblock {targetId|targetUsername} -> engeli kaldır."""
+        conn = db()
+        try:
+            me = self._auth_row(conn)
+            if not me:
+                return self._send(401, {"error": "unauthorized"})
+            target = self._find_user(conn, self._body())
+            if not target:
+                return self._send(404, {"error": "user_not_found"})
+            conn.execute("DELETE FROM blocks WHERE blocker_id=? AND blocked_id=?", (me["id"], target["id"]))
+            conn.commit()
+            return self._send(200, {"ok": True})
+        finally:
+            conn.close()
+
+    def _blocks_list(self):
+        """GET /blocks -> engellediğim kullanıcılar."""
+        conn = db()
+        try:
+            me = self._auth_row(conn)
+            if not me:
+                return self._send(401, {"error": "unauthorized"})
+            rows = conn.execute(
+                "SELECT u.id, u.username FROM blocks b JOIN users u ON u.id=b.blocked_id "
+                "WHERE b.blocker_id=? ORDER BY b.created DESC",
+                (me["id"],),
+            ).fetchall()
+            return self._send(200, {"blocked": [dict(r) for r in rows]})
+        finally:
+            conn.close()
+
+    def _mod_notices(self):
+        """GET /moderation/notices -> hakkımdaki moderasyon bildirimleri (sebebiyle)."""
+        conn = db()
+        try:
+            me = self._auth_row(conn)
+            if not me:
+                return self._send(401, {"error": "unauthorized"})
+            rows = conn.execute(
+                "SELECT action, reason, until, created FROM mod_notices "
+                "WHERE user_id=? ORDER BY id DESC LIMIT 50",
+                (me["id"],),
+            ).fetchall()
+            now = int(time.time())
+            return self._send(200, {
+                "notices": [dict(r) for r in rows],
+                "muted_until": me["muted_until"] if me["muted_until"] and me["muted_until"] > now else 0,
+                "suspended": bool(me["suspended"]),
+            })
+        finally:
+            conn.close()
+
     def _report(self):
-        """POST /report {targetId|targetUsername, reason, detail?, context?}
+        """POST /report {targetId|targetUsername, reason, detail?, context?, msgId?}
         Kullanıcıdan kullanıcıya şikayet — yönetim paneli inceler (reports tablosu)."""
         conn = db()
         try:
@@ -1831,10 +2120,13 @@ class Handler(BaseHTTPRequestHandler):
                 reason = "other"
             detail = str(b.get("detail") or "")[:500]
             context = str(b.get("context") or "")[:32]
+            # Şikayet edilen mesaj (opsiyonel) — panelde SINIRLI bağlam bunun etrafında gösterilir.
+            msg_id = b.get("msgId")
+            msg_id = int(msg_id) if str(msg_id or "").isdigit() else None
             conn.execute(
-                "INSERT INTO reports (reporter_id, target_id, reason, detail, context, created) "
-                "VALUES (?,?,?,?,?,?)",
-                (me["id"], target["id"], reason, detail, context, int(time.time())),
+                "INSERT INTO reports (reporter_id, target_id, reason, detail, context, msg_id, status, created) "
+                "VALUES (?,?,?,?,?,?,'new',?)",
+                (me["id"], target["id"], reason, detail, context, msg_id, int(time.time())),
             )
             conn.commit()
             return self._send(200, {"ok": True})

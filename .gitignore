@@ -43,6 +43,11 @@ __screenshots__/
 .DS_Store
 Thumbs.db
 
+# E2E / test çıktıları (Playwright)
+/test-results
+/playwright-report
+/playwright/.cache
+
 # Python
 __pycache__/
 *.pyc

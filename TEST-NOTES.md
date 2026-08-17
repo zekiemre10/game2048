@@ -1,16 +1,34 @@
 # 2048 — Test Notları
 
-Son güncelleme: 2026-08-15
+Son güncelleme: 2026-08-17
 
 ## Özet
 
 | Alan | Durum |
 |------|-------|
 | Otomatik birim/bileşen testleri | ✅ **333/333 geçiyor** (`ng test`, 41 dosya) |
-| Python backend testleri | ✅ **13 dosya geçiyor** (`python server/run_tests.py`) — kayıt/giriş/sync/skor/oda/**hesap silme** + bot paritesi, yedek-geri yükleme, sertleştirme |
+| Python backend testleri | ✅ **15 dosya geçiyor** (`python server/run_tests.py`) — kayıt/giriş/sync/skor/oda/**hesap silme**/**admin** + bot paritesi, yedek-geri yükleme, sertleştirme |
+| **Uçtan uca (E2E)** | ✅ **4/4 geçiyor** (`npm run test:e2e`, Playwright/Chromium; CI'da) — oyna · mod · tahta boyutu · dil |
+| **Kod kapsamı (ölçüm)** | 📊 Satır **%49.9** · İfade %45.4 · Dal %48.8 · Fonksiyon %48.3 (`npm run test:coverage`) |
 | Production build | ✅ Hatasız (`ng build`) |
 | Bulunan kritik hata | ✅ Kalmadı (aşağıda giderilen hatalar) |
-| Gerçek cihaz/tarayıcı testi | ⏳ Kısmen — aşağıdaki kontrol listesi elle yapılmalı |
+
+## Uçtan uca (E2E) — `e2e/game.spec.ts` (Playwright)
+
+Gerçek Chromium'da **misafir/çevrimdışı** oynanış akışları (backend gerekmez →
+CI'da dış bağımlılık yok). `npm run test:e2e` uygulamayı `ng serve` ile ayağa
+kaldırır ve şunları doğrular:
+
+| Senaryo | Beklenen | Durum |
+|---------|----------|-------|
+| Başlangıç ekranı yüklenir | Başlık + **5 mod kartı** görünür | ✅ |
+| Klasik oyun + klavye | Oyun görünümü + **16 hücre**, ok tuşlarıyla oynanır, taş var | ✅ |
+| Tahta boyutu 3×3 | Seçip başlayınca **9 hücre** | ✅ |
+| Dil TR → EN | Ayarlar'dan **anında** başlık değişir (Ayarlar → Settings) | ✅ |
+
+**Kapsam ölçümü:** `npm run test:coverage` (v8) → satır %49.9 (çekirdek oyun
+mantığı yüksek; UI panelleri düşük). Ölçümdür, CI kapısı değil (yavaş koşumda
+bir YZ-doğruluk testi ara sıra kaymaya duyarlı).
 
 > **Not:** Aşağıdaki `## 1.` bölümündeki dosya-bazlı döküm ilk çekirdeği (85
 > test) anlatır; sonraki iş paketleri (çevrimiçi, YZ koç, bulmaca, i18n, PWA…)

@@ -12,19 +12,124 @@
           {{ t('chat.back') }}
         </button>
         <span class="chat-peer">👤 {{ friend.username }}</span>
+        <div class="chat-mod-actions">
+          <button
+            type="button"
+            class="chat-mod-btn"
+            [attr.aria-label]="t('mod.report.user')"
+            [title]="t('mod.report.user')"
+            (click)="openReport('user')"
+          >
+            🚩
+          </button>
+          <button
+            type="button"
+            class="chat-mod-btn"
+            [attr.aria-label]="t('mod.block.action')"
+            [title]="t('mod.block.action')"
+            [disabled]="blockBusy()"
+            (click)="onBlock()"
+          >
+            🚫
+          </button>
+        </div>
       </div>
+
+      @if (modInfo() === 'reported') {
+        <p class="chat-mod-note ok" role="status">{{ t('mod.report.done') }}</p>
+      } @else if (modInfo() === 'report_error' || modInfo() === 'block_error') {
+        <p class="chat-mod-note err" role="alert">{{ t('mod.error') }}</p>
+      }
 
       <div class="chat-messages">
         @if (chatMessages().length === 0) {
           <p class="chat-empty">{{ t('chat.empty') }}</p>
         } @else {
           @for (m of chatMessages(); track m.id) {
-            <div class="chat-bubble" [class.mine]="isMine(m)">
-              {{ m.body }}
+            <div class="chat-row" [class.mine]="isMine(m)">
+              <div class="chat-bubble" [class.mine]="isMine(m)">
+                {{ m.body }}
+              </div>
+              @if (!isMine(m)) {
+                <button
+                  type="button"
+                  class="chat-report-msg"
+                  [attr.aria-label]="t('mod.report.message')"
+                  [title]="t('mod.report.message')"
+                  (click)="openReport(m.id)"
+                >
+                  🚩
+                </button>
+              }
             </div>
           }
         }
       </div>
+
+      <!-- Şikayet penceresi (sebep + isteğe bağlı açıklama + gizlilik notu) -->
+      @if (reportFor(); as target) {
+        <div class="chat-report-backdrop" (click)="closeReport()">
+          <div
+            class="chat-report-dialog"
+            role="dialog"
+            aria-modal="true"
+            [attr.aria-label]="t('mod.report.title')"
+            (click)="$event.stopPropagation()"
+          >
+            <h3>{{ t('mod.report.title') }}</h3>
+            <p class="chat-report-sub">
+              {{
+                target === 'user'
+                  ? t('mod.report.subUser', { user: friend.username })
+                  : t('mod.report.subMsg')
+              }}
+            </p>
+
+            <label class="chat-report-label" for="report-reason">{{
+              t('mod.report.reasonLabel')
+            }}</label>
+            <select
+              id="report-reason"
+              class="chat-report-reason"
+              [value]="reportReason()"
+              (change)="onReasonChange($event)"
+            >
+              @for (r of REASONS; track r) {
+                <option [value]="r">{{ t('mod.reason.' + r) }}</option>
+              }
+            </select>
+
+            <label class="chat-report-label" for="report-detail">{{
+              t('mod.report.detailLabel')
+            }}</label>
+            <textarea
+              id="report-detail"
+              class="chat-report-detail"
+              maxlength="500"
+              rows="3"
+              [value]="reportDetail()"
+              (input)="onDetailInput($event)"
+              [placeholder]="t('mod.report.detailPlaceholder')"
+            ></textarea>
+
+            <p class="chat-report-privacy">🔒 {{ t('mod.report.privacy') }}</p>
+
+            <div class="chat-report-buttons">
+              <button type="button" class="btn-secondary" (click)="closeReport()">
+                {{ t('btn.cancel') }}
+              </button>
+              <button
+                type="button"
+                class="btn-primary"
+                [disabled]="reportBusy()"
+                (click)="submitReport()"
+              >
+                {{ t('mod.report.submit') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
 
       <!-- Emoji şeridi -->
       <div class="chat-emojis">
@@ -39,6 +144,10 @@
           </button>
         }
       </div>
+
+      @if (chatSendError()) {
+        <p class="chat-mod-note err" role="alert">⚠️ {{ sendErrorText() }}</p>
+      }
 
       <form class="chat-input" (submit)="$event.preventDefault(); onSendChat()">
         <input

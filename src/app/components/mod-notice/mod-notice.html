@@ -1,0 +1,20 @@
+@if (notice(); as n) {
+  <div class="mod-notice" [class.severe]="n.action === 'suspend'" role="alert">
+    <div class="mod-notice-body">
+      <strong class="mod-notice-title">{{ title() }}</strong>
+      <span class="mod-notice-reason">{{ t('mod.notice.reasonLabel') }}: {{ reason(n) }}</span>
+      @if (untilText()) {
+        <span class="mod-notice-until">{{ untilText() }}</span>
+      }
+      <span class="mod-notice-appeal">{{ t('mod.notice.appeal') }}</span>
+    </div>
+    <button
+      type="button"
+      class="mod-notice-dismiss"
+      [attr.aria-label]="t('btn.close')"
+      (click)="dismiss()"
+    >
+      ✕
+    </button>
+  </div>
+}

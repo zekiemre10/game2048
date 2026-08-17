@@ -121,6 +121,15 @@
               <button class="friend-btn ghost" type="button" (click)="onRemoveFriend(f.id)">
                 {{ t('fr.remove') }}
               </button>
+              <button
+                class="friend-btn ghost"
+                type="button"
+                [title]="t('mod.block.action')"
+                [attr.aria-label]="t('mod.block.action') + ' — ' + f.username"
+                (click)="onBlockFriend(f)"
+              >
+                🚫
+              </button>
             </div>
           }
         </div>

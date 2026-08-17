@@ -22,6 +22,7 @@ import { SettingsPanel } from './components/settings-panel/settings-panel';
 import { AuthPanel } from './components/auth-panel/auth-panel';
 import { ChatPanel } from './components/chat-panel/chat-panel';
 import { FriendsPanel } from './components/friends-panel/friends-panel';
+import { ModNoticeBanner } from './components/mod-notice/mod-notice';
 import { MultiplayerPanel } from './components/multiplayer-panel/multiplayer-panel';
 import { GameService } from './services/game.service';
 import { I18nService } from './services/i18n.service';
@@ -64,6 +65,7 @@ const KEY_TO_DIRECTION: Record<string, Direction> = {
     AuthPanel,
     ChatPanel,
     FriendsPanel,
+    ModNoticeBanner,
     MultiplayerPanel,
   ],
   templateUrl: './app.html',

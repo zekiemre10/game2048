@@ -119,6 +119,34 @@ export class FriendsService {
     return r;
   }
 
+  /** Kullanıcıyı engelle — bu kişiden mesaj/istek gelmez (moderasyon). */
+  async block(userId: number): Promise<RequestResult> {
+    const r = await this.post('/block', { targetId: userId });
+    if (r.ok) await this.refresh(); // engelleme arkadaşlığı da kaldırır
+    return r;
+  }
+
+  /** Engeli kaldır. */
+  async unblock(userId: number): Promise<RequestResult> {
+    return this.post('/unblock', { targetId: userId });
+  }
+
+  /** Kullanıcıyı/mesajı şikayet et (sebep + isteğe bağlı açıklama + mesaj id). */
+  async report(
+    userId: number,
+    reason: string,
+    detail = '',
+    msgId?: number,
+  ): Promise<RequestResult> {
+    return this.post('/report', {
+      targetId: userId,
+      reason,
+      detail,
+      msgId,
+      context: 'chat',
+    });
+  }
+
   private async post(path: string, body: unknown): Promise<RequestResult> {
     const headers = this.auth.authHeaders();
     if (!headers) return { ok: false, error: 'unauthorized' };

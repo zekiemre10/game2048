@@ -29,6 +29,8 @@ export class ChatService {
   readonly messages = signal<ChatMessage[]>([]);
   /** Gönderiliyor mu? */
   readonly sending = signal(false);
+  /** Son gönderim hatası kodu (ör. 'muted', 'blocked', 'banned'); yoksa null. */
+  readonly sendError = signal<string | null>(null);
 
   /** Okunmamış mesajı olan arkadaş kimlikleri. */
   readonly unread = signal<Set<number>>(new Set());
@@ -49,6 +51,7 @@ export class ChatService {
   async open(friend: Friend): Promise<void> {
     this.activeFriend.set(friend);
     this.messages.set([]);
+    this.sendError.set(null);
     await this.loadMessages(true);
     this.markSeen();
     this.startActivePolling();
@@ -93,13 +96,19 @@ export class ChatService {
     const text = body.trim();
     if (!friend || !headers || !text) return false;
     this.sending.set(true);
+    this.sendError.set(null);
     try {
       const res = await fetch(`${API_BASE}/messages`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ to: friend.id, body: text }),
       });
-      if (!res.ok) return false;
+      if (!res.ok) {
+        // Moderasyon engelleri (susturma / engellenme / askı) sebebiyle reddedilebilir.
+        const err = await res.json().catch(() => ({}));
+        this.sendError.set(err.error || 'error');
+        return false;
+      }
       const j = await res.json();
       // Aynı mesaj yoklama yanıtıyla da gelebilir → id'ye göre tekilleştir
       // (yoksa @for track m.id çift anahtar hatası verir ve balon iki kez çizilir).

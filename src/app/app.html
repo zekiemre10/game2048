@@ -6,6 +6,9 @@
   <app-tutorial (closed)="onCloseTutorial()" />
 }
 
+<!-- Moderasyon bildirimi (uyarı/susturma/askı — sebebiyle; giriş varken) -->
+<app-mod-notice />
+
 <!-- PWA şeridi: yeni sürüm > çevrimdışı > kuruluma davet (öncelik sırası) -->
 @if (pwaUpdateReady() || !online() || pwaInstallable()) {
   <div class="pwa-bar" [class.pwa-offline]="!online() && !pwaUpdateReady()">

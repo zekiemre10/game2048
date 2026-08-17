@@ -121,6 +121,24 @@ mesaj ve dar bir çevresi yöneticiye görünür. Yönetici sohbetlerini serbest
 okuyamaz." (Bkz. ana `README.md` → Gizlilik ve veri; arayüzde şikayet/engelle
 akışında da gösterilmeli.)
 
+### Oyuncu arayüzü (uygulanmış)
+
+Oyun frontend'i bu backend'i şu noktalarda tüketir (yalnızca oyuncu tarafı;
+yönetici kuyruğu **ayrı panele** aittir — bkz. "panel AYRI bir uygulamadır"):
+
+- **Sohbet paneli** (`components/chat-panel`): başlıkta 🚩 *kullanıcıyı şikayet*
+  + 🚫 *engelle*; her gelen mesajda 🚩 *mesajı şikayet*. Şikayet penceresi = sebep
+  seçimi + isteğe bağlı açıklama + **gizlilik notu** (yalnız şikayet edilen mesaj
+  görünür). `POST /report {targetId, reason, detail?, msgId?}` · `POST /block`.
+- **Arkadaş listesi** (`components/friends-panel`): her arkadaş satırında 🚫 engelle.
+- **Gönderim engeli geri bildirimi**: susturulmuş/engellenmiş/askılı kullanıcı mesaj
+  yollayınca sebep sohbette gösterilir (`chat.service` → `sendError`).
+- **Moderasyon bildirimi** (`components/mod-notice` + `services/moderation.service`):
+  giriş varken `GET /moderation/notices` yoklanır; uyarı/susturma/askı **sebebiyle**
+  ve (varsa) bitiş zamanıyla banner'da gösterilir + itiraz yolu hatırlatılır.
+  Kullanıcı kapatınca (localStorage) tekrar çıkmaz. i18n anahtarları `mod.*`
+  (TR+EN). Testler: `moderation.service.spec.ts`.
+
 ## NestJS geçişi notu
 
 Canlı backend **Python** (`server/app.py`). NestJS'e (`api-nest/`) devirde bu

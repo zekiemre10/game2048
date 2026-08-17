@@ -87,6 +87,12 @@ export class FriendsPanel {
     await this.friends.remove(userId);
   }
 
+  /** Kullanıcıyı engelle (onaylı) — mesaj/istek kesilir, arkadaşlık kalkar. */
+  async onBlockFriend(friend: Friend): Promise<void> {
+    if (!confirm(this.t('mod.block.confirm', { user: friend.username }))) return;
+    await this.friends.block(friend.id);
+  }
+
   /** Bu arkadaşta okunmamış mesaj var mı? */
   protected hasUnread(friendId: number): boolean {
     return this.chatUnread().has(friendId);

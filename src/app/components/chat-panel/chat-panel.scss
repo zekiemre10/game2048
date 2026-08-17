@@ -113,3 +113,154 @@
 .chat-send {
   flex-shrink: 0;
 }
+
+// --- Moderasyon: engelle / şikayet ---
+.chat-mod-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.2rem;
+}
+
+.chat-mod-btn {
+  background: none;
+  border: none;
+  font-size: 1.15rem;
+  cursor: pointer;
+  padding: 0.2rem 0.3rem;
+  border-radius: 8px;
+  line-height: 1;
+
+  &:hover {
+    background: var(--panel-input-bg, rgba(128, 128, 128, 0.15));
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+.chat-mod-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  text-align: center;
+
+  &.ok {
+    color: var(--accent, #8f7a66);
+  }
+
+  &.err {
+    color: #d64545;
+  }
+}
+
+.chat-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  align-self: flex-start;
+  max-width: 88%;
+
+  &.mine {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+  }
+
+  .chat-bubble {
+    max-width: 100%;
+  }
+}
+
+.chat-report-msg {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.15rem;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.15s;
+
+  .chat-row:hover &,
+  &:focus-visible {
+    opacity: 0.7;
+  }
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+.chat-report-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  padding: 1rem;
+}
+
+.chat-report-dialog {
+  background: var(--panel-bg, #faf8ef);
+  color: inherit;
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  width: min(420px, 100%);
+  max-height: 90dvh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+
+  h3 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+}
+
+.chat-report-sub {
+  margin: 0;
+  font-size: 0.88rem;
+  opacity: 0.75;
+}
+
+.chat-report-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-top: 0.3rem;
+}
+
+.chat-report-reason,
+.chat-report-detail {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border-radius: 9px;
+  border: 1px solid var(--panel-border, rgba(128, 128, 128, 0.35));
+  background: var(--panel-input-bg, rgba(128, 128, 128, 0.08));
+  color: inherit;
+  font: inherit;
+  font-size: 0.95rem;
+}
+
+.chat-report-detail {
+  resize: vertical;
+  min-height: 3.4rem;
+}
+
+.chat-report-privacy {
+  margin: 0.3rem 0 0;
+  font-size: 0.78rem;
+  opacity: 0.7;
+  line-height: 1.35;
+}
+
+.chat-report-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}

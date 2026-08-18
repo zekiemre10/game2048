@@ -35,6 +35,8 @@ from replay import replay_game, daily_seed
 from bot_ai import play_bot_game, BOT_SPEED_MS, BOT_CHARACTERS
 # Skor tutarlılık denetimi (şüpheli/imkânsız leaderboard kaydı tespiti).
 import score_audit
+# Metrik panosu sorguları + anonim enstrümantasyon.
+import metrics
 
 # Zorluk kademeleri (istemci AI_LEVELS ile aynı) + oda başına bot sınırı.
 BOT_LEVELS = ("easy", "medium", "hard", "expert")
@@ -571,6 +573,37 @@ def init_db():
             reverted_at INTEGER,
             UNIQUE(scope, period, user_id)
         );
+        -- Metrik panosu (📈) — üç HAFİF, ANONİM tablo. Çıktı yalnız toplam
+        -- sayı/oran; ham kimlik/ad/e-posta/IP hiçbir metrikte dönmez.
+        -- Günlük aktiflik (DAU/WAU + tutunma). user_id İÇ kimlik; asla dışa açılmaz.
+        CREATE TABLE IF NOT EXISTS user_activity (
+            user_id INTEGER NOT NULL,
+            day TEXT NOT NULL,             -- YYYY-MM-DD (UTC)
+            PRIMARY KEY (user_id, day)
+        );
+        -- Anonim olay akışı (mod dağılımı). KİŞİSEL VERİ YOK: user_id/IP tutulmaz.
+        CREATE TABLE IF NOT EXISTS events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts INTEGER NOT NULL,
+            name TEXT NOT NULL,            -- game_start | game_over
+            mode TEXT,                     -- classic|zen|time|level|daily
+            level INTEGER,
+            score INTEGER
+        );
+        -- Sunucu sağlığı günlük sayaçları (istek/hata).
+        CREATE TABLE IF NOT EXISTS daily_metrics (
+            day TEXT PRIMARY KEY,
+            requests INTEGER NOT NULL DEFAULT 0,
+            errors INTEGER NOT NULL DEFAULT 0
+        );
+        -- Pano sorgu indeksleri (büyük veride <1sn hedefi).
+        CREATE INDEX IF NOT EXISTS idx_users_created ON users(created);
+        CREATE INDEX IF NOT EXISTS idx_activity_day ON user_activity(day);
+        CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts);
+        CREATE INDEX IF NOT EXISTS idx_events_name ON events(name);
+        CREATE INDEX IF NOT EXISTS idx_msg_from ON messages(from_id);
+        CREATE INDEX IF NOT EXISTS idx_friend_status ON friendships(status);
+        CREATE INDEX IF NOT EXISTS idx_roomplayers_user ON room_players(user_id);
         """
     )
     # Şema göçü: users.email kolonu (eski DB'de yoksa ekle)
@@ -783,6 +816,15 @@ def utc_day() -> str:
     return time.strftime("%Y-%m-%d", time.gmtime())
 
 
+def _is_day(s: str) -> bool:
+    """Geçerli `YYYY-MM-DD` mi (metrik tarih aralığı doğrulaması)."""
+    try:
+        time.strptime(str(s), "%Y-%m-%d")
+        return True
+    except (ValueError, TypeError):
+        return False
+
+
 def utc_month() -> str:
     """İçinde bulunulan ay (UTC) — `YYYY-MM`."""
     return time.strftime("%Y-%m", time.gmtime())
@@ -959,6 +1001,9 @@ def user_from_token(conn, token: str):
         # Süresi dolmuş oturumları fırsat buldukça temizle.
         conn.execute("DELETE FROM sessions WHERE created <= ?", (cutoff,))
         conn.commit()
+    else:
+        # Metrik: günlük aktiflik (DAU/WAU + tutunma). Günde tek yazar (ucuz).
+        metrics.record_activity(conn, row["id"])
     return row
 
 
@@ -1269,6 +1314,7 @@ class Handler(BaseHTTPRequestHandler):
         # Cömerttir → normal oyun (oda yoklaması ~1.2sn) etkilenmez.
         if self.headers.get("X-Forwarded-For") and not rate_ok("ip", self._ip(), 600, 60):
             return self._send(429, {"error": "too_many_requests"})
+        err = False
         try:
             route()
         except BadRequest as exc:
@@ -1280,8 +1326,15 @@ class Handler(BaseHTTPRequestHandler):
         except sqlite3.OperationalError:
             self._send(503, {"error": "busy"})
         except Exception:
+            err = True
             traceback.print_exc()  # ayrıntı yalnızca sunucu günlüğüne
             self._send(500, {"error": "server_error"})
+        finally:
+            # Sunucu sağlığı metriği (bellek sayacı; ara sıra DB'ye flush edilir).
+            try:
+                metrics.bump_request(err)
+            except Exception:
+                pass
 
     def _route_get(self):
         p = self._path()
@@ -1315,6 +1368,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._admin_scores()
         if p == "/admin/scores/report":
             return self._admin_scores_report()
+        if p == "/admin/metrics":
+            return self._admin_metrics()
         if p == "/blocks":
             return self._blocks_list()
         if p == "/moderation/notices":
@@ -1341,6 +1396,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._admin_scores_invalidate()
         if p == "/admin/scores/revert":
             return self._admin_scores_revert()
+        if p == "/events":
+            return self._events()
         if p == "/block":
             return self._block()
         if p == "/unblock":
@@ -2054,6 +2111,44 @@ class Handler(BaseHTTPRequestHandler):
                       "score", f"{scope}:{period}:{user_id}", "", self._ip())
             return self._send(200, {"ok": True, "scope": scope, "period": period,
                                     "resettle": resettle})
+        finally:
+            conn.close()
+
+    # --- Metrik panosu -----------------------------------------
+    def _events(self):
+        """POST /events {name, mode?, level?, score?} -> ANONİM olay (mod dağılımı).
+        Auth GEREKMEZ (misafirler de sayılır); PII yok; IP bazlı sınırlı."""
+        # Kötüye kullanım/şişirme guard'ı (IP başına dakikada 120 olay).
+        if not rate_ok("events", self._ip(), 120, 60):
+            return self._send(429, {"error": "too_many_requests"})
+        b = self._body()
+        conn = db()
+        try:
+            ok = metrics.record_event(
+                conn, str(b.get("name") or ""), b.get("mode"),
+                b.get("level"), b.get("score"))
+            return self._send(200 if ok else 400,
+                              {"ok": ok} if ok else {"error": "bad_event"})
+        finally:
+            conn.close()
+
+    def _admin_metrics(self):
+        """GET /admin/metrics?from=&to= -> pano metrikleri (tarih aralığı; öntanımlı
+        son 30 gün). Yönetici + denetlenir. Kişisel veri DÖNMEZ (yalnız toplamlar)."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            metrics.flush_counters(conn)  # bekleyen istek/hata sayaçlarını yaz
+            to = (self._query("to") or metrics.today()).strip()
+            frm = (self._query("from") or metrics._day_add(to, -29)).strip()
+            if not _is_day(frm) or not _is_day(to) or frm > to:
+                return self._send(400, {"error": "bad_range"})
+            data = metrics.compute(conn, frm, to, db_path=DB_PATH)
+            audit_log(conn, admin["id"], admin["username"], "metrics_view",
+                      "metrics", None, f"{frm}..{to}", self._ip())
+            return self._send(200, data)
         finally:
             conn.close()
 
@@ -3160,8 +3255,23 @@ class Handler(BaseHTTPRequestHandler):
         pass  # sessiz
 
 
+def _metrics_flusher():
+    """İstek/hata sayaçlarını periyodik olarak daily_metrics'e işler (daemon)."""
+    while True:
+        time.sleep(30)
+        try:
+            conn = db()
+            try:
+                metrics.flush_counters(conn)
+            finally:
+                conn.close()
+        except Exception:
+            pass
+
+
 def main():
     init_db()
+    threading.Thread(target=_metrics_flusher, daemon=True).start()
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     print(f"game2048-api listening on 127.0.0.1:{PORT}, db={DB_PATH}")
     server.serve_forever()

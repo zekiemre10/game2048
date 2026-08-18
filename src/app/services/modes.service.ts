@@ -11,6 +11,7 @@ import { ProfileService } from './profile.service';
 import { GameEngine } from './game-engine';
 import { PuzzleService } from './puzzle.service';
 import { Puzzle } from '../logic/puzzle.model';
+import { TelemetryService } from './telemetry.service';
 
 /**
  * Oyun modları + yaşam döngüsü: beş modun (Klasik/Zen/Zaman Yarışı/Seviye/Günlük)
@@ -30,6 +31,7 @@ export class ModesService {
   private readonly profile = inject(ProfileService);
   private readonly engine = inject(GameEngine);
   private readonly puzzles = inject(PuzzleService);
+  private readonly telemetry = inject(TelemetryService);
 
   /** Oynanan günlük meydan okumanın gün anahtarı (sonuç gönderimi için). */
   readonly dailyDay = signal<string>('');
@@ -55,6 +57,7 @@ export class ModesService {
    * - TimeAttack: sabit geri sayım, en yüksek skor.
    */
   startMode(mode: GameMode, size: number = BOARD_SIZE): void {
+    this.telemetry.event('game_start', { mode }); // anonim metrik (mod dağılımı)
     this.beginRecordedGame(this.board.randomSeed()); // her oyun tohumlu → doğrulanabilir
     this.autoplay.cancel(); // sürüyorsa gösterimi bitir, eski durumu ATMA
     this.timer.paused.set(false);
@@ -87,6 +90,7 @@ export class ModesService {
    * oynar. Yarıştan farkı tek kişilik olması ve sonucun sıralamaya gönderilmesidir.
    */
   startDaily(): void {
+    this.telemetry.event('game_start', { mode: GameMode.Daily });
     const day = utcDayKey();
     this.autoplay.cancel();
     this.timer.paused.set(false);
@@ -113,6 +117,7 @@ export class ModesService {
    * birebir aynı taş dizisini alır (adil yarış). Süre bitince skor kalır.
    */
   startRace(seed: number, duration: number): void {
+    this.telemetry.event('game_start', { mode: GameMode.Race });
     this.autoplay.cancel();
     this.timer.paused.set(false);
     this.assistant.startNewGame(); // oneri + degerlendirme + zaman cizelgesi sifirla
@@ -134,6 +139,7 @@ export class ModesService {
 
   /** Seviye modunu 1. seviyeden başlatır. */
   startLevelMode(): void {
+    this.telemetry.event('game_start', { mode: GameMode.Level });
     this.board.mode.set(GameMode.Level);
     this.board.level.set(1);
     this.startLevel();
@@ -170,6 +176,7 @@ export class ModesService {
    * sayar (bilgi amaçlı); kazanma/kaybetme PuzzleService hedefine göre.
    */
   startPuzzle(puzzle: Puzzle): void {
+    this.telemetry.event('game_start', { mode: GameMode.Puzzle });
     this.autoplay.cancel();
     this.timer.paused.set(false);
     this.assistant.startNewGame();

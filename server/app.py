@@ -628,6 +628,7 @@ def init_db():
         "ALTER TABLE reports ADD COLUMN status TEXT NOT NULL DEFAULT 'new'",  # new | reviewing | resolved
         "ALTER TABLE users ADD COLUMN muted_until INTEGER NOT NULL DEFAULT 0",  # susturma bitişi (epoch)
         "ALTER TABLE users ADD COLUMN suspended INTEGER NOT NULL DEFAULT 0",    # askıya alındı mı (0/1)
+        "ALTER TABLE users ADD COLUMN suspended_until INTEGER NOT NULL DEFAULT 0",  # süreli askı bitişi (0=kalıcı)
         "ALTER TABLE monthly_prizes ADD COLUMN revoked INTEGER NOT NULL DEFAULT 0",  # şampiyonluk düzeltildi mi (hile)
     ):
         try:
@@ -1370,6 +1371,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._admin_scores_report()
         if p == "/admin/metrics":
             return self._admin_metrics()
+        if p == "/admin/users":
+            return self._admin_users()
+        if p == "/admin/users/detail":
+            return self._admin_user_detail()
+        if p == "/admin/users/export":
+            return self._admin_user_export()
         if p == "/blocks":
             return self._blocks_list()
         if p == "/moderation/notices":
@@ -1390,6 +1397,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._admin_set_role()
         if p == "/admin/users/moderate":
             return self._admin_moderate()
+        if p == "/admin/users/delete":
+            return self._admin_user_delete()
         if p == "/admin/reports/resolve":
             return self._admin_report_resolve()
         if p == "/admin/scores/invalidate":
@@ -1542,9 +1551,25 @@ class Handler(BaseHTTPRequestHandler):
             if not row or not check_pw(conn, row, password):
                 return self._send(401, {"error": "bad_credentials"})
             login_succeeded(uname)
-            # Askıya alınmış hesap giriş yapamaz (moderasyon).
+            # Askıya alınmış hesap giriş yapamaz (moderasyon). SÜRELİ askı bittiyse
+            # OTOMATİK kalkar; kalıcı ya da hâlâ süren askı ANLAMLI mesajla reddedilir.
             if row["suspended"]:
-                return self._send(403, {"error": "suspended"})
+                until = row["suspended_until"] or 0
+                now = int(time.time())
+                if until and until <= now:
+                    conn.execute(
+                        "UPDATE users SET suspended=0, suspended_until=0 WHERE id=?", (row["id"],))
+                    conn.commit()
+                else:
+                    notice = conn.execute(
+                        "SELECT reason FROM mod_notices WHERE user_id=? AND action='suspend' "
+                        "ORDER BY id DESC LIMIT 1", (row["id"],)
+                    ).fetchone()
+                    return self._send(403, {
+                        "error": "suspended",
+                        "until": until,                       # 0 = kalıcı
+                        "reason": (notice["reason"] if notice else "") or "",
+                    })
             token = make_token(conn, row["id"])
             return self._send(200, {"token": token, "user": user_public(row)})
         finally:
@@ -1786,7 +1811,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def _admin_moderate(self):
         """POST /admin/users/moderate {username, action, minutes?, reason} -> moderasyon.
-        action: warn | mute | unmute | suspend | unsuspend. Denetlenir + kullanıcıya bildirilir."""
+        action: warn | mute | unmute | suspend | unsuspend.
+
+        GEREKÇE ZORUNLU (gerçek hesaba müdahale → gerekçesiz eylem yok). Askı
+        SÜRELİ olabilir (`minutes` → otomatik biter) ya da KALICI. Denetlenir +
+        kullanıcıya SEBEBİYLE bildirilir. Admin modere edilemez."""
         conn = db()
         try:
             admin = self._admin_row(conn)
@@ -1795,9 +1824,11 @@ class Handler(BaseHTTPRequestHandler):
             b = self._body()
             uname = (b.get("username") or "").strip().lower()
             action = str(b.get("action") or "").strip().lower()
-            reason = str(b.get("reason") or "")[:300]
+            reason = str(b.get("reason") or "").strip()[:300]
             if action not in ("warn", "mute", "unmute", "suspend", "unsuspend"):
                 return self._send(400, {"error": "bad_action"})
+            if not reason:
+                return self._send(400, {"error": "reason_required"})
             target = conn.execute(
                 "SELECT id, username, role FROM users WHERE username_lower=?", (uname,)
             ).fetchone()
@@ -1806,20 +1837,29 @@ class Handler(BaseHTTPRequestHandler):
             if target["role"] == "admin":
                 return self._send(403, {"error": "cannot_moderate_admin"})
             now = int(time.time())
+
+            def _minutes(default, cap):
+                m = b.get("minutes")
+                m = int(m) if str(m or "").isdigit() else default
+                return max(1, min(m, cap))
+
             until = None
             if action == "mute":
-                minutes = b.get("minutes")
-                minutes = int(minutes) if str(minutes or "").isdigit() else 60
-                minutes = max(1, min(minutes, 60 * 24 * 30))  # 1 dk .. 30 gün
-                until = now + minutes * 60
+                until = now + _minutes(60, 60 * 24 * 30) * 60  # 1 dk .. 30 gün
                 conn.execute("UPDATE users SET muted_until=? WHERE id=?", (until, target["id"]))
             elif action == "unmute":
                 conn.execute("UPDATE users SET muted_until=0 WHERE id=?", (target["id"],))
             elif action == "suspend":
-                conn.execute("UPDATE users SET suspended=1 WHERE id=?", (target["id"],))
+                # `minutes` verilirse SÜRELİ (otomatik biter), yoksa KALICI (until=0).
+                has_min = str(b.get("minutes") or "").isdigit()
+                until = (now + _minutes(60, 60 * 24 * 365) * 60) if has_min else 0
+                conn.execute(
+                    "UPDATE users SET suspended=1, suspended_until=? WHERE id=?",
+                    (until or 0, target["id"]))
                 conn.execute("DELETE FROM sessions WHERE user_id=?", (target["id"],))  # oturumları kapat
             elif action == "unsuspend":
-                conn.execute("UPDATE users SET suspended=0 WHERE id=?", (target["id"],))
+                conn.execute(
+                    "UPDATE users SET suspended=0, suspended_until=0 WHERE id=?", (target["id"],))
             # Etkilenen kullanıcıya SEBEBİYLE bildir + denetim kaydı.
             conn.execute(
                 "INSERT INTO mod_notices (user_id, action, reason, until, created) VALUES (?,?,?,?,?)",
@@ -1829,6 +1869,208 @@ class Handler(BaseHTTPRequestHandler):
             audit_log(conn, admin["id"], admin["username"], f"moderate:{action}",
                       "user", target["id"], reason, self._ip())
             return self._send(200, {"ok": True, "action": action, "until": until})
+        finally:
+            conn.close()
+
+    # --- Kullanıcı yönetimi (arama / detay / dışa aktarma / silme) --------
+    def _find_user_row(self, conn):
+        """Sorgudan id VEYA username ile kullanıcı satırı (parola alanları HARİÇ)."""
+        uid = self._query("id")
+        if str(uid).isdigit():
+            return conn.execute(
+                "SELECT id, username, email, data, created, role, suspended, "
+                "suspended_until, muted_until FROM users WHERE id=?", (int(uid),)).fetchone()
+        uname = (self._query("username") or "").strip().lower()
+        if uname:
+            return conn.execute(
+                "SELECT id, username, email, data, created, role, suspended, "
+                "suspended_until, muted_until FROM users WHERE username_lower=?", (uname,)).fetchone()
+        return None
+
+    def _admin_users(self):
+        """GET /admin/users?q=&from=&to=&limit= -> kullanıcı arama/listeleme.
+        q: ad VEYA e-posta (LIKE); from/to: kayıt tarihi (YYYY-MM-DD). Parola
+        HASH'İ ASLA DÖNMEZ (yalnız açık SELECT alanları)."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            where, args = [], []
+            q = (self._query("q") or "").strip()
+            if q:
+                like = f"%{q.lower()}%"
+                where.append("(username_lower LIKE ? OR lower(COALESCE(email,'')) LIKE ?)")
+                args += [like, like]
+            frm, to = (self._query("from") or "").strip(), (self._query("to") or "").strip()
+            if frm and _is_day(frm):
+                where.append("created >= ?"); args.append(metrics.day_start_ts(frm))
+            if to and _is_day(to):
+                where.append("created < ?"); args.append(metrics.day_start_ts(to) + 86400)
+            try:
+                limit = max(1, min(int(self._query("limit") or 50), 200))
+            except ValueError:
+                limit = 50
+            sql = ("SELECT id, username, email, created, role, suspended, suspended_until, "
+                   "muted_until FROM users")
+            if where:
+                sql += " WHERE " + " AND ".join(where)
+            sql += " ORDER BY created DESC LIMIT ?"
+            args.append(limit)
+            rows = [dict(r) for r in conn.execute(sql, tuple(args)).fetchall()]
+            total = conn.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"]
+            return self._send(200, {"users": rows, "total": total, "count": len(rows)})
+        finally:
+            conn.close()
+
+    def _admin_user_detail(self):
+        """GET /admin/users/detail?id=|username= -> kullanıcı detayı: hesap, skorlar,
+        arkadaş sayısı, şikayet geçmişi, moderasyon geçmişi. Parola HASH'İ DÖNMEZ."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            u = self._find_user_row(conn)
+            if not u:
+                return self._send(404, {"error": "user_not_found"})
+            uid = u["id"]
+            try:
+                data = json.loads(u["data"] or "{}")
+            except Exception:
+                data = {}
+            last_day = conn.execute(
+                "SELECT MAX(day) AS d FROM user_activity WHERE user_id=?", (uid,)).fetchone()["d"]
+            monthly_best = conn.execute(
+                "SELECT MAX(score) AS s FROM monthly_scores WHERE user_id=?", (uid,)).fetchone()["s"]
+            friends = conn.execute(
+                "SELECT COUNT(*) AS n FROM friendships WHERE status='accepted' "
+                "AND (requester_id=? OR addressee_id=?)", (uid, uid)).fetchone()["n"]
+            reports = [dict(r) for r in conn.execute(
+                "SELECT r.id, r.reason, r.detail, r.status, r.created, ru.username AS reporter "
+                "FROM reports r LEFT JOIN users ru ON ru.id=r.reporter_id "
+                "WHERE r.target_id=? ORDER BY r.id DESC LIMIT 100", (uid,))]
+            notices = [dict(r) for r in conn.execute(
+                "SELECT action, reason, until, created FROM mod_notices "
+                "WHERE user_id=? ORDER BY id DESC LIMIT 100", (uid,))]
+            audit = [dict(r) for r in conn.execute(
+                "SELECT action, admin_username, detail, created FROM admin_audit "
+                "WHERE target_type='user' AND target_id=? ORDER BY id DESC LIMIT 100", (str(uid),))]
+            account = {
+                "id": uid, "username": u["username"], "email": u["email"],
+                "created": u["created"], "role": u["role"],
+                "suspended": bool(u["suspended"]), "suspendedUntil": u["suspended_until"] or 0,
+                "mutedUntil": u["muted_until"] or 0, "lastActiveDay": last_day,
+            }
+            scores = {
+                "bestScore": int(data.get("bestScore") or 0),
+                "bestLevel": int(data.get("bestLevel") or 1),
+                "bestTile": int(data.get("bestTile") or 0),
+                "gamesPlayed": int(data.get("gamesPlayed") or 0),
+                "gamesWon": int(data.get("gamesWon") or 0),
+                "championships": int(data.get("championships") or 0),
+                "monthlyBest": monthly_best or 0,
+            }
+            return self._send(200, {
+                "account": account, "scores": scores, "friends": friends,
+                "reports": reports, "modHistory": notices, "auditHistory": audit,
+            })
+        finally:
+            conn.close()
+
+    def _admin_user_export(self):
+        """GET /admin/users/export?id=|username= -> kullanıcının KENDİ verisinin
+        dışa aktarımı (veri koruma talebi). Parola hash'i/tuzu DÖNMEZ; yalnız o
+        kullanıcıya ait veri (başkalarının özel verisi değil). Denetlenir."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            u = self._find_user_row(conn)
+            if not u:
+                return self._send(404, {"error": "user_not_found"})
+            uid = u["id"]
+            try:
+                data = json.loads(u["data"] or "{}")
+            except Exception:
+                data = {}
+            monthly = [dict(r) for r in conn.execute(
+                "SELECT month, score, best FROM monthly_scores WHERE user_id=?", (uid,))]
+            daily = [dict(r) for r in conn.execute(
+                "SELECT day, score, best, moves FROM daily_scores WHERE user_id=?", (uid,))]
+            friends = [r["username"] for r in conn.execute(
+                "SELECT CASE WHEN requester_id=? THEN a.username ELSE b.username END AS username "
+                "FROM friendships f LEFT JOIN users a ON a.id=f.addressee_id "
+                "LEFT JOIN users b ON b.id=f.requester_id "
+                "WHERE status='accepted' AND (requester_id=? OR addressee_id=?)", (uid, uid, uid))]
+            sent = [dict(r) for r in conn.execute(
+                "SELECT to_id, body, created FROM messages WHERE from_id=? ORDER BY id", (uid,))]
+            notices = [dict(r) for r in conn.execute(
+                "SELECT action, reason, until, created FROM mod_notices WHERE user_id=?", (uid,))]
+            export = {
+                "account": {"id": uid, "username": u["username"], "email": u["email"],
+                            "created": u["created"]},
+                "progress": data, "monthlyScores": monthly, "dailyScores": daily,
+                "friends": friends, "sentMessages": sent, "moderationNotices": notices,
+            }
+            audit_log(conn, admin["id"], admin["username"], "user_export",
+                      "user", uid, "veri dışa aktarma", self._ip())
+            return self._send(200, {"export": export})
+        finally:
+            conn.close()
+
+    def _admin_user_delete(self):
+        """POST /admin/users/delete {id|username, reason, confirmUsername} -> hesabı
+        KALICI siler. ÇİFT ONAY: confirmUsername hedefin adına birebir eşleşmeli.
+        Gerekçe ZORUNLU. Admin silinemez. Denetlenir (kullanıcı silindiği için
+        bildirim değil, denetim kaydı tutulur)."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            b = self._body()
+            reason = str(b.get("reason") or "").strip()[:300]
+            if not reason:
+                return self._send(400, {"error": "reason_required"})
+            uid = b.get("id")
+            if str(uid).isdigit():
+                target = conn.execute(
+                    "SELECT id, username, role FROM users WHERE id=?", (int(uid),)).fetchone()
+            else:
+                target = conn.execute(
+                    "SELECT id, username, role FROM users WHERE username_lower=?",
+                    (str(b.get("username") or "").strip().lower(),)).fetchone()
+            if not target:
+                return self._send(404, {"error": "user_not_found"})
+            if target["role"] == "admin":
+                return self._send(403, {"error": "cannot_delete_admin"})
+            # ÇİFT ONAY: kullanıcı adını birebir yazmalı (yanlışlıkla silmeye karşı).
+            if str(b.get("confirmUsername") or "") != target["username"]:
+                return self._send(400, {"error": "confirm_mismatch"})
+            tid = target["id"]
+            conn.execute("DELETE FROM room_players WHERE code IN "
+                         "(SELECT code FROM rooms WHERE host_id=?)", (tid,))
+            conn.execute("DELETE FROM rooms WHERE host_id=?", (tid,))
+            conn.execute("DELETE FROM room_players WHERE user_id=?", (tid,))
+            conn.execute("DELETE FROM friendships WHERE requester_id=? OR addressee_id=?", (tid, tid))
+            conn.execute("DELETE FROM messages WHERE from_id=? OR to_id=?", (tid, tid))
+            conn.execute("DELETE FROM monthly_scores WHERE user_id=?", (tid,))
+            conn.execute("DELETE FROM monthly_prizes WHERE user_id=?", (tid,))
+            conn.execute("DELETE FROM daily_scores WHERE user_id=?", (tid,))
+            conn.execute("DELETE FROM flagged_submissions WHERE user_id=?", (tid,))
+            conn.execute("DELETE FROM reports WHERE reporter_id=? OR target_id=?", (tid, tid))
+            conn.execute("DELETE FROM blocks WHERE blocker_id=? OR blocked_id=?", (tid, tid))
+            conn.execute("DELETE FROM mod_notices WHERE user_id=?", (tid,))
+            conn.execute("DELETE FROM user_activity WHERE user_id=?", (tid,))
+            conn.execute("DELETE FROM sessions WHERE user_id=?", (tid,))
+            conn.execute("DELETE FROM users WHERE id=?", (tid,))
+            conn.commit()
+            # Denetim: silmeden ÖNCEki kimlikle (kim, kimi, neden).
+            audit_log(conn, admin["id"], admin["username"], "user_delete",
+                      "user", tid, f"{target['username']}: {reason}", self._ip())
+            return self._send(200, {"ok": True, "deleted": target["username"]})
         finally:
             conn.close()
 

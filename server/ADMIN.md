@@ -242,6 +242,57 @@ kova. Ad, e-posta, IP, ham kullanıcı kimliği DÖNMEZ. `events` anonimdir. `us
 yalnız iç kimlik+gün tutar ve dışa açılmaz (yalnız DAU/WAU/tutunma toplamlarına girer).
 Veri yokken tüm gruplar sıfır/boş döner (arayüz bozulmaz). Testler: `test_metrics.py`.
 
+## Kullanıcı yönetimi (arama · detay · moderasyon · veri koruma)
+
+Gerçek hesaplar var → gerçek moderasyon mümkün. Bu paket **gerçek insanların
+hesaplarına** müdahale eder; bu yüzden her eylem **gerekçe ister, denetlenir,
+kullanıcıya bildirilir ve geri alınabilir** (silme hariç — o ayrı + çift onaylı).
+
+### Uç noktalar (hepsi admin + taze oturum + denetlenir)
+
+| Yöntem | Yol | Ne |
+|--------|-----|-----|
+| GET | `/admin/users?q=&from=&to=&limit=` | arama/listeleme (ad **veya** e-posta LIKE; kayıt tarihi aralığı) |
+| GET | `/admin/users/detail?id=\|username=` | hesap + skorlar + arkadaş sayısı + şikayet geçmişi + moderasyon geçmişi + denetim geçmişi |
+| POST | `/admin/users/moderate` `{username, action, minutes?, reason}` | warn \| mute \| unmute \| suspend \| unsuspend — **gerekçe ZORUNLU** |
+| GET | `/admin/users/export?id=\|username=` | kullanıcının KENDİ verisinin dışa aktarımı (veri koruma talebi) |
+| POST | `/admin/users/delete` `{id\|username, reason, confirmUsername}` | hesabı KALICI sil — **gerekçe + çift onay** |
+
+### Süreli cezalar (otomatik biter)
+
+- **Susturma:** `mute {minutes}` (1 dk–30 gün) → `muted_until`. Susturulan mesaj
+  gönderemez; süre geçince kontrol (`_message_send`) otomatik serbest bırakır.
+- **Askı:** `suspend {minutes}` → **SÜRELİ** (`suspended_until`, otomatik biter);
+  `minutes` yoksa **KALICI** (`suspended_until=0`). Askılı hesap **giriş yapamaz**;
+  açık oturumları kapatılır. Giriş denemesinde süreli askı **bitmişse otomatik
+  kalkar**, hâlâ sürüyorsa **anlamlı mesajla** reddedilir (403 + `reason` + `until`
+  → oyuncu giriş ekranında sebebi ve bitişi görür). `unsuspend` elle kaldırır.
+
+### Güvenlik güvenceleri (kodda)
+
+- **Parola hash'i asla dönmez:** arama/detay/dışa aktarma sorguları `pwhash`/`salt`
+  alanlarını **hiç seçmez** (açık alan listesi). Denetlenir (`test_user_management`).
+- **Yönetici kullanıcı adına giriş yapamaz:** kimliğe bürünme (impersonation) ucu
+  **yoktur**; oturum yalnızca parolayla (`/login`) açılır. Admin başkasının jetonunu
+  üretemez.
+- **Admin dokunulmazlığı:** admin rolü modere/silinemez (`cannot_moderate_admin`
+  / `cannot_delete_admin`).
+
+### Hesap silme (ayrı + çift onaylı)
+
+Moderasyondan **ayrı** ve daha ağır: `reason` zorunlu **ve** `confirmUsername`
+hedefin adına **birebir** eşleşmeli (yanlışlıkla silmeye karşı). İlişkili tüm
+satırlar temizlenir (odalar, arkadaşlıklar, mesajlar, skorlar, şikayetler,
+engeller, bildirimler, aktiflik, oturumlar → en son `users`). Kullanıcı adı
+yeniden serbest kalır. Denetime silinen kimlik + gerekçeyle yazılır.
+
+### Bildirim ve itiraz
+
+Her moderasyon eylemi `mod_notices` ile kullanıcıya **sebebiyle** bildirilir
+(oyuncu banner'ı + askıda giriş ekranı). **İtiraz:** kullanıcı sebebi görüp hesap
+e-postasından iletir; yönetici `admin_audit` + detay ekranıyla yeniden değerlendirir
+(`unmute`/`unsuspend`). Silme geri alınamaz → bu yüzden çift onaylıdır.
+
 ## NestJS geçişi notu
 
 Canlı backend **Python** (`server/app.py`). NestJS'e (`api-nest/`) devirde bu

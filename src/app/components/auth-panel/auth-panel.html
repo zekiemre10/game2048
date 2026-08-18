@@ -59,7 +59,12 @@
       </label>
 
       @if (authError()) {
-        <p class="auth-error">{{ t(authError()) }}</p>
+        <p class="auth-error">
+          {{ t(authError()) }}
+          @if (authErrorDetail()) {
+            <span class="auth-error-detail">{{ authErrorDetail() }}</span>
+          }
+        </p>
       }
 
       <button class="btn-primary auth-submit" type="submit" [disabled]="authBusy()">

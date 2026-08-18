@@ -37,11 +37,14 @@ export class AuthPanel {
   protected readonly authPass = signal('');
   /** Hata mesajı anahtarı (auth.err.*), yoksa ''. */
   protected readonly authError = signal('');
+  /** Askı ayrıntısı (sebep + bitiş/kalıcı), yoksa ''. */
+  protected readonly authErrorDetail = signal('');
 
   /** Giriş/kayıt sekmesini değiştir. */
   setAuthTab(tab: 'login' | 'register'): void {
     this.authTab.set(tab);
     this.authError.set('');
+    this.authErrorDetail.set('');
   }
 
   onAuthNameInput(event: Event): void {
@@ -60,6 +63,7 @@ export class AuthPanel {
   async onAuthSubmit(): Promise<void> {
     if (this.authBusy()) return;
     this.authError.set('');
+    this.authErrorDetail.set('');
     const name = this.authName().trim();
     const pass = this.authPass();
     const result =
@@ -72,6 +76,19 @@ export class AuthPanel {
       this.close.emit();
     } else {
       this.authError.set(`auth.err.${result.error}`);
+      // Askıda: kullanıcıya SEBEBİYLE ve (varsa) bitişiyle anlamlı mesaj göster.
+      if (result.error === 'suspended') {
+        const parts: string[] = [];
+        if (result.reason) parts.push(result.reason);
+        parts.push(
+          result.until
+            ? this.t('auth.err.suspendedUntil', {
+                date: new Date(result.until * 1000).toLocaleString(),
+              })
+            : this.t('auth.err.suspendedPermanent'),
+        );
+        this.authErrorDetail.set(parts.join(' · '));
+      }
     }
   }
 }

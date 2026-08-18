@@ -140,9 +140,10 @@ def main():
     st, j = call("POST", "/login", {"username": "bob", "password": "parola123"})
     check("askıya alınan B giriş yapamaz (403 suspended)", st == 403 and j.get("error") == "suspended", f"{st} {j}")
 
-    # --- admin modere edilemez ---
-    st, _ = call("POST", "/admin/users/moderate", {"username": "moderator", "action": "mute"}, tm)
-    check("admin modere edilemez (403)", st == 403, str(st))
+    # --- admin modere edilemez (gerekçe verilir ki tek ret sebebi admin-dokunulmazlığı olsun) ---
+    st, j = call("POST", "/admin/users/moderate",
+                 {"username": "moderator", "action": "mute", "reason": "test"}, tm)
+    check("admin modere edilemez (403)", st == 403 and j.get("error") == "cannot_moderate_admin", f"{st} {j}")
 
     print()
     if fails:

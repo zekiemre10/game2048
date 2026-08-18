@@ -41,6 +41,15 @@
   }
 }
 
+// Askı ayrıntısı: sebep + bitiş, hata kutusunun altında kendi satırında.
+.auth-error-detail {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.82rem;
+  font-weight: 400;
+  opacity: 0.9;
+}
+
 .auth-submit {
   margin-top: 0.25rem;
   width: 100%;

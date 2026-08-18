@@ -52,6 +52,9 @@ export interface AuthUser {
 export interface AuthResult {
   ok: boolean;
   error?: string;
+  /** Askı durumunda: sebep ve bitiş (epoch sn; 0 = kalıcı). */
+  reason?: string;
+  until?: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -152,7 +155,8 @@ export class AuthService {
         body: JSON.stringify({ username, password, email, data }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) return { ok: false, error: json.error || 'error' };
+      if (!res.ok)
+        return { ok: false, error: json.error || 'error', reason: json.reason, until: json.until };
 
       this.setToken(json.token);
       this.user.set(json.user);

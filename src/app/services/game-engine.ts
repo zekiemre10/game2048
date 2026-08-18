@@ -9,6 +9,7 @@ import { BoardStore } from './board-store';
 import { TimerService } from './timer.service';
 import { AssistantStore } from './assistant-store';
 import { EconomyService } from './economy.service';
+import { EconomySettingsService } from './economy-settings.service';
 import { MissionsService } from './missions.service';
 import { ProfileService } from './profile.service';
 import { AchievementsService, AchievementStats } from './achievements.service';
@@ -42,6 +43,7 @@ export class GameEngine {
   private readonly timer = inject(TimerService);
   private readonly assistant = inject(AssistantStore);
   private readonly economy = inject(EconomyService);
+  private readonly econSettings = inject(EconomySettingsService);
   private readonly missions = inject(MissionsService);
   private readonly profile = inject(ProfileService);
   private readonly achievements = inject(AchievementsService);
@@ -335,7 +337,8 @@ export class GameEngine {
       this.lastReward.set(0); // ödül zaten alınmış
       return false;
     }
-    const reward = levelConfig(level).gold;
+    // Panelden yönetilen çarpan (varsayılan 1.0; sunucu erişilemezse gömülü).
+    const reward = Math.round(levelConfig(level).gold * this.econSettings.levelRewardMult());
     this.rewardedLevels.add(level);
     this.addGold(reward);
     this.lastReward.set(reward);

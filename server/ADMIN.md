@@ -334,6 +334,54 @@ Oda listesi **oyuncu adı taşımaz** (yalnız kod + sayı). Son hatalar özeti
 (`room_close`/`room_reset`/`maintenance:*`) `admin_audit`'e yazılır. Test:
 `test_monitoring.py`.
 
+## Ekonomi ve içerik ayarları (⚖️ RİSKLİ)
+
+Ekonomi parametreleri koda gömülüydü → dengelemek yeni sürüm gerektiriyordu.
+Bu paket **az sayıda** değeri panelden ayarlanabilir yapar; yıkıcı olmaması için
+katı kurallarla.
+
+### Kapsam kararı (bilinçli olarak DAR)
+
+Yalnız üç grup — gerçekten dengelenmesi gerekenler (`econ.py::SPEC`):
+| Anahtar | Varsayılan | Aralık | Neden |
+|---|---|---|---|
+| `level_reward_mult` | 1.0 | 0.1–5.0 | Tüm seviye altınlarını tek koldan ölçekler ("altın çok hızlı birikiyor" → düşür). Seviye-başına dozlarca değer yerine bir çarpan. |
+| `power_price.{time,bomb,shuffle,undo,hint}` | 30/40/25/20/15 | 1–500 | Güç maliyetleri (doğrudan "güç maliyetleri" kapsamı). |
+| `champion_prize_gold` | 2000 | 100–20000 | Aylık şampiyonluk altını (güç kısmı SABİT). Ay-kilitli (aşağıda). |
+
+Kasıtlı olarak DIŞARIDA: mağaza tema fiyatları, görev ödülleri, 7-gün takvimi —
+gerekirse aynı desenle sonra eklenir. "Her şeyi açmak" ekonomiyi kırılganlaştırır.
+
+### Güvenlik ilkeleri (hepsi kodda)
+
+1. **Oyun ASLA beklemez** — istemci `EconomySettingsService` her okumada ANINDA
+   döner: gömülü varsayılan → localStorage önbelleği → sunucu. `GET /settings`
+   erişilemezse oyun **gömülü varsayılanlarla** çalışır.
+2. **Aralık denetimi İKİ tarafta** — `econ.validate` (sunucu, YETKİLİ) aralık dışı/
+   tip hatasını **REDDEDER** (400, kırpma değil); istemci de clamp'ler (savunma
+   derinliği: sunucu bozuk değer dönse bile ekonomi bozulmaz). Kayıtlı bozuk
+   override okunurken sessizce varsayılana düşülür.
+3. **Oyuncu varlıkları dokunulmaz** — ayarlar yalnız YENİ ödül/fiyat hesabına girer;
+   mevcut altın/güç/envanter `users.data`'da, ayar değişimi onu hiç yazmaz.
+4. **Geri alınabilir** — her değişiklik `settings_history`'ye yazılır; `POST
+   /admin/settings/undo {key}` bir önceki değere (yoksa varsayılana) döner.
+5. **Aylık ödül ay ortasında değişmez** — `champion_prize_gold` yalnız o ay **hiç
+   skor girilmemişken** değiştirilebilir; yarış başladıysa `409
+   champion_locked_midmonth`. (Yarış ortasında kuralı değiştirmek adil değil.)
+
+### Uç noktalar
+
+| Yöntem | Yol | Ne |
+|--------|-----|-----|
+| GET | `/settings` | **PUBLIC** — etkin ayarlar (varsayılan+override, clamp'li). `Cache-Control: max-age=30`. İstemci okuma katmanı bunu tüketir. |
+| GET | `/admin/settings` | her anahtar: current+default+min+max+tip+ay-kilidi + son değişiklikler |
+| POST | `/admin/settings` `{key, value}` | değiştir (aralık dışı→400, ay-kilidi→409); geçmişe+denetime yazılır |
+| POST | `/admin/settings/undo` `{key}` | son değişikliği geri al |
+
+Sunucu tarafı `champion_prize(conn)` ödül altınını ayardan (clamp'li) okur; güçler
+sabit. Testler: `test_econ.py` (saf doğrulama) + `test_economy.py` (uçlar+ay-kilidi+
+geri alma+oyuncu-varlığı-etkilenmez). `econ.py` app.py ile deploy edilmeli.
+
 ## NestJS geçişi notu
 
 Canlı backend **Python** (`server/app.py`). NestJS'e (`api-nest/`) devirde bu

@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, output, signal } from '@ang
 import { GameService } from '../../services/game.service';
 import { I18nService } from '../../services/i18n.service';
 import { ThemeService } from '../../services/theme.service';
+import { EconomySettingsService } from '../../services/economy-settings.service';
 import { THEMES } from '../../models/theme.model';
 import { POWERS, PowerId } from '../../models/power.model';
 
@@ -21,6 +22,7 @@ export class StorePanel {
   private readonly game = inject(GameService);
   private readonly i18n = inject(I18nService);
   private readonly themeService = inject(ThemeService);
+  private readonly econSettings = inject(EconomySettingsService);
 
   /** Panel kapatıldığında bildirilir. */
   readonly close = output<void>();
@@ -66,9 +68,13 @@ export class StorePanel {
     this.game.buyPower(id);
   }
 
+  /** Bir gücün güncel fiyatı (panelden yönetilir; varsayılan power.model'den). */
+  protected powerPrice(id: PowerId): number {
+    return this.econSettings.powerPrice(id);
+  }
+
   /** Bir güce yetecek altın var mı? */
   protected canAfford(id: PowerId): boolean {
-    const price = POWERS.find((p) => p.id === id)!.price;
-    return this.gold() >= price;
+    return this.gold() >= this.powerPrice(id);
   }
 }

@@ -1,7 +1,8 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { Direction } from '../models/tile.model';
-import { PowerId, PowerInventory, powerDef } from '../models/power.model';
+import { PowerId, PowerInventory } from '../models/power.model';
 import { EconomyService } from './economy.service';
+import { EconomySettingsService } from './economy-settings.service';
 import { loadPowers, savePowers } from './game-storage';
 
 /**
@@ -16,6 +17,7 @@ import { loadPowers, savePowers } from './game-storage';
 @Injectable({ providedIn: 'root' })
 export class PowersService {
   private readonly economy = inject(EconomyService);
+  private readonly econSettings = inject(EconomySettingsService);
 
   /** Güç envanteri (her güçten kaç adet). */
   readonly inventory = signal<PowerInventory>(loadPowers());
@@ -53,7 +55,7 @@ export class PowersService {
 
   /** Bir gücü altınla satın alır (envantere ekler). @returns başarılıysa true. */
   buy(id: PowerId): boolean {
-    if (!this.economy.spend(powerDef(id).price)) return false;
+    if (!this.economy.spend(this.econSettings.powerPrice(id))) return false;
     this.inventory.update((inv) => ({ ...inv, [id]: inv[id] + 1 }));
     savePowers(this.inventory());
     return true;

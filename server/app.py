@@ -37,6 +37,8 @@ from bot_ai import play_bot_game, BOT_SPEED_MS, BOT_CHARACTERS
 import score_audit
 # Metrik panosu sorguları + anonim enstrümantasyon.
 import metrics
+# Ekonomi ayarları (panelden yönetilen değerler + aralık denetimi).
+import econ
 # Canlı oda + sunucu izleme (oda özeti, takılmış tespiti, sağlık, bakım).
 import monitor
 from collections import deque
@@ -114,12 +116,34 @@ def contains_banned(text) -> bool:
     joined = "".join(tokens)
     return any(w in joined for w in BANNED_SUB)
 
-# Ay sonu şampiyonluk ödülü — bilinçli olarak BÜYÜK: bir aylık rekabetin
-# karşılığı, normal günlük ödüllerin çok üzerinde olmalı.
-CHAMPION_PRIZE = {
-    "gold": 2000,
-    "powers": {"time": 3, "bomb": 3, "shuffle": 3, "undo": 3, "hint": 3},
-}
+# Ay sonu şampiyonluk ödülü — güç kısmı SABİT; altını ekonomi ayarından gelir
+# (champion_prize_gold; ay ortasında DEĞİŞTİRİLEMEZ — bkz. _admin_set_setting).
+CHAMPION_PRIZE_POWERS = {"time": 3, "bomb": 3, "shuffle": 3, "undo": 3, "hint": 3}
+
+
+def load_settings(conn) -> dict:
+    """settings tablosundaki override'ları {key: value} olarak döndürür (JSON çözer)."""
+    out = {}
+    try:
+        for r in conn.execute("SELECT key, value FROM settings"):
+            try:
+                out[r["key"]] = json.loads(r["value"])
+            except Exception:
+                pass  # bozuk kayıt → yok say (effective varsayılana düşürür)
+    except sqlite3.OperationalError:
+        pass  # tablo henüz yoksa
+    return out
+
+
+def effective_settings(conn) -> dict:
+    """Gömülü varsayılan + GEÇERLİ override birleşimi (econ.effective ile clamp/reddet)."""
+    return econ.effective(load_settings(conn))
+
+
+def champion_prize(conn) -> dict:
+    """Aylık şampiyonluk ödülü: altını ayardan (clamp'li), güçleri sabit."""
+    gold = int(effective_settings(conn)["champion_prize_gold"])
+    return {"gold": gold, "powers": CHAMPION_PRIZE_POWERS}
 
 # --- Skor doğrulama (replay) ----------------------------------
 MAX_MOVES = 100_000  # transkript üst sınırı (uzun oyun ~1000-3000 hamle)
@@ -602,6 +626,23 @@ def init_db():
             day TEXT PRIMARY KEY,
             requests INTEGER NOT NULL DEFAULT 0,
             errors INTEGER NOT NULL DEFAULT 0
+        );
+        -- Ekonomi ayarları (⚖️): panelden yönetilen override'lar. Kayıt YOKSA
+        -- gömülü VARSAYILAN kullanılır (oyun ekonomi ayarı için beklemez).
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,           -- JSON kodlu (sayı)
+            updated INTEGER NOT NULL,
+            admin_username TEXT
+        );
+        -- Ayar değişiklik geçmişi (geri alma + denetim izi).
+        CREATE TABLE IF NOT EXISTS settings_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            key TEXT NOT NULL,
+            old_value TEXT,                -- JSON (yoksa NULL = varsayılandan değişti)
+            new_value TEXT NOT NULL,
+            admin_username TEXT,
+            created INTEGER NOT NULL
         );
         -- Pano sorgu indeksleri (büyük veride <1sn hedefi).
         CREATE INDEX IF NOT EXISTS idx_users_created ON users(created);
@@ -1234,13 +1275,16 @@ def room_state(conn, code):
 class Handler(BaseHTTPRequestHandler):
     server_version = "game2048-api/1.0"
 
-    def _send(self, code: int, obj):
+    def _send(self, code: int, obj, cache_seconds: int = 0):
         # 204 gövde taşıyamaz (RFC 9110); nginx ve katı istemciler reddedebilir.
         body = b"" if code == 204 else json.dumps(obj).encode("utf-8")
         self.send_response(code)
         if body:
             self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        # Kısa önbellek (yalnız istenirse; ör. ekonomi ayarları) → her oyunda istek yok.
+        if cache_seconds > 0 and code == 200:
+            self.send_header("Cache-Control", f"public, max-age={cache_seconds}")
         # CORS: yalnızca İZİNLİ köken(ler) (eskiden "*" idi → her site API'yi
         # tarayıcıdan kullanabiliyordu). İstek kökeni izinliyse yansıt; değilse
         # ACAO gönderme (tarayıcı engeller). Aynı-köken istekte Origin yoktur.
@@ -1385,6 +1429,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._admin_scores_report()
         if p == "/admin/metrics":
             return self._admin_metrics()
+        if p == "/settings":
+            return self._settings()
+        if p == "/admin/settings":
+            return self._admin_settings()
         if p == "/admin/users":
             return self._admin_users()
         if p == "/admin/users/detail":
@@ -1417,6 +1465,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._admin_moderate()
         if p == "/admin/users/delete":
             return self._admin_user_delete()
+        if p == "/admin/settings":
+            return self._admin_set_setting()
+        if p == "/admin/settings/undo":
+            return self._admin_undo_setting()
         if p == "/admin/rooms/close":
             return self._admin_room_close()
         if p == "/admin/maintenance":
@@ -2513,6 +2565,129 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             conn.close()
 
+    # --- Ekonomi ayarları (⚖️) ---------------------------------
+    def _settings(self):
+        """GET /settings -> istemcinin okuduğu ETKİN ekonomi ayarları (varsayılan +
+        geçerli override). Auth GEREKMEZ (oyun okur); kısa süre önbelleklenir.
+        Sunucu erişilemezse istemci GÖMÜLÜ varsayılana düşer (bu uç hiç dönmese de
+        oyun çalışır)."""
+        conn = db()
+        try:
+            eff = effective_settings(conn)
+            # İstemci kısa önbellek (30 sn) → her oyunda istek atmaz.
+            return self._send(200, {"settings": eff}, cache_seconds=30)
+        finally:
+            conn.close()
+
+    def _admin_settings(self):
+        """GET /admin/settings -> her anahtar: mevcut değer + varsayılan + aralık +
+        tip + ay-kilidi (panel edit ekranı için) + son değişiklikler. Yönetici."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            eff = effective_settings(conn)
+            overrides = load_settings(conn)
+            rows = []
+            for spec in econ.spec_rows():
+                k = spec["key"]
+                rows.append({**spec, "current": eff[k], "overridden": k in overrides})
+            history = [dict(r) for r in conn.execute(
+                "SELECT key, old_value, new_value, admin_username, created "
+                "FROM settings_history ORDER BY id DESC LIMIT 50")]
+            return self._send(200, {"settings": rows, "history": history})
+        finally:
+            conn.close()
+
+    def _admin_set_setting(self):
+        """POST /admin/settings {key, value} -> ekonomi ayarı değiştir.
+
+        - Aralık dışı/tip hatası → 400 (REDDET, kırpma).
+        - Ay-kilitli anahtar (champion_prize_gold) + bu ay YARIŞ BAŞLADIYSA (aylık
+          skor var) → 409 champion_locked_midmonth (kural yarış ortasında değişmez).
+        - Değişiklik settings_history'ye yazılır (geri alma), denetime düşer.
+        Oyuncu varlıkları ETKİLENMEZ (yalnız yeni ödül/fiyat hesapları)."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            b = self._body()
+            key = str(b.get("key") or "")
+            ok, value, err = econ.validate(key, b.get("value"))
+            if not ok:
+                return self._send(400, {"error": err})  # unknown_key|bad_type|out_of_range
+            # Ay ortası koruması: aylık ödül, o ay skor girildiyse değişmez.
+            if key in econ.MONTH_LOCKED:
+                started = conn.execute(
+                    "SELECT 1 FROM monthly_scores WHERE month=? AND score>0 LIMIT 1",
+                    (utc_month(),)).fetchone()
+                if started:
+                    return self._send(409, {"error": "champion_locked_midmonth",
+                                            "month": utc_month()})
+            now = int(time.time())
+            old = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+            old_val = old["value"] if old else None
+            newv = json.dumps(value)
+            conn.execute(
+                "INSERT INTO settings (key, value, updated, admin_username) VALUES (?,?,?,?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated=excluded.updated, "
+                "admin_username=excluded.admin_username",
+                (key, newv, now, admin["username"]))
+            conn.execute(
+                "INSERT INTO settings_history (key, old_value, new_value, admin_username, created) "
+                "VALUES (?,?,?,?,?)", (key, old_val, newv, admin["username"], now))
+            conn.commit()
+            audit_log(conn, admin["id"], admin["username"], "setting_change",
+                      "setting", key, f"{old_val} -> {newv}", self._ip())
+            return self._send(200, {"ok": True, "key": key, "value": value})
+        finally:
+            conn.close()
+
+    def _admin_undo_setting(self):
+        """POST /admin/settings/undo {key} -> son değişikliği GERİ AL: bir önceki
+        değere döner (yoksa override kaldırılır → gömülü varsayılan). Denetlenir."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            key = str(self._body().get("key") or "")
+            if key not in econ.SPEC:
+                return self._send(400, {"error": "unknown_key"})
+            # En son değişikliğin ÖNCEKİ değeri (old_value).
+            last = conn.execute(
+                "SELECT old_value FROM settings_history WHERE key=? ORDER BY id DESC LIMIT 1",
+                (key,)).fetchone()
+            if not last:
+                return self._send(404, {"error": "no_history"})
+            now = int(time.time())
+            cur = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+            cur_val = cur["value"] if cur else None
+            if last["old_value"] is None:
+                # Önceki durum: override yoktu → override'ı kaldır (varsayılana dön).
+                conn.execute("DELETE FROM settings WHERE key=?", (key,))
+                restored = None
+            else:
+                conn.execute(
+                    "INSERT INTO settings (key, value, updated, admin_username) VALUES (?,?,?,?) "
+                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated=excluded.updated, "
+                    "admin_username=excluded.admin_username",
+                    (key, last["old_value"], now, admin["username"]))
+                restored = last["old_value"]
+            conn.execute(
+                "INSERT INTO settings_history (key, old_value, new_value, admin_username, created) "
+                "VALUES (?,?,?,?,?)",
+                (key, cur_val, restored if restored is not None else "__default__", admin["username"], now))
+            conn.commit()
+            audit_log(conn, admin["id"], admin["username"], "setting_undo",
+                      "setting", key, f"{cur_val} -> {restored}", self._ip())
+            eff = effective_settings(conn)
+            return self._send(200, {"ok": True, "key": key, "value": eff[key]})
+        finally:
+            conn.close()
+
     def _sync(self):
         conn = db()
         try:
@@ -3383,7 +3558,7 @@ class Handler(BaseHTTPRequestHandler):
         ).fetchone()
         if not row:
             return None
-        return {"month": row["month"], "score": row["score"], **CHAMPION_PRIZE}
+        return {"month": row["month"], "score": row["score"], **champion_prize(conn)}
 
     def _monthly_submit(self):
         """POST /monthly/submit {seed,moves,size} -> bu ayın skorunu bildir.
@@ -3469,7 +3644,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {
                 "ok": True,
                 "month": row["month"],
-                **CHAMPION_PRIZE,
+                **champion_prize(conn),
             })
         finally:
             conn.close()

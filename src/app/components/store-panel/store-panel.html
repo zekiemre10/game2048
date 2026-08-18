@@ -76,7 +76,7 @@
                 [disabled]="!canAfford(p.id)"
                 (click)="onBuyPower(p.id)"
               >
-                💰 {{ p.price }}
+                💰 {{ powerPrice(p.id) }}
               </button>
             </div>
           }

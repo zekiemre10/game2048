@@ -8,19 +8,23 @@ import { API_BASE } from './auth.service';
  */
 @Injectable({ providedIn: 'root' })
 export class TelemetryService {
-  /** Olay gönder (ör. game_start {mode}). Sonuç beklenmez. */
+  /** Olay gönder (ör. game_start {mode}). Sonuç beklenmez.
+   *
+   * `navigator.sendBeacon` kullanır: ateşle-unut telemetri için DOĞRU API —
+   * bloklamaz, açık bağlantı bırakmaz, oyunu/sayfayı yavaşlatmaz. jsdom/SSR'de
+   * (birim testleri) sendBeacon YOKTUR → sessizce atlanır (test ağ çağrısı
+   * yapmaz, takılmaz). Gerçek tarayıcı + Playwright'ta çalışır. */
   event(name: string, payload: Record<string, unknown> = {}): void {
     try {
-      void fetch(`${API_BASE}/events`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, ...payload }),
-        keepalive: true,
-      }).catch(() => {
-        /* telemetri kritik değil — sessizce geç */
+      if (typeof navigator === 'undefined' || typeof navigator.sendBeacon !== 'function') {
+        return; // test/SSR ortamı — ağ çağrısı yapma
+      }
+      const body = new Blob([JSON.stringify({ name, ...payload })], {
+        type: 'application/json',
       });
+      navigator.sendBeacon(`${API_BASE}/events`, body);
     } catch {
-      /* fetch yoksa/bozuksa sessiz */
+      /* telemetri kritik değil — sessizce geç */
     }
   }
 }

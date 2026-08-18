@@ -205,6 +205,43 @@ yönetici `admin_audit` + kayıtla yeniden değerlendirir (`revert`).
 Testler: `test_score_audit.py` (saf matematik) + `test_score_moderation.py`
 (düşürme/geri alma/şampiyonluk/bildirim/denetim/yetki).
 
+## Metrik panosu (📈 veriye dayalı karar)
+
+Veri zaten birikiyordu ama okunmuyordu. Bu katman **sorgu + hafif enstrümantasyon**
+ekler; kalıcı pano ekranı **ayrı yönetici uygulamasına** aittir (bu API'yi tüketir).
+
+**Var olan tablolardan** (yeni veri gerektirmez): kullanıcı sayısı + kayıt eğrisi
+(`users.created`), seviye hunisi + skor dağılımı (`data` blob'u `bestLevel`/
+`bestScore`), çevrimiçi kullanım (`friendships`/`messages`/`room_players`).
+
+**Üç HAFİF, ANONİM tablo** (eksikler için — `merge_progress` whitelist'i mod tutmaz,
+`sessions` silinebilir):
+- `user_activity(user_id, day)` — DAU/WAU + tutunma. `_auth_row`'da **günde tek**
+  yazılır (bellek koruması). user_id İÇ kimlik; **hiçbir metrik çıktısında dönmez**.
+- `events(ts, name, mode, level, score)` — mod dağılımı. **KİŞİSEL VERİ YOK**
+  (user_id/IP tutulmaz). İstemci `ModesService` 5 başlangıç noktasından
+  `POST /events {name:'game_start', mode}` gönderir (ateşle-unut, anonim).
+- `daily_metrics(day, requests, errors)` — sunucu sağlığı; `_dispatch` bellek
+  sayacı → 30sn'de bir flush (daemon).
+
+Sorgu indeksleri eklendi (`users.created`, `user_activity.day`, `events.*` …) →
+**<1sn**. `metrics.py` (saf, test edilir) `compute(from,to)` tüm grupları döner;
+tutunma **kohort bazlı** (D+1 / D+1..D+7); UTC gün aritmetiği (`calendar.timegm`).
+
+| Yöntem | Yol | Ne |
+|--------|-----|-----|
+| GET | `/admin/metrics?from=&to=` | pano metrikleri (öntanımlı son 30 gün) — admin + denetlenir |
+| POST | `/events` `{name, mode?, level?, score?}` | **anonim** olay (auth'suz, IP-sınırlı) |
+
+Ayrıca CLI: `python3 metrics_report.py app.db` (salt-okunur JSON dökümü).
+
+### 🔒 Gizlilik (kabul kriteri)
+
+Toplanan **hiçbir metrik kişisel veri içermez**: çıktı yalnız toplam sayı / oran /
+kova. Ad, e-posta, IP, ham kullanıcı kimliği DÖNMEZ. `events` anonimdir. `user_activity`
+yalnız iç kimlik+gün tutar ve dışa açılmaz (yalnız DAU/WAU/tutunma toplamlarına girer).
+Veri yokken tüm gruplar sıfır/boş döner (arayüz bozulmaz). Testler: `test_metrics.py`.
+
 ## NestJS geçişi notu
 
 Canlı backend **Python** (`server/app.py`). NestJS'e (`api-nest/`) devirde bu

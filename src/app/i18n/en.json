@@ -248,6 +248,7 @@
   "mp.create": "➕ Create Room",
   "mp.done": "✓ done",
   "mp.duration": "Duration",
+  "mp.err.adminClosed": "This room was closed by a moderator.",
   "mp.err.already_started": "The race already started.",
   "mp.err.error": "Something went wrong.",
   "mp.err.invalid_character": "Invalid character.",

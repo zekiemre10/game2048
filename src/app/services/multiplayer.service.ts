@@ -37,6 +37,8 @@ export interface RoomState {
   startedAt: number | null;
   now: number;
   players: RoomPlayer[];
+  /** Yönetici bu odayı kapattı mı (izleme paneli müdahalesi). */
+  adminClosed?: boolean;
 }
 
 export type MpResult = { ok: boolean; error?: string };
@@ -273,6 +275,10 @@ export class MultiplayerService {
 
   /** Yeni oda durumunu uygula + geçişleri işle (lobi→yarış). */
   private applyRoom(next: RoomState): void {
+    // Yönetici odayı kapattıysa oyuncuya anlamlı mesaj göster (izleme paneli).
+    if (next.adminClosed && !this.room()?.adminClosed) {
+      this.notice.set('mp.err.adminClosed');
+    }
     this.room.set(next);
     if (next.status === 'racing' && !this.raceStarted) {
       this.raceStarted = true;

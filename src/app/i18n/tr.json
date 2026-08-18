@@ -248,6 +248,7 @@
   "mp.create": "➕ Oda Kur",
   "mp.done": "✓ bitti",
   "mp.duration": "Süre",
+  "mp.err.adminClosed": "Bu oda bir yönetici tarafından kapatıldı.",
   "mp.err.already_started": "Yarış çoktan başladı.",
   "mp.err.error": "Bir hata oluştu.",
   "mp.err.invalid_character": "Geçersiz karakter.",

@@ -293,6 +293,47 @@ Her moderasyon eylemi `mod_notices` ile kullanıcıya **sebebiyle** bildirilir
 e-postasından iletir; yönetici `admin_audit` + detay ekranıyla yeniden değerlendirir
 (`unmute`/`unsuspend`). Silme geri alınamaz → bu yüzden çift onaylıdır.
 
+## Canlı oda + sunucu izleme (👁️)
+
+Çok oyunculu sistem çalışıyor ama görünmüyordu: kaç oda açık, takılan var mı,
+botlar çalışıyor mu, sunucu sağlığı ne. Bu katman **görünürlük + müdahale** verir.
+Mantık `monitor.py`'de (saf/test edilir); app.py ILE BIRLIKTE deploy edilmeli.
+
+### Uç noktalar (admin + taze oturum)
+
+| Yöntem | Yol | Ne |
+|--------|-----|-----|
+| GET | `/admin/rooms` | açık odalar: kod, oyuncu/bot sayısı, durum, yaş, **takılmış** bayrağı (oto-yenilenir; oyuncu ADI dönmez) |
+| POST | `/admin/rooms/close` `{code, reason, delete?}` | odayı **kapat** (bitir + `admin_closed`) ya da **sıfırla** (`delete:true`); gerekçe zorunlu |
+| GET | `/admin/status` | çalışma süresi, bellek (RSS), DB + **WAL** boyutu, son yedek, bugünkü hata oranı + **son hataların özeti**, oda sayıları, bot sağlığı |
+| POST | `/admin/maintenance` `{action}` | `cleanup_rooms` \| `vacuum` \| `backup` — elle tetikleme |
+
+### Takılmış oda tespiti
+
+`is_stuck`: (a) `racing` durumunda ama süresi + **120sn pay** kadar geçmiş
+(lazy-finish tetiklenmemiş), ya da (b) **1 saatten uzun** `lobby`de (hiç
+başlamamış). Kapatılan oda oyunculara `room_state.adminClosed` ile bildirilir →
+oyuncu **anlamlı mesaj** görür ("Bu oda bir yönetici tarafından kapatıldı",
+`mp.err.adminClosed`).
+
+### Bakım — elle **ve** zamanlanmış
+
+Aynı `monitor` fonksiyonları iki yoldan koşar:
+- **Elle:** `/admin/maintenance` (sorun anında).
+- **Zamanlanmış:** `_maintenance_daemon` (daemon) — **saatlik** oda temizliği
+  (`cleanup_rooms`: bitmiş + 6 saatten eski odalar + yetim oyuncu satırları) +
+  **günlük yedek** (`backup`: WAL checkpoint → `app.db.bak-<ts>`). `vacuum` elle.
+
+Bağımlılık (sağlandı): dağıtım altyapısı — systemd servisi `game2048-api`,
+yedekler `app.db.bak-*`. Panel bunların durumunu gösterir.
+
+### Güvenlik / gizlilik
+
+Oda listesi **oyuncu adı taşımaz** (yalnız kod + sayı). Son hatalar özeti
+**PII taşımaz** (yalnız yol + hata tipi + zaman). Her yönetim eylemi
+(`room_close`/`room_reset`/`maintenance:*`) `admin_audit`'e yazılır. Test:
+`test_monitoring.py`.
+
 ## NestJS geçişi notu
 
 Canlı backend **Python** (`server/app.py`). NestJS'e (`api-nest/`) devirde bu

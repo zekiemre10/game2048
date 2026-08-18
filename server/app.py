@@ -37,6 +37,13 @@ from bot_ai import play_bot_game, BOT_SPEED_MS, BOT_CHARACTERS
 import score_audit
 # Metrik panosu sorguları + anonim enstrümantasyon.
 import metrics
+# Canlı oda + sunucu izleme (oda özeti, takılmış tespiti, sağlık, bakım).
+import monitor
+from collections import deque
+
+# Süreç başlangıcı (çalışma süresi için) + son hataların halka tamponu (izleme).
+SERVER_START_TS = int(time.time())
+_recent_errors = deque(maxlen=50)
 
 # Zorluk kademeleri (istemci AI_LEVELS ile aynı) + oda başına bot sınırı.
 BOT_LEVELS = ("easy", "medium", "hard", "expert")
@@ -630,6 +637,7 @@ def init_db():
         "ALTER TABLE users ADD COLUMN suspended INTEGER NOT NULL DEFAULT 0",    # askıya alındı mı (0/1)
         "ALTER TABLE users ADD COLUMN suspended_until INTEGER NOT NULL DEFAULT 0",  # süreli askı bitişi (0=kalıcı)
         "ALTER TABLE monthly_prizes ADD COLUMN revoked INTEGER NOT NULL DEFAULT 0",  # şampiyonluk düzeltildi mi (hile)
+        "ALTER TABLE rooms ADD COLUMN admin_closed INTEGER NOT NULL DEFAULT 0",  # yönetici kapattı mı (oyuncuya mesaj)
     ):
         try:
             conn.execute(stmt)
@@ -1216,6 +1224,7 @@ def room_state(conn, code):
         "startedAt": started,
         "now": now,
         "players": players,
+        "adminClosed": bool(room["admin_closed"]) if "admin_closed" in room.keys() else False,
     }
 
 
@@ -1326,8 +1335,13 @@ class Handler(BaseHTTPRequestHandler):
             self._send(409, {"error": "conflict"})
         except sqlite3.OperationalError:
             self._send(503, {"error": "busy"})
-        except Exception:
+        except Exception as exc:
             err = True
+            # İzleme için son hataların ÖZETİ (PII yok: yalnız yol + hata tipi).
+            _recent_errors.appendleft({
+                "ts": int(time.time()), "path": self._path(),
+                "type": type(exc).__name__,
+            })
             traceback.print_exc()  # ayrıntı yalnızca sunucu günlüğüne
             self._send(500, {"error": "server_error"})
         finally:
@@ -1377,6 +1391,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._admin_user_detail()
         if p == "/admin/users/export":
             return self._admin_user_export()
+        if p == "/admin/rooms":
+            return self._admin_rooms()
+        if p == "/admin/status":
+            return self._admin_status()
         if p == "/blocks":
             return self._blocks_list()
         if p == "/moderation/notices":
@@ -1399,6 +1417,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._admin_moderate()
         if p == "/admin/users/delete":
             return self._admin_user_delete()
+        if p == "/admin/rooms/close":
+            return self._admin_room_close()
+        if p == "/admin/maintenance":
+            return self._admin_maintenance()
         if p == "/admin/reports/resolve":
             return self._admin_report_resolve()
         if p == "/admin/scores/invalidate":
@@ -2071,6 +2093,103 @@ class Handler(BaseHTTPRequestHandler):
             audit_log(conn, admin["id"], admin["username"], "user_delete",
                       "user", tid, f"{target['username']}: {reason}", self._ip())
             return self._send(200, {"ok": True, "deleted": target["username"]})
+        finally:
+            conn.close()
+
+    # --- Canlı oda + sunucu izleme -----------------------------
+    def _admin_rooms(self):
+        """GET /admin/rooms -> açık odalar (kod, oyuncu/bot sayısı, durum, yaş,
+        takılmış bayrağı) + durum sayıları. Oyuncu ADLARI dönmez. Oto-yenilenir
+        (istemci yoklar)."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            now = int(time.time())
+            rooms = monitor.list_rooms(conn, now)
+            return self._send(200, {
+                "rooms": rooms,
+                "counts": monitor.room_counts(conn),
+                "stuck": sum(1 for r in rooms if r["stuck"]),
+                "now": now,
+            })
+        finally:
+            conn.close()
+
+    def _admin_room_close(self):
+        """POST /admin/rooms/close {code, reason, delete?} -> odayı KAPAT (bitir)
+        ya da SIFIRLA (delete=true → tamamen sil). Gerekçe zorunlu. Kapatılan oda
+        oyunculara `adminClosed` ile bildirilir (anlamlı mesaj). Denetlenir."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            b = self._body()
+            code = (b.get("code") or "").strip().upper()
+            reason = str(b.get("reason") or "").strip()[:300]
+            if not code:
+                return self._send(400, {"error": "bad_code"})
+            if not reason:
+                return self._send(400, {"error": "reason_required"})
+            room = conn.execute("SELECT code FROM rooms WHERE code=?", (code,)).fetchone()
+            if not room:
+                return self._send(404, {"error": "room_not_found"})
+            delete = bool(b.get("delete"))
+            if delete:
+                conn.execute("DELETE FROM room_players WHERE code=?", (code,))
+                conn.execute("DELETE FROM rooms WHERE code=?", (code,))
+            else:
+                # Bitir + yönetici-kapattı işaretle → oyuncular yoklamada mesaj görür.
+                conn.execute(
+                    "UPDATE rooms SET status='finished', admin_closed=1 WHERE code=?", (code,))
+            conn.commit()
+            audit_log(conn, admin["id"], admin["username"],
+                      "room_reset" if delete else "room_close",
+                      "room", code, reason, self._ip())
+            return self._send(200, {"ok": True, "code": code, "deleted": delete})
+        finally:
+            conn.close()
+
+    def _admin_status(self):
+        """GET /admin/status -> sunucu sağlığı: çalışma süresi, bellek, DB + WAL
+        boyutu, son yedek, hata oranı + son hataların özeti, oda sayıları, bot
+        sağlığı. Denetlenmez (salt-okuma), yalnız admin görebilir."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            metrics.flush_counters(conn)  # bugünün istek/hata sayısı taze olsun
+            status = monitor.server_status(
+                conn, DB_PATH, SERVER_START_TS, _recent_errors)
+            return self._send(200, status)
+        finally:
+            conn.close()
+
+    def _admin_maintenance(self):
+        """POST /admin/maintenance {action} -> bakım eylemi: cleanup_rooms |
+        vacuum | backup. Elle tetiklenir (zamanlanmış da koşar). Denetlenir."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            action = str(self._body().get("action") or "").strip().lower()
+            if action == "cleanup_rooms":
+                result = monitor.cleanup_rooms(conn)
+            elif action == "vacuum":
+                monitor.vacuum(conn)
+                result = {"ok": True}
+            elif action == "backup":
+                dest = monitor.backup(conn, DB_PATH, time.time())
+                result = {"backup": os.path.basename(dest)}
+            else:
+                return self._send(400, {"error": "bad_action"})
+            audit_log(conn, admin["id"], admin["username"], f"maintenance:{action}",
+                      "server", None, json.dumps(result), self._ip())
+            return self._send(200, {"ok": True, "action": action, "result": result})
         finally:
             conn.close()
 
@@ -3511,9 +3630,31 @@ def _metrics_flusher():
             pass
 
 
+def _maintenance_daemon():
+    """Zamanlanmış bakım (daemon): saatlik oda temizliği + günlük yedek.
+    Elle tetikleme (/admin/maintenance) bundan bağımsızdır; ikisi de aynı
+    monitor fonksiyonlarını çağırır."""
+    last_backup_day = None
+    while True:
+        time.sleep(3600)  # saatlik
+        try:
+            conn = db()
+            try:
+                monitor.cleanup_rooms(conn)  # eski/bitmiş odalar + yetim oyuncular
+                today = time.strftime("%Y-%m-%d", time.gmtime())
+                if today != last_backup_day:
+                    monitor.backup(conn, DB_PATH, time.time())  # günlük yedek
+                    last_backup_day = today
+            finally:
+                conn.close()
+        except Exception:
+            traceback.print_exc()
+
+
 def main():
     init_db()
     threading.Thread(target=_metrics_flusher, daemon=True).start()
+    threading.Thread(target=_maintenance_daemon, daemon=True).start()
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     print(f"game2048-api listening on 127.0.0.1:{PORT}, db={DB_PATH}")
     server.serve_forever()

@@ -232,3 +232,26 @@
   opacity: 0.65;
   text-align: center;
 }
+
+// Veri indirme + gizlilik bağlantısı (veri sorumluluğu).
+.data-export-btn {
+  width: 100%;
+  margin: 0.4rem 0 0.2rem;
+}
+
+.privacy-link {
+  display: inline-block;
+  margin-top: 0.6rem;
+  background: none;
+  border: none;
+  padding: 0.2rem 0;
+  color: var(--accent, #8f7a66);
+  font: inherit;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:hover {
+    opacity: 0.85;
+  }
+}

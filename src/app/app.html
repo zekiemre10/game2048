@@ -130,8 +130,14 @@
     (showTutorial)="onShowTutorial()"
     (logout)="onLogout()"
     (openAuth)="onOpenAuth()"
+    (openPrivacy)="onOpenPrivacy()"
     (accountDeleted)="onAccountDeleted()"
   />
+}
+
+<!-- Gizlilik politikası (ayrı bileşen: components/privacy-panel) -->
+@if (privacyOpen()) {
+  <app-privacy-panel (close)="onClosePrivacy()" />
 }
 
 <!-- Mağaza paneli (ayrı bileşen: components/store-panel) -->
@@ -190,7 +196,7 @@
 
 <!-- Hesap paneli (ayrı bileşen: components/auth-panel) -->
 @if (authOpen()) {
-  <app-auth-panel (close)="onCloseAuth()" (goHome)="onGoHome()" />
+  <app-auth-panel (close)="onCloseAuth()" (goHome)="onGoHome()" (openPrivacy)="onOpenPrivacy()" />
 }
 
 @if (status() === GameStatus.Idle) {

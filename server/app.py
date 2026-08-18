@@ -1401,6 +1401,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"ok": True})
         if p == "/me":
             return self._me()
+        if p == "/account/export":
+            return self._account_export()
         if p == "/friends":
             return self._friends_list()
         if p == "/users/search":
@@ -1571,7 +1573,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, {"error": "invalid_username"})
         if contains_banned(username):
             return self._send(400, {"error": "banned_username"})
-        if not EMAIL_RE.match(email):
+        # E-posta ARTIK İSTEĞE BAĞLI (veri sorumluluğu: kullanılmayan veri toplanmaz).
+        # Verilirse biçimi doğrulanır; boşsa hesap e-postasız açılır.
+        if email and not EMAIL_RE.match(email):
             return self._send(400, {"error": "invalid_email"})
         if len(password) < 6:
             return self._send(400, {"error": "weak_password"})
@@ -1706,11 +1710,51 @@ class Handler(BaseHTTPRequestHandler):
             conn.execute("DELETE FROM daily_scores WHERE user_id = ?", (uid,))
             conn.execute("DELETE FROM flagged_submissions WHERE user_id = ?", (uid,))
             conn.execute("DELETE FROM reports WHERE reporter_id = ? OR target_id = ?", (uid, uid))
+            conn.execute("DELETE FROM blocks WHERE blocker_id = ? OR blocked_id = ?", (uid, uid))
+            conn.execute("DELETE FROM mod_notices WHERE user_id = ?", (uid,))
+            conn.execute("DELETE FROM user_activity WHERE user_id = ?", (uid,))
             conn.execute("DELETE FROM sessions WHERE user_id = ?", (uid,))  # tüm oturumları kapat
             conn.execute("DELETE FROM users WHERE id = ?", (uid,))
             conn.commit()
             print(f"[account] deleted user id={uid} username={row['username']}", flush=True)
             return self._send(200, {"ok": True})
+        finally:
+            conn.close()
+
+    def _account_export(self):
+        """GET /account/export -> kullanıcının KENDİ verisinin tam dışa aktarımı
+        (veri taşınabilirliği hakkı). Parola hash'i/tuzu DÖNMEZ; yalnız o kullanıcıya
+        ait veri. Auth zorunlu (yalnız kendi verisi)."""
+        conn = db()
+        try:
+            row = user_from_token(conn, self._token())
+            if not row:
+                return self._send(401, {"error": "unauthorized"})
+            uid = row["id"]
+            try:
+                data = json.loads(row["data"] or "{}")
+            except Exception:
+                data = {}
+            monthly = [dict(r) for r in conn.execute(
+                "SELECT month, score, best FROM monthly_scores WHERE user_id=?", (uid,))]
+            daily = [dict(r) for r in conn.execute(
+                "SELECT day, score, best, moves FROM daily_scores WHERE user_id=?", (uid,))]
+            friends = [r["username"] for r in conn.execute(
+                "SELECT CASE WHEN requester_id=? THEN a.username ELSE b.username END AS username "
+                "FROM friendships f LEFT JOIN users a ON a.id=f.addressee_id "
+                "LEFT JOIN users b ON b.id=f.requester_id "
+                "WHERE status='accepted' AND (requester_id=? OR addressee_id=?)", (uid, uid, uid))]
+            sent = [dict(r) for r in conn.execute(
+                "SELECT to_id, body, created FROM messages WHERE from_id=? ORDER BY id", (uid,))]
+            notices = [dict(r) for r in conn.execute(
+                "SELECT action, reason, until, created FROM mod_notices WHERE user_id=?", (uid,))]
+            export = {
+                "account": {"id": uid, "username": row["username"], "email": row["email"],
+                            "created": row["created"]},
+                "progress": data, "monthlyScores": monthly, "dailyScores": daily,
+                "friends": friends, "sentMessages": sent, "moderationNotices": notices,
+            }
+            return self._send(200, {"export": export})
         finally:
             conn.close()
 
@@ -2237,6 +2281,8 @@ class Handler(BaseHTTPRequestHandler):
             elif action == "backup":
                 dest = monitor.backup(conn, DB_PATH, time.time())
                 result = {"backup": os.path.basename(dest)}
+            elif action == "retention":
+                result = retention_cleanup(conn)  # saklama süresi dolan veri
             else:
                 return self._send(400, {"error": "bad_action"})
             audit_log(conn, admin["id"], admin["username"], f"maintenance:{action}",
@@ -3805,10 +3851,43 @@ def _metrics_flusher():
             pass
 
 
+# --- Veri saklama süreleri (gün) — gizlilik politikasıyla BİREBİR ------------
+# Belge: PRIVACY.md. Süresi dolan veri otomatik silinir (retention_cleanup).
+RETENTION_MESSAGES_DAYS = 180        # özel mesajlar 6 ay sonra silinir
+RETENTION_EVENTS_DAYS = 90           # anonim telemetri 3 ay
+RETENTION_RESOLVED_REPORTS_DAYS = 180  # çözülmüş şikayetler 6 ay
+RETENTION_MOD_NOTICES_DAYS = 365     # moderasyon bildirimleri 1 yıl (itiraz penceresi)
+RETENTION_AUDIT_DAYS = 365           # yönetici denetim izi 1 yıl
+
+
+def retention_cleanup(conn) -> dict:
+    """Saklama süresi DOLAN veriyi otomatik siler (gizlilik politikası). Toplanan
+    veri ne kadar az kalırsa risk o kadar az. Dönen: silinen satır sayıları."""
+    now = int(time.time())
+    day = 86400
+    counts = {}
+    plans = [
+        ("messages", "DELETE FROM messages WHERE created < ?", RETENTION_MESSAGES_DAYS),
+        ("events", "DELETE FROM events WHERE ts < ?", RETENTION_EVENTS_DAYS),
+        ("reports", "DELETE FROM reports WHERE status='resolved' AND created < ?",
+         RETENTION_RESOLVED_REPORTS_DAYS),
+        ("mod_notices", "DELETE FROM mod_notices WHERE created < ?", RETENTION_MOD_NOTICES_DAYS),
+        ("admin_audit", "DELETE FROM admin_audit WHERE created < ?", RETENTION_AUDIT_DAYS),
+    ]
+    for name, sql, days in plans:
+        try:
+            cur = conn.execute(sql, (now - days * day,))
+            counts[name] = cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
+        except sqlite3.OperationalError:
+            counts[name] = 0  # tablo yoksa geç
+    conn.commit()
+    return counts
+
+
 def _maintenance_daemon():
-    """Zamanlanmış bakım (daemon): saatlik oda temizliği + günlük yedek.
-    Elle tetikleme (/admin/maintenance) bundan bağımsızdır; ikisi de aynı
-    monitor fonksiyonlarını çağırır."""
+    """Zamanlanmış bakım (daemon): saatlik oda temizliği + saklama-süresi temizliği
+    + günlük yedek. Elle tetikleme (/admin/maintenance) bundan bağımsızdır; ikisi de
+    aynı fonksiyonları çağırır."""
     last_backup_day = None
     while True:
         time.sleep(3600)  # saatlik
@@ -3816,6 +3895,7 @@ def _maintenance_daemon():
             conn = db()
             try:
                 monitor.cleanup_rooms(conn)  # eski/bitmiş odalar + yetim oyuncular
+                retention_cleanup(conn)  # saklama süresi dolan veri (gizlilik)
                 today = time.strftime("%Y-%m-%d", time.gmtime())
                 if today != last_backup_day:
                     monitor.backup(conn, DB_PATH, time.time())  # günlük yedek

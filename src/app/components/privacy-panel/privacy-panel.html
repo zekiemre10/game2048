@@ -1,0 +1,184 @@
+<div class="settings-backdrop" (click)="close.emit()">
+  <div
+    class="settings-panel privacy-panel"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="t('privacy.title')"
+    (click)="$event.stopPropagation()"
+  >
+    <h2 class="settings-title">📋 {{ t('privacy.title') }}</h2>
+
+    <div class="privacy-body">
+      @if (tr()) {
+        <p class="privacy-lead">
+          2048, gerçek hesaplar tutan bir oyundur. Verini nasıl işlediğimizi burada açıkça
+          anlatıyoruz. İlke basit:
+          <strong>toplamadığımız veri, korumamız gereken veri değildir</strong> — bu yüzden mümkün
+          olduğunca az veri tutarız.
+        </p>
+
+        <h3>Hangi veriyi topluyoruz ve neden</h3>
+        <ul>
+          <li>
+            <strong>Kullanıcı adı</strong> — hesabını tanımlar, sıralama ve arkadaşlıkta görünür.
+            Zorunlu.
+          </li>
+          <li>
+            <strong>Parola</strong> — yalnızca <em>geri döndürülemez</em> özet (hash, PBKDF2) olarak
+            saklanır; düz metin parolanı biz de göremeyiz.
+          </li>
+          <li>
+            <strong>E-posta</strong> — <strong>İSTEĞE BAĞLI.</strong> Vermezsen hesabın yine açılır.
+            Yalnızca gelecekte hesap kurtarma için tutulur; sana e-posta göndermeyiz, pazarlama
+            yapmayız.
+          </li>
+          <li>
+            <strong>Oyun ilerlemesi</strong> — skorlar, seviye, altın, güçler, başarımlar. Oyunun
+            kendisi için.
+          </li>
+          <li><strong>Arkadaşlıklar ve özel mesajlar</strong> — sosyal özellikler için.</li>
+          <li>
+            <strong>Anonim kullanım olayları</strong> — hangi modun oynandığı gibi (kimlik/İP
+            içermez), oyunu dengelemek için.
+          </li>
+        </ul>
+
+        <h3>Ne kadar süre saklıyoruz</h3>
+        <ul>
+          <li>Özel mesajlar: <strong>180 gün</strong> sonra otomatik silinir.</li>
+          <li>Anonim kullanım olayları: <strong>90 gün</strong>.</li>
+          <li>
+            Çözülmüş şikayetler: <strong>180 gün</strong>; moderasyon bildirimleri:
+            <strong>1 yıl</strong> (itiraz penceresi).
+          </li>
+          <li>Yönetici denetim kaydı: <strong>1 yıl</strong>. Oyun odaları: birkaç saat.</li>
+          <li>
+            Hesabın ve ilerlemen: sen silene kadar. Süresi dolan veri sunucuda otomatik temizlenir.
+          </li>
+        </ul>
+
+        <h3>Kimler erişebilir</h3>
+        <p>
+          <strong>Sen:</strong> kendi verini istediğin an indirebilir, hesabını silebilirsin.
+          <strong>Yöneticiler:</strong> sorun/şikayet halinde hesap bilgilerini (parola hariç),
+          skorları ve hakkındaki şikayet/moderasyon geçmişini görebilir; gerekçesi
+          <em>zorunlu</em> ve <em>kayıtlı</em> moderasyon uygulayabilir (uyarı/susturma/askı).
+          Yönetici <strong>parolanı göremez</strong> ve <strong>senin adına giriş yapamaz</strong>.
+        </p>
+
+        <h3>Sohbet gizliliği</h3>
+        <p>
+          Özel mesajların gizlidir. Yönetici sohbetlerini <strong>serbestçe okuyamaz</strong>;
+          rastgele konuşma çeken bir araç <em>yoktur</em>. Yalnızca biri seni şikayet ederse,
+          <strong>yalnızca</strong> şikayet edilen mesaj ve dar bir çevresi (en çok ±3 mesaj)
+          incelenebilir — bu erişim de denetim kaydına yazılır.
+        </p>
+
+        <h3>Verini indir</h3>
+        <p>
+          Ayarlar → "Verilerimi indir" ile hesabına ait tüm veriyi bir JSON dosyası olarak
+          indirebilirsin.
+        </p>
+
+        <h3>Hesabını sil — ve ne olur</h3>
+        <p>
+          Ayarlar → "Hesabı sil" (parola onaylı, kalıcı). Silince şunlar
+          <strong>tamamen</strong> gider: hesabın, oyun ilerlemen, skorların (aylık/günlük),
+          arkadaşlıkların, engellerin, gönderdiğin ve aldığın mesajlar, moderasyon bildirimlerin ve
+          oturumların. Kullanıcı adın yeniden serbest kalır. Bu işlem geri alınamaz.
+        </p>
+
+        <h3>İtiraz</h3>
+        <p>
+          Bir moderasyon işlemine itirazın varsa, hesap e-postandan bize ulaşabilirsin; yönetici
+          kayıtla yeniden değerlendirir.
+        </p>
+      } @else {
+        <p class="privacy-lead">
+          2048 keeps real accounts. Here's plainly how we handle your data. The principle is simple:
+          <strong>data we don't collect is data we don't have to protect</strong> — so we keep as
+          little as possible.
+        </p>
+
+        <h3>What we collect and why</h3>
+        <ul>
+          <li>
+            <strong>Username</strong> — identifies your account; shown in leaderboards and to
+            friends. Required.
+          </li>
+          <li>
+            <strong>Password</strong> — stored only as an <em>irreversible</em> hash (PBKDF2); even
+            we can't read your plaintext password.
+          </li>
+          <li>
+            <strong>Email</strong> — <strong>OPTIONAL.</strong> Your account works without it. Kept
+            only for future account recovery; we don't email you or market to you.
+          </li>
+          <li>
+            <strong>Game progress</strong> — scores, level, gold, powers, achievements. For the game
+            itself.
+          </li>
+          <li><strong>Friendships and private messages</strong> — for the social features.</li>
+          <li>
+            <strong>Anonymous usage events</strong> — e.g. which mode is played (no identity/IP), to
+            balance the game.
+          </li>
+        </ul>
+
+        <h3>How long we keep it</h3>
+        <ul>
+          <li>Private messages: auto-deleted after <strong>180 days</strong>.</li>
+          <li>Anonymous usage events: <strong>90 days</strong>.</li>
+          <li>
+            Resolved reports: <strong>180 days</strong>; moderation notices:
+            <strong>1 year</strong> (appeal window).
+          </li>
+          <li>Admin audit log: <strong>1 year</strong>. Game rooms: a few hours.</li>
+          <li>
+            Your account and progress: until you delete it. Expired data is auto-cleaned on the
+            server.
+          </li>
+        </ul>
+
+        <h3>Who can access it</h3>
+        <p>
+          <strong>You:</strong> download your data or delete your account anytime.
+          <strong>Admins:</strong> for issues/reports, can see account info (not the password),
+          scores, and the report/moderation history about you; can apply moderation
+          (warn/mute/suspend) with a <em>mandatory, logged</em> reason. An admin
+          <strong>cannot see your password</strong> and <strong>cannot log in as you</strong>.
+        </p>
+
+        <h3>Chat privacy</h3>
+        <p>
+          Your private messages are private. Admins <strong>cannot freely read</strong> your chats;
+          there is <em>no</em> tool to pull arbitrary conversations. Only if someone reports you can
+          <strong>just</strong> the reported message and a narrow window around it (at most ±3
+          messages) be reviewed — and that access is logged.
+        </p>
+
+        <h3>Download your data</h3>
+        <p>Settings → "Download my data" exports everything tied to your account as a JSON file.</p>
+
+        <h3>Delete your account — and what happens</h3>
+        <p>
+          Settings → "Delete account" (password-confirmed, permanent). Deleting
+          <strong>fully</strong>
+          removes: your account, game progress, scores (monthly/daily), friendships, blocks,
+          messages you sent and received, moderation notices, and sessions. Your username becomes
+          available again. This can't be undone.
+        </p>
+
+        <h3>Appeals</h3>
+        <p>
+          If you want to appeal a moderation action, reach us from your account email; an admin
+          re-reviews it with the record.
+        </p>
+      }
+    </div>
+
+    <button class="btn-primary settings-close" type="button" (click)="close.emit()">
+      {{ t('btn.close') }}
+    </button>
+  </div>
+</div>

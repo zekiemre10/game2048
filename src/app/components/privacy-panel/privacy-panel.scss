@@ -1,0 +1,47 @@
+// Panel chrome global _panels.scss'ten gelir. Buradakiler gizlilik metnine özel.
+
+.privacy-panel {
+  max-height: min(88dvh, 720px);
+  display: flex;
+  flex-direction: column;
+}
+
+.privacy-body {
+  overflow-y: auto;
+  text-align: left;
+  padding: 0.25rem 0.25rem 0.5rem;
+  line-height: 1.55;
+  font-size: 0.92rem;
+
+  h3 {
+    margin: 1.1rem 0 0.35rem;
+    font-size: 1rem;
+    color: var(--accent, #8f7a66);
+  }
+
+  ul {
+    margin: 0.2rem 0;
+    padding-left: 1.2rem;
+  }
+
+  li {
+    margin: 0.25rem 0;
+  }
+
+  p {
+    margin: 0.4rem 0;
+  }
+
+  strong {
+    font-weight: 700;
+  }
+}
+
+.privacy-lead {
+  opacity: 0.9;
+}
+
+.privacy-panel .settings-close {
+  margin-top: 0.6rem;
+  flex-shrink: 0;
+}

@@ -23,6 +23,14 @@ export class AuthPanel {
   readonly close = output<void>();
   /** Ana ekrana dön (ana bileşen paneller + odayı da temizler). */
   readonly goHome = output<void>();
+  /** Gizlilik politikası panelini aç (kayıt onayı bağlantısı). */
+  readonly openPrivacy = output<void>();
+
+  /** Gizlilik politikası onayı (kayıtta zorunlu). */
+  protected readonly consent = signal(false);
+  onConsentChange(event: Event): void {
+    this.consent.set((event.target as HTMLInputElement).checked);
+  }
 
   protected readonly t = (key: string, params?: Record<string, string | number>) =>
     this.i18n.t(key, params);

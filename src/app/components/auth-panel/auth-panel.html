@@ -36,7 +36,7 @@
       </label>
       @if (authTab() === 'register') {
         <label class="auth-field">
-          <span>{{ t('auth.email') }}</span>
+          <span>{{ t('auth.emailOptional') }}</span>
           <input
             type="email"
             autocomplete="email"
@@ -45,6 +45,7 @@
             [value]="authEmail()"
             (input)="onAuthEmailInput($event)"
           />
+          <span class="auth-hint">{{ t('auth.emailWhy') }}</span>
         </label>
       }
       <label class="auth-field">
@@ -58,6 +59,19 @@
         />
       </label>
 
+      @if (authTab() === 'register') {
+        <label class="auth-consent">
+          <input type="checkbox" [checked]="consent()" (change)="onConsentChange($event)" />
+          <span>
+            {{ t('auth.consentPre') }}
+            <button type="button" class="auth-privacy-link" (click)="openPrivacy.emit()">
+              {{ t('privacy.title') }}
+            </button>
+            {{ t('auth.consentPost') }}
+          </span>
+        </label>
+      }
+
       @if (authError()) {
         <p class="auth-error">
           {{ t(authError()) }}
@@ -67,7 +81,11 @@
         </p>
       }
 
-      <button class="btn-primary auth-submit" type="submit" [disabled]="authBusy()">
+      <button
+        class="btn-primary auth-submit"
+        type="submit"
+        [disabled]="authBusy() || (authTab() === 'register' && !consent())"
+      >
         @if (authBusy()) {
           {{ t('auth.working') }}
         } @else {

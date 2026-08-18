@@ -23,6 +23,7 @@ import { AuthPanel } from './components/auth-panel/auth-panel';
 import { ChatPanel } from './components/chat-panel/chat-panel';
 import { FriendsPanel } from './components/friends-panel/friends-panel';
 import { ModNoticeBanner } from './components/mod-notice/mod-notice';
+import { PrivacyPanel } from './components/privacy-panel/privacy-panel';
 import { MultiplayerPanel } from './components/multiplayer-panel/multiplayer-panel';
 import { GameService } from './services/game.service';
 import { I18nService } from './services/i18n.service';
@@ -66,6 +67,7 @@ const KEY_TO_DIRECTION: Record<string, Direction> = {
     ChatPanel,
     FriendsPanel,
     ModNoticeBanner,
+    PrivacyPanel,
     MultiplayerPanel,
   ],
   templateUrl: './app.html',
@@ -130,6 +132,15 @@ export class App {
 
   /** Ayarlar paneli açık mı? */
   protected readonly settingsOpen = signal(false);
+
+  /** Gizlilik politikası paneli açık mı? (Ayarlar + kayıt ekranından açılır) */
+  protected readonly privacyOpen = signal(false);
+  onOpenPrivacy(): void {
+    this.privacyOpen.set(true);
+  }
+  onClosePrivacy(): void {
+    this.privacyOpen.set(false);
+  }
 
   /** Mağaza paneli açık mı? */
   protected readonly storeOpen = signal(false);

@@ -282,6 +282,38 @@ export class AuthService {
     }
   }
 
+  /**
+   * Kullanıcının KENDİ verisini indirir (veri taşınabilirliği). Sunucudan çeker,
+   * tarayıcıda bir JSON dosyası olarak kaydettirir. @returns başarılıysa true.
+   */
+  async exportData(): Promise<boolean> {
+    if (!this.token) return false;
+    this.busy.set(true);
+    try {
+      const res = await fetch(`${API}/account/export`, {
+        headers: { Authorization: `Bearer ${this.token}` },
+      });
+      if (!res.ok) return false;
+      const j = await res.json();
+      const blob = new Blob([JSON.stringify(j.export ?? j, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `2048-verilerim-${this.user()?.username ?? 'hesap'}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   private setToken(t: string): void {
     this.token = t;
     try {

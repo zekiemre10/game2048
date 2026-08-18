@@ -45,6 +45,9 @@ export class SettingsPanel {
   readonly logout = output<void>();
   /** Misafirken giriş/kayıt paneli aç (giriş erişimi artık profilde değil, burada). */
   readonly openAuth = output<void>();
+
+  /** Gizlilik politikası panelini aç. */
+  readonly openPrivacy = output<void>();
   /** Hesap KALICI silindi → ana bileşen açık sohbet/oda/arkadaş durumunu temizler. */
   readonly accountDeleted = output<void>();
 
@@ -131,6 +134,20 @@ export class SettingsPanel {
   onDelPasswordInput(event: Event): void {
     this.delPassword.set((event.target as HTMLInputElement).value);
     if (this.delError()) this.delError.set('');
+  }
+
+  /** Veri indirme durumu (buton metni için). */
+  protected readonly exportBusy = signal(false);
+  protected readonly exportDone = signal(false);
+
+  /** Kendi verini JSON olarak indir (veri taşınabilirliği). */
+  async onExportData(): Promise<void> {
+    if (this.exportBusy()) return;
+    this.exportBusy.set(true);
+    this.exportDone.set(false);
+    const ok = await this.auth.exportData();
+    this.exportBusy.set(false);
+    if (ok) this.exportDone.set(true);
   }
 
   /** Hesabı kalıcı sil (şifre onaylı). Başarılıysa ana bileşene bildir. */

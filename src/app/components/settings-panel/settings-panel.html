@@ -137,6 +137,19 @@
           </button>
         </div>
 
+        <!-- Verilerimi indir (veri taşınabilirliği) -->
+        <button
+          class="btn-primary ghost data-export-btn"
+          type="button"
+          [disabled]="exportBusy()"
+          (click)="onExportData()"
+        >
+          {{ exportBusy() ? t('privacy.exporting') : t('privacy.exportData') }}
+        </button>
+        @if (exportDone()) {
+          <p class="settings-note" role="status">{{ t('privacy.exportDone') }}</p>
+        }
+
         <!-- Hesabı sil (şifre onaylı, kalıcı) -->
         @if (!deleteOpen()) {
           <button class="del-acc-btn" type="button" (click)="onOpenDelete()">
@@ -178,6 +191,11 @@
           {{ t('auth.signInCta') }}
         </button>
       }
+
+      <!-- Gizlilik politikası (herkese açık: veri sorumluluğu) -->
+      <button class="privacy-link" type="button" (click)="openPrivacy.emit()">
+        📋 {{ t('privacy.title') }}
+      </button>
     </section>
 
     <p class="settings-credit">{{ t('set.credit') }}</p>

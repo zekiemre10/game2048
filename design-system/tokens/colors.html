@@ -1,0 +1,59 @@
+<!-- @dsCard group="Renkler" -->
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Renk Tokenları · Açık</title>
+    <style>
+      :root {
+        --bg: #faf8ef; --board: #bbada0; --cell: #cdc1b4;
+        --text: #776e65; --text-light: #f9f6f2; --button: #8f7a66; --button-hover: #9f8b77;
+        --font: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: var(--font); background: var(--bg); color: var(--text); padding: 28px; }
+      h1 { font-size: 15px; letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 4px; opacity: 0.75; }
+      p.sub { margin: 0 0 22px; opacity: 0.65; font-size: 13px; }
+      .group { margin-bottom: 22px; }
+      .group h2 { font-size: 13px; font-weight: 700; margin: 0 0 10px; }
+      .row { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+      .sw { border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; overflow: hidden; background: #fff; }
+      .chip { height: 58px; }
+      .meta { padding: 9px 11px; }
+      .meta b { display: block; font-size: 13px; color: #333; }
+      .meta code { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; color: #888; }
+    </style>
+  </head>
+  <body>
+    <h1>Renk Tokenları</h1>
+    <p class="sub">Açık tema (varsayılan) — <code>src/styles/_base.scss</code>. Değişkenler tema başına değişir; kare paleti sabittir.</p>
+
+    <div class="group">
+      <h2>Yüzeyler</h2>
+      <div class="row">
+        <div class="sw"><div class="chip" style="background:#faf8ef"></div><div class="meta"><b>--color-bg</b><code>#faf8ef</code></div></div>
+        <div class="sw"><div class="chip" style="background:#bbada0"></div><div class="meta"><b>--color-board</b><code>#bbada0</code></div></div>
+        <div class="sw"><div class="chip" style="background:#cdc1b4"></div><div class="meta"><b>--color-cell-empty</b><code>#cdc1b4</code></div></div>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Metin & buton</h2>
+      <div class="row">
+        <div class="sw"><div class="chip" style="background:#776e65"></div><div class="meta"><b>--color-text</b><code>#776e65</code></div></div>
+        <div class="sw"><div class="chip" style="background:#f9f6f2"></div><div class="meta"><b>--color-text-light</b><code>#f9f6f2</code></div></div>
+        <div class="sw"><div class="chip" style="background:#8f7a66"></div><div class="meta"><b>--color-button</b><code>#8f7a66</code></div></div>
+        <div class="sw"><div class="chip" style="background:#9f8b77"></div><div class="meta"><b>--color-button-hover</b><code>#9f8b77</code></div></div>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Katmanlar (overlay)</h2>
+      <div class="row">
+        <div class="sw"><div class="chip" style="background:rgba(238,228,218,0.73)"></div><div class="meta"><b>--color-overlay</b><code>oyun sonu</code></div></div>
+        <div class="sw"><div class="chip" style="background:rgba(237,194,46,0.5)"></div><div class="meta"><b>--color-overlay-win</b><code>kazandın</code></div></div>
+      </div>
+    </div>
+  </body>
+</html>

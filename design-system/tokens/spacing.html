@@ -1,0 +1,44 @@
+<!-- @dsCard group="Boşluk" -->
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Boşluk & yarıçap</title>
+    <style>
+      :root { --font: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: var(--font); background: #faf8ef; color: #776e65; padding: 28px; }
+      h1 { font-size: 15px; letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 4px; opacity: 0.75; }
+      p.sub { margin: 0 0 22px; opacity: 0.65; font-size: 13px; }
+      .group h2 { font-size: 13px; font-weight: 700; margin: 18px 0 10px; }
+      .row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; }
+      .item { text-align: center; }
+      .box { background: #8f7a66; }
+      .item code { display: block; margin-top: 6px; font-family: ui-monospace, Consolas, monospace; font-size: 11px; opacity: 0.7; }
+      .gap-demo { display: flex; background: #bbada0; padding: 8px; border-radius: 6px; width: max-content; }
+      .gap-demo span { width: 40px; height: 40px; background: #eee4da; border-radius: 3px; }
+    </style>
+  </head>
+  <body>
+    <h1>Boşluk & yarıçap</h1>
+    <p class="sub"><code>src/styles/_variables.scss</code>. Hücre arası boşluk ekranla ölçeklenir: <code>clamp(6px, 2.4vw, 15px)</code>.</p>
+
+    <div class="group">
+      <h2>Yarıçap</h2>
+      <div class="row">
+        <div class="item"><div class="box" style="width:64px;height:44px;border-radius:3px"></div><code>--radius-sm · 3px</code></div>
+        <div class="item"><div class="box" style="width:64px;height:44px;border-radius:6px"></div><code>--radius-md · 6px</code></div>
+        <div class="item"><div class="box" style="width:64px;height:44px;border-radius:12px"></div><code>--radius-lg · 12px</code></div>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Kare boşluğu (gap)</h2>
+      <div class="gap-demo" style="gap:15px">
+        <span></span><span></span><span></span>
+      </div>
+      <code style="opacity:0.7;font-size:11px">$gap · 15px (mobilde 6px'e iner)</code>
+    </div>
+  </body>
+</html>

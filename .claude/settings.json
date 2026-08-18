@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build)",
+      "Bash(npm test)",
+      "Bash(npm start)",
+      "Bash(npm run check:i18n)",
+      "Bash(npm run format)",
+      "Bash(npm run format:check)",
+      "Bash(npm run test:e2e)",
+      "Bash(python server/run_tests.py)",
+      "Bash(python:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ],
+    "deny": []
+  }
+}

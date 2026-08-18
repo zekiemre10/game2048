@@ -1,0 +1,42 @@
+<!-- @dsCard group="Butonlar" -->
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Butonlar</title>
+    <style>
+      /* Gerçek .btn-primary — src/styles/_base.scss (inline'landı) */
+      :root { --color-button:#8f7a66; --color-button-hover:#9f8b77; --color-text:#776e65; --color-text-light:#f9f6f2;
+        --font:'Clear Sans','Helvetica Neue',Arial,sans-serif; --radius-md:6px; }
+      * { box-sizing: border-box; }
+      body { margin:0; font-family:var(--font); background:#faf8ef; color:var(--color-text); padding:28px; }
+      h1 { font-size:15px; letter-spacing:0.04em; text-transform:uppercase; margin:0 0 4px; opacity:0.75; }
+      p.sub { margin:0 0 22px; opacity:0.65; font-size:13px; }
+      .row { display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin-bottom:20px; }
+      .lbl { width:100%; font-size:12px; font-weight:700; opacity:0.6; text-transform:uppercase; letter-spacing:0.03em; }
+      .btn-primary { background:var(--color-button); color:var(--color-text-light); font-weight:700; font-size:1.05rem;
+        padding:0.75rem 1.5rem; border:none; border-radius:var(--radius-md); min-height:44px; }
+      .btn-primary:hover { background:var(--color-button-hover); }
+      .btn-primary.ghost { background:transparent; color:var(--color-text); box-shadow:inset 0 0 0 2px var(--color-button); }
+      .btn-primary:disabled { opacity:0.45; cursor:not-allowed; }
+    </style>
+  </head>
+  <body>
+    <h1>Butonlar</h1>
+    <p class="sub">Tek yardımcı sınıf: <code>.btn-primary</code> + <code>.ghost</code> varyantı. Dokunmatik hedef ≥44px.</p>
+
+    <div class="row"><span class="lbl">Birincil</span>
+      <button class="btn-primary">Yeni Oyun</button>
+      <button class="btn-primary">Sonraki Seviye</button>
+    </div>
+    <div class="row"><span class="lbl">İkincil (ghost / çerçeveli)</span>
+      <button class="btn-primary ghost">Baştan</button>
+      <button class="btn-primary ghost">Geri Al</button>
+    </div>
+    <div class="row"><span class="lbl">Devre dışı</span>
+      <button class="btn-primary" disabled>Gönder</button>
+      <button class="btn-primary ghost" disabled>Kapat</button>
+    </div>
+  </body>
+</html>

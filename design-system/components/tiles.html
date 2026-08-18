@@ -1,0 +1,37 @@
+<!-- @dsCard group="Kareler" -->
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kare renk skalası</title>
+    <style>
+      :root { --font: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: var(--font); background: #faf8ef; color: #776e65; padding: 28px; }
+      h1 { font-size: 15px; letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 4px; opacity: 0.75; }
+      p.sub { margin: 0 0 22px; opacity: 0.65; font-size: 13px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 12px; max-width: 640px; }
+      .cell { text-align: center; }
+      .tile { height: 70px; border-radius: 6px; display: grid; place-items: center; font-weight: 800; font-size: 22px; }
+      .cell code { display: block; margin-top: 5px; font-family: ui-monospace, Consolas, monospace; font-size: 11px; opacity: 0.7; }
+    </style>
+  </head>
+  <body>
+    <h1>Kare renk skalası (2 → 2048)</h1>
+    <p class="sub">Tüm temalarda AYNI — tanınırlık için. <code>src/styles/_variables.scss → $tile-colors</code>. 2/4 koyu metin, 8+ açık metin.</p>
+    <div class="grid">
+      <div class="cell"><div class="tile" style="background:#eee4da;color:#776e65">2</div><code>#eee4da</code></div>
+      <div class="cell"><div class="tile" style="background:#ede0c8;color:#776e65">4</div><code>#ede0c8</code></div>
+      <div class="cell"><div class="tile" style="background:#f2b179;color:#f9f6f2">8</div><code>#f2b179</code></div>
+      <div class="cell"><div class="tile" style="background:#f59563;color:#f9f6f2">16</div><code>#f59563</code></div>
+      <div class="cell"><div class="tile" style="background:#f67c5f;color:#f9f6f2">32</div><code>#f67c5f</code></div>
+      <div class="cell"><div class="tile" style="background:#f65e3b;color:#f9f6f2">64</div><code>#f65e3b</code></div>
+      <div class="cell"><div class="tile" style="background:#edcf72;color:#f9f6f2;font-size:18px">128</div><code>#edcf72</code></div>
+      <div class="cell"><div class="tile" style="background:#edcc61;color:#f9f6f2;font-size:18px">256</div><code>#edcc61</code></div>
+      <div class="cell"><div class="tile" style="background:#edc850;color:#f9f6f2;font-size:18px">512</div><code>#edc850</code></div>
+      <div class="cell"><div class="tile" style="background:#edc53f;color:#f9f6f2;font-size:16px">1024</div><code>#edc53f</code></div>
+      <div class="cell"><div class="tile" style="background:#edc22e;color:#f9f6f2;font-size:16px">2048</div><code>#edc22e</code></div>
+    </div>
+  </body>
+</html>

@@ -682,8 +682,13 @@
   position: absolute;
   inset: 0;
   display: flex;
-  align-items: center;
+  // İçerik (analiz + koç + zaman çizelgesi) tahta karesinden UZUN olabilir.
+  // Ortalamak yerine üstten hizala + KAYDIR → alttaki eylem düğmeleri
+  // ("Sonraki Seviye" vb.) kırpılmaz, her zaman erişilebilir.
+  align-items: flex-start;
   justify-content: center;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   border-radius: v.$radius-lg;
   background: var(--color-overlay);
   animation: overlay-fade 220ms ease-in-out;
@@ -698,6 +703,8 @@
   text-align: center;
   padding: clamp(0.75rem, 4vw, 1.5rem);
   width: 100%;
+  // Kısa içerikte dikey ORTALA; uzun içerikte margin çöker ve üstten kaydırılır.
+  margin: auto;
 }
 
 .overlay-title {

@@ -394,49 +394,9 @@
                 </div>
               }
 
-              <!-- YZ oyun sonu analizi (algoritmik) — bulmaca/yarış hariç -->
-              @if (mode() !== GameMode.Race && mode() !== GameMode.Puzzle) {
-                @if (analysisText()) {
-                  <div class="overlay-analysis">{{ analysisText() }}</div>
-                } @else {
-                  <button
-                    class="btn-primary ghost overlay-analyze"
-                    type="button"
-                    (click)="onAnalyze()"
-                  >
-                    {{ t('ov.analyze') }}
-                  </button>
-                }
-              }
-
-              <!-- Kişisel LLM koç (istek üzerine; yalnızca giriş yapmış oyuncuya) -->
-              @if (canCoach()) {
-                @if (coachText()) {
-                  <div class="overlay-coach">
-                    <p class="coach-text">{{ coachText() }}</p>
-                    @if (coachIsAi()) {
-                      <p class="coach-badge">🤖 {{ t('coach.aiLabel') }}</p>
-                    } @else {
-                      <p class="coach-badge coach-fallback">💡 {{ t('coach.unavailable') }}</p>
-                    }
-                  </div>
-                } @else {
-                  <button
-                    class="btn-primary ghost overlay-coach-btn"
-                    type="button"
-                    [disabled]="coachLoading()"
-                    (click)="onCoach()"
-                  >
-                    {{ coachLoading() ? t('coach.loading') : t('coach.button') }}
-                  </button>
-                }
-              }
-
-              <!-- Hamle zaman çizelgesi: "oyunu nerede kaybettin?" (yarış/bulmaca hariç) -->
-              @if (mode() !== GameMode.Race && mode() !== GameMode.Puzzle) {
-                <app-move-timeline />
-              }
-
+              <!-- Birincil eylem düğmeleri (Sonraki Seviye / Devam / Tekrar Dene…)
+                   ÖNCE gelir → alttaki uzun analiz + zaman çizelgesi kaydırma
+                   gerektirse de bu düğmeler HER ZAMAN görünür kalır. -->
               <div class="overlay-actions">
                 @if (mode() === GameMode.Race) {
                   <!-- Yarış bitti → çok oyunculu panele dön (sonuçlar orada) -->
@@ -487,6 +447,49 @@
                   }
                 }
               </div>
+
+              <!-- YZ oyun sonu analizi (algoritmik) — bulmaca/yarış hariç -->
+              @if (mode() !== GameMode.Race && mode() !== GameMode.Puzzle) {
+                @if (analysisText()) {
+                  <div class="overlay-analysis">{{ analysisText() }}</div>
+                } @else {
+                  <button
+                    class="btn-primary ghost overlay-analyze"
+                    type="button"
+                    (click)="onAnalyze()"
+                  >
+                    {{ t('ov.analyze') }}
+                  </button>
+                }
+              }
+
+              <!-- Kişisel LLM koç (istek üzerine; yalnızca giriş yapmış oyuncuya) -->
+              @if (canCoach()) {
+                @if (coachText()) {
+                  <div class="overlay-coach">
+                    <p class="coach-text">{{ coachText() }}</p>
+                    @if (coachIsAi()) {
+                      <p class="coach-badge">🤖 {{ t('coach.aiLabel') }}</p>
+                    } @else {
+                      <p class="coach-badge coach-fallback">💡 {{ t('coach.unavailable') }}</p>
+                    }
+                  </div>
+                } @else {
+                  <button
+                    class="btn-primary ghost overlay-coach-btn"
+                    type="button"
+                    [disabled]="coachLoading()"
+                    (click)="onCoach()"
+                  >
+                    {{ coachLoading() ? t('coach.loading') : t('coach.button') }}
+                  </button>
+                }
+              }
+
+              <!-- Hamle zaman çizelgesi: "oyunu nerede kaybettin?" (yarış/bulmaca hariç) -->
+              @if (mode() !== GameMode.Race && mode() !== GameMode.Puzzle) {
+                <app-move-timeline />
+              }
             </div>
           </div>
         }

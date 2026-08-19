@@ -52,15 +52,31 @@ PATH += %JAVA_HOME%\bin ; %ANDROID_HOME%\platform-tools ; %ANDROID_HOME%\emulato
    açık. Kapalıysa: *Windows Özellikleri → Windows Hypervisor Platform* + BIOS'ta
    sanallaştırma (VT-x).
 
-## Kalan adımlar (senin yapman gereken)
+## Emülatör / cihaz — DOĞRULANDI (BlueStacks ile)
 
-- **Gerçek cihaz:** telefonda *Geliştirici seçenekleri* + *USB hata ayıklama* aç,
-  USB ile bağla → `adb devices` listede görünmeli. (Windows'ta cihaza özel OEM USB
-  sürücüsü gerekebilir.) Şu an bağlı cihaz **yok**.
-- **Emülatör testi:** `emulator -avd Pixel_6` (ya da Android Studio → Device
-  Manager → Pixel_6 ▶). İlk açılış birkaç dk sürer.
+Telefon yok → test hedefi olarak **BlueStacks** kullanıldı (Airport'ta da öyleydi).
+BlueStacks hem emülatör hem `adb devices`'daki cihaz yerine geçer:
+
+```powershell
+adb connect 127.0.0.1:5555      # BlueStacks Pie64 (adb portu conf'ta 5555)
+adb devices                     # 127.0.0.1:5555   device
+# dogrulandi: model SM-G998B · Android 9 · x86_64 · sys.boot_completed=1 (hazir+hizli)
+```
+
+> **Tuzak (Berk/Çınar):** Android Studio'nun **Pixel_6** AVD'si **16KB-sayfa
+> (`android-37.1 ps16k`)** sistem imajı kullanıyor → OS boot'u aşırı yavaş (6+ dk
+> hâlâ boot animasyonunda). `adb devices`'da görünür ama tam açılması uzun sürer.
+> **Çözüm:** BlueStacks'e `adb connect 127.0.0.1:5555` (hızlı), ya da SDK Manager'dan
+> **standart** bir x86_64 sistem imajı indirip daha hafif bir AVD oluştur.
+> BlueStacks + Android Studio emülatörü **aynı anda** açma — aynı hipervizörü
+> paylaşıp çakışırlar; birini kapat.
+
+## Kalan adım (tek — sonraki pakete ait)
+
 - **`npx cap doctor`:** Capacitor projeye **eklenince** (sonraki paket) tam temiz
   çıkar; şu an game2048'de Capacitor yok, bu yüzden bu adım o pakete kalıyor.
+- (İstersen gerçek telefon da bağlanabilir: *Geliştirici seçenekleri + USB hata
+  ayıklama* → `adb devices`. Zorunlu değil; BlueStacks yeterli.)
 
 ## 🍎 iOS — ENGELLİ (donanım)
 

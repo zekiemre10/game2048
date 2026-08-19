@@ -126,6 +126,13 @@ body {
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  // Mobil çentik/güvenli alan (safe-area): içerik durum çubuğu/çentik/gesture
+  // çubuğu altına girmesin. Web'de env() = 0 → hiçbir etkisi yok (web dağıtımı
+  // bozulmaz). viewport-fit=cover index.html'de tanımlı.
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
   // Mobilde çift dokunuşla zoom / metin seçimi oyunu bozmasın
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;

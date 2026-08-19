@@ -77,8 +77,14 @@ MAX_SCORE = 10_000_000  # makul üst sınır (uydurma skorları ele)
 # --- Backend sertleştirme (CORS + içerik filtresi) --------------------------
 # CORS: yalnızca oyunun yayınlandığı köken(ler)e izin ver (eskiden "*" idi →
 # herhangi bir site API'yi tarayıcıdan kullanabiliyordu). Ortamdan okunur;
-# varsayılan canlı köken + yerel geliştirme (ng serve).
-_DEFAULT_ORIGINS = "http://34.158.136.9,http://localhost:4200,http://127.0.0.1:4200"
+# varsayılan canlı köken + yerel geliştirme (ng serve) + MOBİL (Capacitor).
+# Capacitor WebView kökeni: Android `https://localhost` (androidScheme=https),
+# iOS `capacitor://localhost`. Bu kökenlerden gelen istek "aynı köken" sayılmaz →
+# API'ye erişmesi için CORS izni ŞART (yoksa mobil uygulama sunucuya bağlanamaz).
+_DEFAULT_ORIGINS = (
+    "http://34.158.136.9,http://localhost:4200,http://127.0.0.1:4200,"
+    "https://localhost,http://localhost,capacitor://localhost"
+)
 CORS_ORIGINS = {
     o.strip() for o in os.environ.get("GAME2048_CORS_ORIGINS", _DEFAULT_ORIGINS).split(",") if o.strip()
 }

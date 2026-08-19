@@ -35,6 +35,7 @@ import { ChatService } from './services/chat.service';
 import { MultiplayerService } from './services/multiplayer.service';
 import { LeaderboardService } from './services/leaderboard.service';
 import { DailyService } from './services/daily.service';
+import { MobileService } from './services/mobile.service';
 import { SfxService } from './services/sfx.service';
 import { Direction, GameMode, GameStatus } from './models/tile.model';
 import { swipeDirection } from './logic/swipe';
@@ -86,6 +87,7 @@ export class App {
   private readonly mp = inject(MultiplayerService);
   private readonly leaderboard = inject(LeaderboardService);
   private readonly daily = inject(DailyService);
+  private readonly mobile = inject(MobileService);
 
   /** Statik metin çevirisi (şablonda anahtarla çağrılır). */
   protected readonly t = (key: string, params?: Record<string, string | number>) =>
@@ -271,6 +273,10 @@ export class App {
   private readonly mpStatus = this.mp.status;
 
   constructor() {
+    // Mobil (Capacitor): açılış ekranını gizle + durum çubuğu + Android GERİ tuşu.
+    // Web'de no-op → web dağıtımı etkilenmez.
+    void this.mobile.init(() => this.onMobileBack());
+
     // Giriş varken arkadaş listesi + gelen istek rozetini güncel tut.
     this.friends.refresh();
     this.friends.startPolling();
@@ -575,6 +581,47 @@ export class App {
     this.leaderboardOpen.set(false);
     this.dailyOpen.set(false);
     this.puzzlesOpen.set(false);
+  }
+
+  /** Açık bir panel/sohbet/overlay var mı? (Android GERİ tuşu için) */
+  private anyOverlayOpen(): boolean {
+    return (
+      this.settingsOpen() ||
+      this.storeOpen() ||
+      this.profileOpen() ||
+      this.missionsOpen() ||
+      this.achievementsOpen() ||
+      this.leaderboardOpen() ||
+      this.dailyOpen() ||
+      this.puzzlesOpen() ||
+      this.friendsOpen() ||
+      this.mpOpen() ||
+      this.authOpen() ||
+      this.privacyOpen() ||
+      !!this.activeChat()
+    );
+  }
+
+  /**
+   * Android donanım GERİ tuşu: (1) açık panel/sohbet varsa kapat, (2) oyundaysan
+   * ana ekrana dön (çıkma), (3) ana ekranda çıkış ONAYI sor. MobileService bağlar.
+   */
+  onMobileBack(): void {
+    if (this.anyOverlayOpen()) {
+      this.closeAllPanels();
+      this.authOpen.set(false);
+      this.privacyOpen.set(false);
+      this.chat.close();
+      return;
+    }
+    if (this.status() !== GameStatus.Idle) {
+      this.onGoHome(); // oyundan ana ekrana (uygulamadan çıkma)
+      return;
+    }
+    // Ana ekran: çıkış onayı.
+    if (confirm(this.t('mobile.exitConfirm'))) {
+      void this.mobile.exitApp();
+    }
   }
 
   /** Ayarlar panelini kapat. */

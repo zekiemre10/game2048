@@ -382,6 +382,47 @@ Sunucu tarafı `champion_prize(conn)` ödül altınını ayardan (clamp'li) okur
 sabit. Testler: `test_econ.py` (saf doğrulama) + `test_economy.py` (uçlar+ay-kilidi+
 geri alma+oyuncu-varlığı-etkilenmez). `econ.py` app.py ile deploy edilmeli.
 
+## YZ koç: model bağlama, ayarlar ve maliyet izleme (panel)
+
+Oyunun "Kişisel koç" (LLM analiz) özelliğini **panelden** yönetir: model/parametre
+seçimi (yeniden başlatma yok), canlı test, kullanım/maliyet sayaçları, aylık bütçe
++ otomatik kapatma. Modül `server/llm.py` (saf: model beyaz listesi + fiyat tahmini
++ ayar doğrulama).
+
+### 💰 Bütçe (emir onayı)
+
+**Aylık bütçe tavanı: $10** (emir onayı, 2026-08-19). Bu tutara ulaşınca YZ **otomatik
+kapanır**, oyun çalışmaya devam eder (şablon analizine düşer). **Anahtar HENÜZ
+tanımlanmadı** → özellik şu an sessizce kapalı, **hiç maliyet yok**; anahtar ileride
+verildiğinde bu tavan uygulanır.
+
+### 🔑 Anahtar hijyeni (mutlak)
+
+- API anahtarı **YALNIZCA sunucudaki env**'de: `GAME2048_LLM_KEY`.
+- **Asla** DB'de, **asla** yanıtta (yalnız `keyPresent: true/false`), **asla** commit
+  mesajında/logda. (Berk'te bir kez commit'e düştü → parola rotasyonu + geçmiş
+  temizliği gerekti; tekrarlanmamalı.)
+- Anahtar yoksa özellik **sessizce kapalı** (`llm_allowed` → False; uç noktalar 503,
+  oyun şablona düşer). Panelden anahtar TANIMLANMAZ; yalnız env.
+
+### Uç noktalar (admin + taze oturum + denetlenir)
+
+| Yöntem | Yol | Ne |
+|--------|-----|-----|
+| GET | `/admin/llm` | etkin model/param/bütçe + bu ayki kullanım (istek/token/tahmini USD) + model listesi + aktiflik. **Anahtar dönmez** (keyPresent bool). |
+| POST | `/admin/llm/settings` `{model?, temperature?, maxTokens?, budgetMonthlyUsd?, enabled?}` | panelden değiştir — **yeniden başlatma YOK** (canlı okunur); aralık dışı/bilinmeyen model REDDEDİLİR |
+| POST | `/admin/llm/test` | seçili modele **küçük canlı istek** + yanıt/token/maliyet; anahtar yoksa 503 |
+
+### Maliyet + otomatik kapatma
+
+`llm_usage` (gün → istek/in_tokens/out_tokens/cost_usd). `llm_complete` her çağrıda:
+(1) `llm_config` ile modeli/paramı **canlı** okur, (2) `llm_allowed` ile ANAHTAR +
+panel-açık + **aylık bütçe** kontrol eder — aşıldıysa **None** döner (oto-kapatma →
+şablon), (3) sağlayıcı `usage`'ından token'ları alıp `llm.estimate_cost` ile tahmini
+maliyeti kaydeder. **Fiyatlar tahmindir** (`llm.MODELS`), fatura değil — bütçe tavanı
+bu tahmine göre kapatır. Oto-kapatma testte doğrulandı (düşük bütçe → 503 → bütçe
+geri alınınca yeniden çalışır: `test_llm_admin.py`).
+
 ## NestJS geçişi notu
 
 Canlı backend **Python** (`server/app.py`). NestJS'e (`api-nest/`) devirde bu

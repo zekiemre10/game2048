@@ -39,6 +39,8 @@ import score_audit
 import metrics
 # Ekonomi ayarları (panelden yönetilen değerler + aralık denetimi).
 import econ
+# YZ koç ayarları + maliyet tahmini (panelden model/bütçe yönetimi).
+import llm as llm_mod
 # Canlı oda + sunucu izleme (oda özeti, takılmış tespiti, sağlık, bakım).
 import monitor
 from collections import deque
@@ -378,52 +380,105 @@ def build_coach_prompt(s: dict):
     return system, user
 
 
+def llm_config(conn):
+    """Etkin YZ ayarı: env VARSAYILAN + panel OVERRIDE (model/param/bütçe/enabled).
+    Panelden değişir, YENİDEN BAŞLATMA gerektirmez (her çağrıda canlı okunur).
+    ANAHTAR burada YOK — yalnız env'de (ANALYSIS_API_KEY)."""
+    ov = load_settings(conn)
+    eff = llm_mod.effective_settings({k: v for k, v in ov.items() if k.startswith("llm.")})
+    model = ov.get("llm.model") or ANALYSIS_MODEL
+    ok, _, _ = llm_mod.validate_model(model)
+    if not ok:
+        model = ANALYSIS_MODEL
+    provider = llm_mod.provider_for(model) if model in llm_mod.MODELS else ANALYSIS_PROVIDER
+    return {
+        "model": model, "provider": provider,
+        "temperature": float(eff["llm.temperature"]),
+        "max_tokens": int(eff["llm.max_tokens"]),
+        "budget": float(eff["llm.budget_monthly_usd"]),
+        "enabled": bool(int(eff["llm.enabled"])),
+    }
+
+
+def llm_month_cost(conn):
+    """Bu ayki YZ kullanımı: istek + token + tahmini USD (bütçe tavanı için)."""
+    r = conn.execute(
+        "SELECT COALESCE(SUM(cost_usd),0) AS c, COALESCE(SUM(requests),0) AS req, "
+        "COALESCE(SUM(in_tokens),0) AS it, COALESCE(SUM(out_tokens),0) AS ot "
+        "FROM llm_usage WHERE day LIKE ?", (utc_month() + "%",)).fetchone()
+    return {"cost": round(r["c"], 4), "requests": r["req"], "inTokens": r["it"], "outTokens": r["ot"]}
+
+
+def llm_allowed(conn, cfg=None):
+    """YZ çağrısı yapılabilir mi: ANAHTAR var + panelden AÇIK + aylık bütçe AŞILMADI.
+    Bütçe aşılınca False → llm_complete None döner → oyun şablona düşer (çalışmaya devam)."""
+    if not ANALYSIS_API_KEY:
+        return False
+    cfg = cfg or llm_config(conn)
+    if not cfg["enabled"]:
+        return False
+    return llm_month_cost(conn)["cost"] < cfg["budget"]
+
+
+def record_llm_usage(conn, model, in_tok, out_tok):
+    """Bir çağrının token + tahmini maliyetini günlük sayaca ekler."""
+    cost = llm_mod.estimate_cost(model, in_tok, out_tok)
+    conn.execute(
+        "INSERT INTO llm_usage (day, requests, in_tokens, out_tokens, cost_usd) VALUES (?,1,?,?,?) "
+        "ON CONFLICT(day) DO UPDATE SET requests=requests+1, in_tokens=in_tokens+?, "
+        "out_tokens=out_tokens+?, cost_usd=cost_usd+?",
+        (utc_day(), int(in_tok or 0), int(out_tok or 0), cost,
+         int(in_tok or 0), int(out_tok or 0), cost))
+    conn.commit()
+    return cost
+
+
 def llm_complete(system: str, user: str):
-    """Sağlayıcıya (anthropic|openai) tek istek; metin döndürür (hata → None).
-    Ağ çağrısı stdlib urllib ile (ek bağımlılık yok). Testler monkeypatch'ler."""
+    """Sağlayıcıya tek istek → metin (hata/kapalı/BÜTÇE AŞIMI → None → şablona düşer).
+    Model/parametre PANELden (yeniden başlatma yok); ANAHTAR env'de; kullanım +
+    tahmini maliyet kaydedilir. Ağ: stdlib urllib. Testler bunu monkeypatch'ler."""
     if not ANALYSIS_API_KEY:
         return None
+    conn = db()
     try:
-        if ANALYSIS_PROVIDER == "openai":
+        cfg = llm_config(conn)
+        if not llm_allowed(conn, cfg):
+            return None  # panelden kapalı ya da aylık bütçe aşıldı → OTO-KAPATMA
+    finally:
+        conn.close()
+    model, provider, mt, temp = cfg["model"], cfg["provider"], cfg["max_tokens"], cfg["temperature"]
+    try:
+        if provider == "openai":
             url = "https://api.openai.com/v1/chat/completions"
-            payload = {
-                "model": ANALYSIS_MODEL,
-                "max_tokens": 400,
-                "temperature": 0.7,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-            }
-            headers = {
-                "Authorization": "Bearer " + ANALYSIS_API_KEY,
-                "Content-Type": "application/json",
-            }
+            payload = {"model": model, "max_tokens": mt, "temperature": temp,
+                       "messages": [{"role": "system", "content": system},
+                                    {"role": "user", "content": user}]}
+            headers = {"Authorization": "Bearer " + ANALYSIS_API_KEY, "Content-Type": "application/json"}
         else:  # anthropic (varsayılan)
             url = "https://api.anthropic.com/v1/messages"
-            payload = {
-                "model": ANALYSIS_MODEL,
-                "max_tokens": 400,
-                "system": system,
-                "messages": [{"role": "user", "content": user}],
-            }
-            headers = {
-                "x-api-key": ANALYSIS_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "Content-Type": "application/json",
-            }
+            payload = {"model": model, "max_tokens": mt, "temperature": temp,
+                       "system": system, "messages": [{"role": "user", "content": user}]}
+            headers = {"x-api-key": ANALYSIS_API_KEY, "anthropic-version": "2023-06-01",
+                       "Content-Type": "application/json"}
         req = urllib.request.Request(
-            url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST"
-        )
+            url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
         with urllib.request.urlopen(req, timeout=ANALYSIS_TIMEOUT) as r:
             data = json.loads(r.read().decode("utf-8"))
-        if ANALYSIS_PROVIDER == "openai":
+        u = data.get("usage", {}) or {}
+        if provider == "openai":
             text = data["choices"][0]["message"]["content"]
+            in_tok, out_tok = u.get("prompt_tokens", 0), u.get("completion_tokens", 0)
         else:
-            # Anthropic: content bir blok listesi; text bloklarını birleştir.
-            text = "".join(
-                c.get("text", "") for c in data.get("content", []) if c.get("type") == "text"
-            )
+            text = "".join(c.get("text", "") for c in data.get("content", []) if c.get("type") == "text")
+            in_tok, out_tok = u.get("input_tokens", 0), u.get("output_tokens", 0)
+        try:
+            c2 = db()
+            try:
+                record_llm_usage(c2, model, in_tok, out_tok)
+            finally:
+                c2.close()
+        except Exception:
+            pass  # sayaç yazımı kritik değil
         return (text or "").strip() or None
     except Exception:
         traceback.print_exc()  # ayrıntı yalnızca sunucu günlüğünde
@@ -632,6 +687,15 @@ def init_db():
             day TEXT PRIMARY KEY,
             requests INTEGER NOT NULL DEFAULT 0,
             errors INTEGER NOT NULL DEFAULT 0
+        );
+        -- YZ (LLM) koç kullanım/maliyet sayaçları (bütçe tavanı + panel için).
+        -- ANAHTAR yok; yalnız toplam token + tahmini USD (fatura değil, tahmin).
+        CREATE TABLE IF NOT EXISTS llm_usage (
+            day TEXT PRIMARY KEY,           -- YYYY-MM-DD (UTC)
+            requests INTEGER NOT NULL DEFAULT 0,
+            in_tokens INTEGER NOT NULL DEFAULT 0,
+            out_tokens INTEGER NOT NULL DEFAULT 0,
+            cost_usd REAL NOT NULL DEFAULT 0
         );
         -- Ekonomi ayarları (⚖️): panelden yönetilen override'lar. Kayıt YOKSA
         -- gömülü VARSAYILAN kullanılır (oyun ekonomi ayarı için beklemez).
@@ -1441,6 +1505,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._settings()
         if p == "/admin/settings":
             return self._admin_settings()
+        if p == "/admin/llm":
+            return self._admin_llm()
         if p == "/admin/users":
             return self._admin_users()
         if p == "/admin/users/detail":
@@ -1477,6 +1543,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._admin_set_setting()
         if p == "/admin/settings/undo":
             return self._admin_undo_setting()
+        if p == "/admin/llm/settings":
+            return self._admin_llm_settings()
+        if p == "/admin/llm/test":
+            return self._admin_llm_test()
         if p == "/admin/rooms/close":
             return self._admin_room_close()
         if p == "/admin/maintenance":
@@ -2739,6 +2809,109 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"ok": True, "key": key, "value": eff[key]})
         finally:
             conn.close()
+
+    # --- YZ koç: model bağlama + maliyet + bütçe (panel) ---------
+    def _admin_llm(self):
+        """GET /admin/llm -> etkin model/param/bütçe + bu ayki kullanım/maliyet +
+        model listesi + aktiflik. ANAHTAR ASLA DÖNMEZ (yalnız keyPresent bool)."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            cfg = llm_config(conn)
+            month = llm_month_cost(conn)
+            daily = [dict(r) for r in conn.execute(
+                "SELECT day, requests, in_tokens, out_tokens, cost_usd FROM llm_usage "
+                "ORDER BY day DESC LIMIT 30")]
+            return self._send(200, {
+                # ANAHTAR YOK — yalnız var/yok bilgisi:
+                "config": {**cfg, "keyPresent": bool(ANALYSIS_API_KEY)},
+                "models": [{"id": k, "label": v["label"], "provider": v["provider"],
+                            "price": v["price"]} for k, v in llm_mod.MODELS.items()],
+                "usage": {"month": utc_month(), **month},
+                "budget": cfg["budget"],
+                "overBudget": month["cost"] >= cfg["budget"],
+                "active": llm_allowed(conn, cfg),  # anahtar + açık + bütçe içi
+                "dailyMax": ANALYSIS_DAILY_MAX,
+                "daily": daily,
+            })
+        finally:
+            conn.close()
+
+    def _admin_llm_settings(self):
+        """POST /admin/llm/settings {model?, temperature?, maxTokens?, budgetMonthlyUsd?,
+        enabled?} -> panelden model/param/bütçe değiştir. YENİDEN BAŞLATMA YOK
+        (canlı okunur). Aralık dışı REDDEDİLİR. Denetlenir. ANAHTAR burada tanımlanmaz."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            b = self._body()
+            changes = {}
+            if "model" in b:
+                ok, m, err = llm_mod.validate_model(str(b.get("model") or ""))
+                if not ok:
+                    return self._send(400, {"error": err, "field": "model"})
+                changes["llm.model"] = m
+            for key, field in (("llm.temperature", "temperature"),
+                               ("llm.max_tokens", "maxTokens"),
+                               ("llm.budget_monthly_usd", "budgetMonthlyUsd"),
+                               ("llm.enabled", "enabled")):
+                if field in b:
+                    ok, v, err = llm_mod.validate_setting(key, b.get(field))
+                    if not ok:
+                        return self._send(400, {"error": err, "field": field})
+                    changes[key] = v
+            if not changes:
+                return self._send(400, {"error": "no_change"})
+            now = int(time.time())
+            for key, value in changes.items():
+                old = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+                newv = json.dumps(value)
+                conn.execute(
+                    "INSERT INTO settings (key, value, updated, admin_username) VALUES (?,?,?,?) "
+                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated=excluded.updated, "
+                    "admin_username=excluded.admin_username", (key, newv, now, admin["username"]))
+                conn.execute(
+                    "INSERT INTO settings_history (key, old_value, new_value, admin_username, created) "
+                    "VALUES (?,?,?,?,?)", (key, old["value"] if old else None, newv, admin["username"], now))
+            conn.commit()
+            audit_log(conn, admin["id"], admin["username"], "llm_settings",
+                      "llm", None, ",".join(changes.keys()), self._ip())
+            return self._send(200, {"ok": True, "config": llm_config(conn)})
+        finally:
+            conn.close()
+
+    def _admin_llm_test(self):
+        """POST /admin/llm/test -> seçili modele küçük bir CANLI istek atıp yanıtı
+        döner (+ token/maliyet). Anahtar yoksa 503 (özellik kapalı). Denetlenir."""
+        conn = db()
+        try:
+            admin = self._admin_row(conn)
+            if admin is None:
+                return
+            if not ANALYSIS_API_KEY:
+                return self._send(503, {"error": "no_key", "keyPresent": False})
+            cfg = llm_config(conn)
+            before = llm_month_cost(conn)["cost"]
+            audit_log(conn, admin["id"], admin["username"], "llm_test",
+                      "llm", None, cfg["model"], self._ip())
+        finally:
+            conn.close()
+        # Gerçek çağrı (llm_complete kendi bütçe/aktiflik kontrolünü yapar + kaydeder)
+        text = llm_complete("You are a test probe. Answer in one short word.",
+                            "Reply with the single word: OK")
+        if text is None:
+            return self._send(503, {"error": "unavailable_or_over_budget"})
+        conn = db()
+        try:
+            after = llm_month_cost(conn)["cost"]
+        finally:
+            conn.close()
+        return self._send(200, {"ok": True, "model": cfg["model"],
+                                "response": text[:200], "callCostUsd": round(after - before, 6)})
 
     def _sync(self):
         conn = db()

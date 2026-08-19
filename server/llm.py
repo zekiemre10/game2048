@@ -22,12 +22,12 @@ MODELS = {
     "gpt-4o": {"provider": "openai", "price": (2.5, 10.0), "label": "GPT-4o"},
 }
 
-# key -> (default, min, max, tip). Bütçe pakette $10 (emir onayı) → ama ANAHTAR
-# tanımlanana kadar özellik kapalı; bu yalnız tavandır.
+# key -> (default, min, max, tip). Bütçe pakette $5 (emir onayı, 2026-08-19) → ama
+# ANAHTAR tanımlanana kadar özellik kapalı; bu yalnız tavandır. Panelden değiştirilir.
 SETTINGS_SPEC = {
     "llm.temperature": (0.7, 0.0, 1.0, "float"),
     "llm.max_tokens": (400, 64, 2000, "int"),
-    "llm.budget_monthly_usd": (10.0, 0.0, 1000.0, "float"),
+    "llm.budget_monthly_usd": (5.0, 0.0, 1000.0, "float"),
     "llm.enabled": (1, 0, 1, "int"),  # panelden aç/kapa (anahtar ayrı şart)
 }
 

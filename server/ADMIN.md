@@ -391,10 +391,11 @@ seçimi (yeniden başlatma yok), canlı test, kullanım/maliyet sayaçları, ayl
 
 ### 💰 Bütçe (emir onayı)
 
-**Aylık bütçe tavanı: $10** (emir onayı, 2026-08-19). Bu tutara ulaşınca YZ **otomatik
+**Aylık bütçe tavanı: $5** (emir onayı, 2026-08-19). Bu tutara ulaşınca YZ **otomatik
 kapanır**, oyun çalışmaya devam eder (şablon analizine düşer). **Anahtar HENÜZ
 tanımlanmadı** → özellik şu an sessizce kapalı, **hiç maliyet yok**; anahtar ileride
-verildiğinde bu tavan uygulanır.
+verildiğinde bu tavan uygulanır. (Gerçek maliyet ucuz modelle bunun çok altında;
+$5 sıkı bir güvenlik tavanı. Panelden yeniden başlatmadan değiştirilebilir.)
 
 ### 🔑 Anahtar hijyeni (mutlak)
 

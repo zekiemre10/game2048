@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DEBUG-only manifest eki. Manifest merger bunu YALNIZCA debug derlemesine katar;
+  release manifesti dokunulmaz → release'de networkSecurityConfig YOK → varsayilan
+  (Android 9+ cleartext engeli) gecerli. Boylece IP-kapsamli cleartext istisnasi
+  yalnizca debug'da aciktir, release'de kapali.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:networkSecurityConfig="@xml/network_security_config" />
+</manifest>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  YALNIZCA DEBUG derlemesi. (Bu dosya src/debug/ altinda → release APK'ya GIRMEZ.)
+
+  2048'in CANLI API'si zaten HTTPS (https://2048.aicirkit.com/api, gecerli sertifika)
+  oldugu icin uygulama normalde bu istisnaya IHTIYAC DUYMAZ — cleartext engeli
+  HTTPS'i etkilemez. Bu istisna yalnizca bir GELISTIRME kolayligidir: bir gelistirici
+  canli HTTPS yerine DUZ-HTTP bir dev backend'e (ham sunucu IP'si ya da yerel makine)
+  baglanmak isterse debug derlemesinde calissin diye.
+
+  DAR KAPSAM: yalnizca asagidaki adreslere cleartext izni; DIGER TUM trafik korumali
+  kalir (battaniye izin YOK — base-config tanimlanmadi → varsayilan cleartext engeli).
+-->
+<network-security-config>
+  <domain-config cleartextTrafficPermitted="true">
+    <domain includeSubdomains="true">34.158.136.9</domain>   <!-- sunucu IP (eski HTTP yol) -->
+    <domain includeSubdomains="true">10.0.2.2</domain>        <!-- Android emulator → host makine -->
+    <domain includeSubdomains="true">localhost</domain>       <!-- yerel dev backend -->
+  </domain-config>
+</network-security-config>
